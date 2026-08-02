@@ -1734,22 +1734,10 @@
       "rule": "docstring-example-stale-arity"
     },
     {
-      "category": "declaration",
-      "count": 0,
-      "description": "a check-type restating the type an adjacent declare already promised for that variable",
-      "rule": "check-type-redundant-with-declare"
-    },
-    {
       "category": "suspicious",
       "count": 0,
       "description": "a defn :pre/:post vector that is empty or all literal true, so it asserts nothing",
       "rule": "clojure-pre-post-vacuous"
-    },
-    {
-      "category": "suspicious",
-      "count": 0,
-      "description": "a defn :pre condition naming %, which clojure.core's fn binds only inside :post",
-      "rule": "clojure-pre-referencing-percent"
     },
     {
       "category": "arity",

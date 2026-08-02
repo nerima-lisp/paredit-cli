@@ -291,11 +291,11 @@ fn cli_lint_list_rules_prints_the_catalog_without_files() {
         .arg("json")
         .assert()
         .success()
-        // 223 (through PR #82) + 31 of this branch's 39 rules = 254 — the
-        // whole suite's 268 less the 14 `pedantic` rules the default
+        // 223 (through PR #82) + 29 of this branch's 37 rules = 252 — the
+        // whole suite's 266 less the 14 `pedantic` rules the default
         // `recommended` preset holds back. This branch contributes 8 of those
-        // 14, which is why the rise is 31 and not 39.
-        .stdout(predicate::str::contains("\"rule_count\": 254"))
+        // 14, which is why the rise is 29 and not 37.
+        .stdout(predicate::str::contains("\"rule_count\": 252"))
         .stdout(predicate::str::contains("\"self-assignment\""))
         .stdout(predicate::str::contains(
             "a setq/setf/psetq/psetf that assigns a place to itself",
@@ -966,11 +966,11 @@ fn cli_lint_list_rules_marks_severity() {
     let warnings = rules.iter().filter(|r| r["severity"] == "warning").count();
     // The default preset is `recommended`, which holds back the fourteen
     // `pedantic` rules; `--preset all` is what lists the whole suite.
-    // 158 (through PR #82) + 25 of this branch's 39 rules — 6 are
-    // `Severity::Error` and 8 of the remaining 33 warnings are the `pedantic`
-    // rules this preset withholds — = 183, which is the suite's 197 warnings
+    // 158 (through PR #82) + 23 of this branch's 37 rules — 6 are
+    // `Severity::Error` and 8 of the remaining 31 warnings are the `pedantic`
+    // rules this preset withholds — = 181, which is the suite's 195 warnings
     // less the 14 `pedantic` rules, all of them warnings.
-    assert_eq!(warnings, 183);
+    assert_eq!(warnings, 181);
 }
 
 #[test]

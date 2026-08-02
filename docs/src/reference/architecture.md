@@ -65,7 +65,7 @@ src/
 A contract test walks `src/` and refuses anything else.
 
 The lint `REGISTRY` is the canonical example of what *must* live here. It names
-all 268 rules, and every rule depends on the engine; putting the registry in
+all 266 rules, and every rule depends on the engine; putting the registry in
 either would be a cycle. So the engine takes a `RuleCatalog` as an argument and
 never learns which rules exist, the rules never learn the registry does, and
 the registry sits in the root reaching twenty-three feature packages for their
@@ -141,7 +141,7 @@ frequently extended part of the tree.
 | `policy` | Dialect scope, rule selection and gate decisions: logic that needs no tree. |
 | `engine` | The single pass, which walks the document once and dispatches each node to every rule whose `head_filter` matches. |
 
-263 of the 268 shipped rules live in twenty-two themed packages, split seven
+261 of the 266 shipped rules live in twenty-two themed packages, split seven
 ways. A twenty-third, `feature/lint-custom`, holds no rules at all: it is the
 pattern language and the second pass that run the rules a *project* writes for
 itself.
@@ -217,20 +217,23 @@ split by *what the rule reads instead of the operator*. Every grouping above
 keys on the form's head; these four do not. `lint-call-shape` (5 rules) reads
 the size and nesting of an argument list rather than what is being called;
 `lint-documentation` (4) reads the prose in a docstring or comment and checks it
-against the code beside it; `lint-contract-annotation` (4) reads a *separate*
-annotation form — Typed Racket's `(: name (-> …))`, Clojure's `:pre`/`:post`,
-Common Lisp's `check-type` and `declare` — and compares it with the definition
-it describes; `lint-introspection` (3) reads a name that will not exist until
+against the code beside it; `lint-contract-annotation` (2) reads a *separate*
+annotation form — Typed Racket's `(: name (-> …))` and Clojure's `:pre`/`:post`
+— and compares it with the definition it describes; `lint-introspection` (3)
+reads a name that will not exist until
 run time, built by `intern` or looked up by `find-symbol`, which is precisely
 the case no other rule can follow.
 
 This group is the least Common-Lisp-centric in the tree, and it is where the
 dialect matrix gains cases it did not have. `typed-racket-arity-mismatch` is
-the first built-in rule scoped to **Racket** alone; two more of
-`lint-contract-annotation`'s four are Clojure only, leaving just one Common
-Lisp rule in that package. `todo-fixme-no-attribution` goes the other way and
+the first built-in rule scoped to **Racket** alone; the other of
+`lint-contract-annotation`'s two is Clojure only, leaving **no** Common Lisp
+rule in that package — which matters because Common Lisp is the
+`RuleDialectScope` trait default, so a rule there that lost its scope override
+would silently start walking every `.lisp` file.
+`todo-fixme-no-attribution` goes the other way and
 declares **all eleven** dialects, because a `TODO` with nobody's name on it
-reads the same in every one. All 16 are `ReportOnly`, and 8 of them are tagged
+reads the same in every one. All 14 are `ReportOnly`, and 8 of them are tagged
 `pedantic` — a threshold on parameter count or lambda nesting, and a house
 style for docstrings and `TODO`s, are conventions a codebase either adopted or
 did not, so `recommended` withholds them and `--preset pedantic` turns them on.
@@ -257,15 +260,19 @@ The four newest show that the directory layout and the standalone command are
 two decisions rather than one. `feature/lint-{call-shape,introspection}` take
 the directory *with* `cli/`, as before — 8 rules, 8 commands. But
 `feature/lint-{documentation,contract-annotation}` take the directory *without*
-it: their 8 rules are reachable only through `inspect lint --rule <name>`, and
+it: their 6 rules are reachable only through `inspect lint --rule <name>`, and
 the `rule.rs`/`domain.rs` split still earns its keep, because the detection is
 the part worth testing apart from the phrasing. A rule's layout now says what
 its *detection* needs; the presence of `cli/` says whether it also answers on
-its own. The batch that introduced these four added 39 rules but only 19
-commands — the other 20 come from those two packages and from new
-single-module rules in `feature/lint-{safety,performance,portability}`.
+its own. The batch that introduced these four added 37 rules but only 19
+commands — the other 18 come from those two packages and from new
+single-module rules in `feature/lint-{safety,performance,portability}`. It
+proposed 39; `lint-contract-annotation`'s `check-type-redundant-with-declare`
+and `clojure-pre-referencing-percent` were dropped before merge once their
+premises were checked against CLHS 3.3.1 and `clojure/core.clj` and refuted.
+That package's README records both refutations.
 
-**`REGISTRY` is in neither.** It names all 268 rules, and every rule depends on
+**`REGISTRY` is in neither.** It names all 266 rules, and every rule depends on
 the engine, so putting it in the engine or in a rule package would be a cycle.
 It sits in the root crate, and the engine receives a `RuleCatalog` as an
 argument — which is why the engine can be a package at all.

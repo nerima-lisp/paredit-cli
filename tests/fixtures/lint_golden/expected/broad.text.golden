@@ -246,9 +246,7 @@ rule	namestring-round-trip-assumption	0
 rule	sort-not-guaranteed-stable	0
 rule	nested-function-parameter-shadows-enclosing-parameter	0
 rule	docstring-example-stale-arity	0
-rule	check-type-redundant-with-declare	0
 rule	clojure-pre-post-vacuous	0
-rule	clojure-pre-referencing-percent	0
 rule	typed-racket-arity-mismatch	0
 rule	intern-dynamic-package-target	0
 rule	introspection-probe-unchecked	0

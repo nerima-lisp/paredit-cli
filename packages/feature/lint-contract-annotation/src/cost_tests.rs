@@ -1,9 +1,9 @@
 //! What each rule here costs when it is handed thousands of its own heads.
 //!
-//! Two rules in this package correlate a node with something *outside* it —
+//! Both rules in this package correlate a node with something *outside* it —
 //! `typed-racket-arity-mismatch` reads the top-level form above its `define`,
-//! and both Clojure rules ask whether their `defn` is quoted data. That is the
-//! exact shape that has twice produced a rule which is linear per invocation
+//! and `clojure-pre-post-vacuous` asks whether its `defn` is quoted data. That
+//! is the exact shape that has twice produced a rule which is linear per invocation
 //! and therefore quadratic per file: two shipped rules that re-scanned every
 //! top-level form per match were 98% of a whole lint run at 480 definitions,
 //! with a cost ratio of 3.7 per doubling where linear is 2.0.
@@ -49,11 +49,10 @@ use paredit_core_syntax::sexpr::{ExpressionView, SyntaxTree};
 #[derive(Debug)]
 struct NoopRule;
 
-const NOOP_HEADS: [NormalizedHead; 4] = [
+const NOOP_HEADS: [NormalizedHead; 3] = [
     NormalizedHead::new("define"),
     NormalizedHead::new("defn"),
     NormalizedHead::new("defn-"),
-    NormalizedHead::new("check-type"),
 ];
 
 const NOOP_META: RuleMeta = RuleMeta::new(
@@ -85,19 +84,11 @@ impl LintRule for NoopRule {
     }
 }
 
-static ENTRIES: [RuleEntry; 5] = [
+static ENTRIES: [RuleEntry; 3] = [
     RuleEntry::new(&NOOP_META, &NOOP_RULE),
-    RuleEntry::new(
-        &crate::check_type_redundant_with_declare::rule::META,
-        &crate::check_type_redundant_with_declare::rule::RULE,
-    ),
     RuleEntry::new(
         &crate::clojure_pre_post_vacuous::rule::META,
         &crate::clojure_pre_post_vacuous::rule::RULE,
-    ),
-    RuleEntry::new(
-        &crate::clojure_pre_referencing_percent::rule::META,
-        &crate::clojure_pre_referencing_percent::rule::RULE,
     ),
     RuleEntry::new(
         &crate::typed_racket_arity_mismatch::rule::META,
@@ -175,20 +166,6 @@ fn clojure_source(count: usize) -> String {
     out
 }
 
-/// A Common Lisp file of `count` correct functions, each with a `check-type`
-/// that *narrows* the declaration above it — head-matched, fully analysed, and
-/// reaching no finding.
-fn common_lisp_source(count: usize) -> String {
-    let mut out = String::new();
-    for index in 0..count {
-        out.push_str(&format!(
-            "(defun f{index} (x)\n  (declare (type integer x))\n  \
-             (check-type x (integer 0 10))\n  (* x {index}))\n"
-        ));
-    }
-    out
-}
-
 const SIZES: [usize; 4] = [1000, 2000, 4000, 8000];
 
 /// The doubling ratio over an 8× range. Linear is ≈8; the quadratic shape this
@@ -247,101 +224,27 @@ fn cost_typed_racket_arity_mismatch_is_linear_in_the_file() {
 }
 
 #[test]
-fn cost_clojure_rules_are_linear_in_the_file() {
-    let rules = [
-        "clojure-pre-post-vacuous",
-        "clojure-pre-referencing-percent",
-    ];
-    let mut vacuous = Vec::new();
-    let mut percent = Vec::new();
+fn cost_clojure_pre_post_vacuous_is_linear_in_the_file() {
+    let rules = ["clojure-pre-post-vacuous"];
+    let mut micros = Vec::new();
     for size in SIZES {
         let source = clojure_source(size);
         let rows = measure(&source, Dialect::Clojure);
         report("clojure", &rows, size, &rules);
 
-        for rule in rules {
-            assert_eq!(
-                invocations_of(&rows, rule),
-                size as u64,
-                "{rule}: one invocation per defn, not per node"
-            );
-        }
-        vacuous.push(micros_of(&rows, "clojure-pre-post-vacuous"));
-        percent.push(micros_of(&rows, "clojure-pre-referencing-percent"));
-    }
-
-    for (rule, micros) in [
-        ("clojure-pre-post-vacuous", &vacuous),
-        ("clojure-pre-referencing-percent", &percent),
-    ] {
-        let ratio = ratio(micros[0], micros[3]);
-        println!("clojure {rule} 8x ratio = {ratio}");
-        assert!(
-            ratio < MAX_RATIO_OVER_8X,
-            "{rule}: 8x more definitions cost {ratio}x more ({micros:?}us over {SIZES:?})"
-        );
-    }
-}
-
-#[test]
-fn cost_check_type_redundant_with_declare_is_linear_in_the_file() {
-    let rules = ["check-type-redundant-with-declare"];
-    let mut micros = Vec::new();
-    for size in SIZES {
-        let source = common_lisp_source(size);
-        let rows = measure(&source, Dialect::CommonLisp);
-        report("cl", &rows, size, &rules);
-
         assert_eq!(
-            invocations_of(&rows, "check-type-redundant-with-declare"),
+            invocations_of(&rows, "clojure-pre-post-vacuous"),
             size as u64,
-            "one invocation per check-type, not per node"
+            "one invocation per defn, not per node"
         );
-        micros.push(micros_of(&rows, "check-type-redundant-with-declare"));
+        micros.push(micros_of(&rows, "clojure-pre-post-vacuous"));
     }
 
     let ratio = ratio(micros[0], micros[3]);
-    println!("cl      check-type-redundant-with-declare 8x ratio = {ratio}");
+    println!("clojure clojure-pre-post-vacuous 8x ratio = {ratio}");
     assert!(
         ratio < MAX_RATIO_OVER_8X,
-        "8x more check-types cost {ratio}x more: the ancestor lookup is scanning the file, not \
-         descending to the node ({micros:?}us over {SIZES:?})"
-    );
-}
-
-/// The other way this rule's cost could go wrong: many `check-type` forms
-/// inside *one* function, where each one reads the same parent's children.
-///
-/// That is quadratic in the number of checks per function by construction, so
-/// what this pins is the constant — a single function with 2000 checks must
-/// still be well under a second. Real code does not write functions like this;
-/// the test exists so that a change making the per-candidate scan reach further
-/// than the immediate parent shows up as a number rather than as nothing.
-#[test]
-fn cost_many_check_types_in_one_function_stays_bounded() {
-    let checks: String = (0..2000)
-        .map(|index| format!("  (check-type x{index} integer)\n"))
-        .collect();
-    let params: String = (0..2000)
-        .map(|index| format!("x{index} "))
-        .collect::<String>();
-    let source = format!("(defun big ({params})\n  (declare (type integer x0))\n{checks}  x0)\n");
-
-    let started = std::time::Instant::now();
-    let rows = measure(&source, Dialect::CommonLisp);
-    let elapsed = started.elapsed();
-    println!(
-        "cl      one function, 2000 check-types: {:>8}us  invocations={}  wall={elapsed:?}",
-        micros_of(&rows, "check-type-redundant-with-declare"),
-        invocations_of(&rows, "check-type-redundant-with-declare")
-    );
-    assert_eq!(
-        invocations_of(&rows, "check-type-redundant-with-declare"),
-        2000
-    );
-    assert!(
-        elapsed < Duration::from_secs(10),
-        "2000 check-types in one function took {elapsed:?}"
+        "8x more definitions cost {ratio}x more ({micros:?}us over {SIZES:?})"
     );
 }
 
@@ -353,11 +256,7 @@ fn cost_a_file_without_these_heads_never_reaches_a_check() {
         .map(|index| format!("(let [x{index} 1] (inc x{index}))\n"))
         .collect();
     let rows = measure(&source, Dialect::Clojure);
-    for rule in [
-        "clojure-pre-post-vacuous",
-        "clojure-pre-referencing-percent",
-        "cost-control-noop",
-    ] {
+    for rule in ["clojure-pre-post-vacuous", "cost-control-noop"] {
         assert_eq!(
             invocations_of(&rows, rule),
             0,
@@ -368,7 +267,7 @@ fn cost_a_file_without_these_heads_never_reaches_a_check() {
 
 /// A rule must not be dispatched at all for a dialect it does not model — the
 /// dispatcher resolves the dialect scope once, before the walk. So for a
-/// dialect none of these four claim, this package's whole per-file cost is
+/// dialect neither of these two claims, this package's whole per-file cost is
 /// zero, even on a file full of forms whose heads it would otherwise match.
 #[test]
 fn cost_is_zero_for_a_dialect_no_rule_here_models() {
@@ -382,27 +281,31 @@ fn cost_is_zero_for_a_dialect_no_rule_here_models() {
     }
 }
 
-/// The same thing said the other way: on a Common Lisp file, only the one
-/// Common Lisp rule is dispatched. The three others cost nothing at all, which
-/// is what keeps this package off the `clean/forms/*` benchmark's critical
-/// path.
+/// The same thing said the other way, and the sharper version of it: on a
+/// **Common Lisp** file whose every form *does* head-match, neither rule is
+/// dispatched at all. Common Lisp is the [`RuleDialectScope`] trait default, so
+/// this is where a rule that silently lost its scope override would start
+/// costing a whole extra pass over every `.lisp` file in a repository — which
+/// is exactly what the `clean/forms/*` benchmark gate measures.
+///
+/// The `define` head is what makes this non-vacuous: the control *is* invoked
+/// 4000 times on the same bytes, so the head index really did match and the two
+/// zeroes below are the dialect scope talking, not an unmatched head.
+///
+/// This package once shipped a deliberately Common-Lisp-scoped rule; it was
+/// dropped, so the correct expectation here is now zero rather than one.
 #[test]
-fn cost_of_the_non_common_lisp_rules_is_zero_on_a_common_lisp_file() {
+fn cost_is_zero_on_a_common_lisp_file_whose_forms_all_head_match() {
     let source: String = (0..4000)
-        .map(|index| format!("(defun f{index} (x) (* x {index}))\n"))
+        .map(|index| format!("(define f{index} (lambda (x) (* x {index})))\n"))
         .collect();
     let rows = measure(&source, Dialect::CommonLisp);
-    for rule in [
-        "clojure-pre-post-vacuous",
-        "clojure-pre-referencing-percent",
-        "typed-racket-arity-mismatch",
-    ] {
+    for rule in ["clojure-pre-post-vacuous", "typed-racket-arity-mismatch"] {
         assert_eq!(invocations_of(&rows, rule), 0, "{rule} ran for Common Lisp");
     }
-    // And the Common Lisp rule itself is never reached either, because this
-    // file has no `check-type` in it.
     assert_eq!(
-        invocations_of(&rows, "check-type-redundant-with-declare"),
-        0
+        invocations_of(&rows, "cost-control-noop"),
+        4000,
+        "the control must match these heads, or the two zeroes above prove nothing"
     );
 }

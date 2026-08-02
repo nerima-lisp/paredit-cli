@@ -41,6 +41,10 @@
 //! - any `#:kw`, mandatory or optional: a keyword argument is two elements of
 //!   the `dom` sequence but one parameter, and an optional one is parenthesized
 //!   besides.
+//! - a **proposition** or **object**, `(-> Any Boolean : String)`, whose `:`
+//!   ends the `dom` sequence. Everything after it is latent-proposition syntax,
+//!   so a positional count reads three arguments where there is one. The
+//!   `#:+`/`#:-` spelling of the same thing falls out of the `#:` case above.
 //! - the **infix** arrow, `(Integer -> Boolean)`, which the reference also
 //!   accepts. Only an arrow in head position is counted.
 //! - `->*`, `case->`, and an `All`/`∀` wrapper, none of which has `->` at the
@@ -199,7 +203,16 @@ fn arrow_arity(ty: &ExpressionView) -> Option<usize> {
         if let Some(text) = atom_text(child) {
             // `*` is a uniform rest argument, `...` a non-uniform one, and
             // `#:kw` a keyword; none is one positional argument.
-            if text == "*" || text == "..." || text.starts_with("#:") {
+            //
+            // A bare `:` opens the *proposition* (and, after a second `:`, the
+            // object) of a dependent function type. Everything from it onward
+            // is latent-proposition syntax, not a `dom` — so
+            // `(-> Any Boolean : String)` is a **one**-argument function, and
+            // counting positionally would call it three. Declining the whole
+            // arrow is the only honest answer, because the `#:+`/`#:-` spelling
+            // of the same thing is caught by the `#:` test above and the two
+            // must agree.
+            if text == "*" || text == "..." || text == ":" || text.starts_with("#:") {
                 return None;
             }
             // A second arrow anywhere in the sequence means the infix form, or
@@ -480,6 +493,80 @@ mod tests {
     #[test]
     fn declines_the_infix_arrow() {
         assert!(findings("(: f (Integer -> Boolean))\n(define (f x y) #t)\n").is_empty());
+        // The reference's own `add2`. A positional count of the infix form
+        // gives zero arguments against one parameter — the catastrophic case,
+        // because every correct infix annotation would be reported.
+        assert!(findings("(: add2 (Number -> Number))\n(define (add2 n) n)\n").is_empty());
+    }
+
+    /// A dependent function type: the `:` ends the `dom` sequence, so
+    /// `(-> Any Boolean : String)` takes **one** argument and a positional
+    /// count reads three. Reported by the Typed Racket reference's own
+    /// `opt-proposition` grammar; before this was declined the rule fired on
+    /// correct code.
+    #[test]
+    fn declines_an_arrow_carrying_a_proposition_or_object() {
+        for ty in [
+            "(-> Any Boolean : String)",
+            "(-> Any Boolean : (U String Symbol))",
+            "(-> Any Boolean : #:+ String #:- (! String))",
+            // The object follows a second `:`.
+            "(-> Any Boolean : String : (0 0))",
+        ] {
+            assert!(
+                findings(&format!("(: f {ty})\n(define (f x) #t)\n")).is_empty(),
+                "{ty} is a dependent function type, not four positional arguments"
+            );
+        }
+    }
+
+    /// The Typed Racket reference's own `is-zero?` example, which mixes a
+    /// mandatory keyword, an optional keyword, and a nested arrow. A positional
+    /// count reads four arguments against five parameters and reports a
+    /// mismatch on code that type-checks.
+    #[test]
+    fn declines_the_references_own_keyword_example() {
+        assert!(
+            findings(
+                "(: is-zero? (-> Number #:equality (-> Number Number Any) [#:zero Number] Any))\n\
+                 (define (is-zero? n #:equality equality #:zero [zero 0]) (equality n zero))\n"
+            )
+            .is_empty()
+        );
+    }
+
+    /// The unicode `All`. Its inner arrow may also be spelled infix, with the
+    /// parentheses around it omitted — neither reaches a count, because the
+    /// head of the type is not an arrow.
+    #[test]
+    fn declines_every_universal_quantifier_spelling() {
+        assert!(findings("(: f (\u{2200} (A) (-> A A)))\n(define (f x y) x)\n").is_empty());
+        assert!(findings("(: f (All (A) (A -> A)))\n(define (f x y) x)\n").is_empty());
+        assert!(
+            findings("(: f (All (A ...) (-> A ... A Integer)))\n(define (f x) 1)\n").is_empty()
+        );
+    }
+
+    /// Typed Racket's `define` accepts `maybe-tvars` before the header, so the
+    /// header is not always at index 1. Reading index 1 as a parameter list
+    /// would count `(A)` as one parameter.
+    #[test]
+    fn declines_a_define_whose_header_is_not_at_index_one() {
+        assert!(findings("(: f (-> Integer Integer))\n(define #:forall (A) (f x) 1)\n").is_empty());
+        assert!(
+            findings("(: f (-> Integer Integer))\n(define #:\u{2200} (A) (f x) 1)\n").is_empty()
+        );
+    }
+
+    /// A return-type annotation after the header leaves the header itself
+    /// plain, but every such parameter is a bracket form, so the define is
+    /// declined for that reason and never counted.
+    #[test]
+    fn declines_a_define_with_a_return_type_annotation() {
+        assert!(
+            findings("(: f (-> Integer Boolean))\n(define (f [x : Integer]) : Boolean #t)\n")
+                .is_empty()
+        );
     }
 
     /// `->*`, `case->` and `All` have something other than `->` at the head of

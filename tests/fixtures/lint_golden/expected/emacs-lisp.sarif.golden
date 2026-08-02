@@ -3720,18 +3720,6 @@
               }
             },
             {
-              "id": "check-type-redundant-with-declare",
-              "properties": {
-                "category": "declaration",
-                "fixable": false,
-                "severity": "warning",
-                "tags": []
-              },
-              "shortDescription": {
-                "text": "a check-type restating the type an adjacent declare already promised for that variable"
-              }
-            },
-            {
               "id": "clojure-pre-post-vacuous",
               "properties": {
                 "category": "suspicious",
@@ -3741,18 +3729,6 @@
               },
               "shortDescription": {
                 "text": "a defn :pre/:post vector that is empty or all literal true, so it asserts nothing"
-              }
-            },
-            {
-              "id": "clojure-pre-referencing-percent",
-              "properties": {
-                "category": "suspicious",
-                "fixable": false,
-                "severity": "warning",
-                "tags": []
-              },
-              "shortDescription": {
-                "text": "a defn :pre condition naming %, which clojure.core's fn binds only inside :post"
               }
             },
             {

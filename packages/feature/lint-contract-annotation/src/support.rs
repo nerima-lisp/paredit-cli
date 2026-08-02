@@ -504,28 +504,12 @@ pub fn head_is_exactly(view: &ExpressionView, expected: &str) -> bool {
             .is_some_and(|head| head == expected)
 }
 
-/// Whether `view` is a Clojure `#(…)` anonymous-function literal.
-///
-/// Load-bearing for `clojure-pre-referencing-percent`: `%`, `%1` … `%9` and
-/// `%&` are that literal's *own* parameter names, so a `%` inside one is
-/// perfectly ordinary code and must never be reported. A set literal `#{…}` is
-/// also `HashLiteral`-prefixed and is deliberately not matched here — a `%`
-/// inside `#{…}` is the same unbound symbol it would be anywhere else.
-#[must_use]
-pub fn is_function_literal(view: &ExpressionView) -> bool {
-    is_paren_list(view) && view.reader_prefixes.contains(&ReaderPrefix::HashLiteral)
-}
-
-/// Whether `text` names one of the anonymous-function literal's implicit
-/// parameters: `%`, `%1` … `%9`, or `%&`.
-#[must_use]
-pub fn is_percent_parameter(text: &str) -> bool {
-    text == "%"
-        || text == "%&"
-        || text
-            .strip_prefix('%')
-            .is_some_and(|rest| !rest.is_empty() && rest.bytes().all(|b| b.is_ascii_digit()))
-}
+// `is_function_literal` and `is_percent_parameter` used to live here. Both
+// existed solely to keep `clojure-pre-referencing-percent` off a `%` that was a
+// `#(…)` literal's own parameter, and both went with that rule when it was
+// dropped — see this package's README. Nothing else in the package reads `%`,
+// so they are not kept "in case": a future rule that needs them can recover
+// them from git history along with the tests that pinned their edge cases.
 
 // ---------------------------------------------------------------------------
 // Clojure `defn` shape
@@ -718,9 +702,9 @@ mod tests {
     }
 
     /// Clojure's `#(…)` reads as a `HashLiteral` prefix, which is *code*, not
-    /// data. `clojure-pre-referencing-percent` depends on it staying that way:
-    /// it has to see inside a `#(…)` to know that a `%` there is the literal's
-    /// own argument and not the return value.
+    /// data — so the walk descends into one. A reader change that started
+    /// treating it as data would silently stop every rule here from seeing a
+    /// condition written with an anonymous-function literal in it.
     #[test]
     fn a_clojure_function_literal_is_code() {
         assert_eq!(
@@ -1122,25 +1106,6 @@ mod tests {
         // A value must never read as a key: `:post` sits at an odd index only
         // if the map is malformed.
         assert!(clojure_map_value(conditions, "(pos? x)").is_none());
-    }
-
-    #[test]
-    fn a_function_literal_is_told_from_a_set_literal() {
-        let parsed = defn("(f #(pos? %) #{1 2} (g %))");
-        let call = &parsed.root_view().children[0];
-        assert!(is_function_literal(&call.children[1]));
-        assert!(!is_function_literal(&call.children[2]));
-        assert!(!is_function_literal(&call.children[3]));
-    }
-
-    #[test]
-    fn the_percent_parameters_are_exactly_the_readers_own() {
-        for name in ["%", "%1", "%9", "%42", "%&"] {
-            assert!(is_percent_parameter(name), "{name}");
-        }
-        for name in ["", "x", "%x", "%1a", "a%", "&"] {
-            assert!(!is_percent_parameter(name), "{name}");
-        }
     }
 
     #[test]

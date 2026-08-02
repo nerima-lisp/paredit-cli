@@ -15,11 +15,16 @@ use super::rule::RuleEntry;
 /// deliberate, reviewed change rather than a silent drift in the catalogue.
 // 212 (through PR #81's `lint-object-system`, `lint-condition-system` and
 // `lint-iteration-flow`) + 6 (`lint-testing`) + 7 (`lint-concurrency`) + 4
-// (`lint-build-system`) = 229, + this batch's 39: 7 (`lint-control-flow`), 4
+// (`lint-build-system`) = 229, + this batch's 37: 7 (`lint-control-flow`), 4
 // (`lint-conditional`), 6 (`lint-safety`), 3 (`lint-performance`), 3
-// (`lint-portability`), 5 (`lint-call-shape`), 4 (`lint-documentation`), 4
-// (`lint-contract-annotation`) and 3 (`lint-introspection`) = 268.
-pub const RULE_COUNT: usize = 268;
+// (`lint-portability`), 5 (`lint-call-shape`), 4 (`lint-documentation`), 2
+// (`lint-contract-annotation`) and 3 (`lint-introspection`) = 266.
+//
+// This batch proposed 39 and ships 37. `check-type-redundant-with-declare` and
+// `clojure-pre-referencing-percent` were dropped before merge as false-positive
+// generators on correct code; `packages/feature/lint-contract-annotation/README.md`
+// records the primary sources that refuted each premise.
+pub const RULE_COUNT: usize = 266;
 
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
@@ -1083,16 +1088,8 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_documentation::todo_fixme_no_attribution::rule::RULE,
     ),
     RuleEntry::new(
-        &paredit_feature_lint_contract_annotation::check_type_redundant_with_declare::rule::META,
-        &paredit_feature_lint_contract_annotation::check_type_redundant_with_declare::rule::RULE,
-    ),
-    RuleEntry::new(
         &paredit_feature_lint_contract_annotation::clojure_pre_post_vacuous::rule::META,
         &paredit_feature_lint_contract_annotation::clojure_pre_post_vacuous::rule::RULE,
-    ),
-    RuleEntry::new(
-        &paredit_feature_lint_contract_annotation::clojure_pre_referencing_percent::rule::META,
-        &paredit_feature_lint_contract_annotation::clojure_pre_referencing_percent::rule::RULE,
     ),
     RuleEntry::new(
         &paredit_feature_lint_contract_annotation::typed_racket_arity_mismatch::rule::META,
