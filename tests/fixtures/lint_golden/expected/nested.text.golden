@@ -222,6 +222,37 @@ rule	unsynchronized-shared-mutation	0
 rule	asdf-perform-without-call-next-method	0
 rule	asdf-self-referential-depends-on	0
 rule	defpackage-without-in-package	0
+rule	block-name-shadows-outer-block	0
+rule	dotimes-dolist-index-var-mutated	0
+rule	go-to-undefined-tag	0
+rule	multiple-value-bind-all-ignored	0
+rule	return-from-unmatched-block	0
+rule	return-outside-implicit-nil-block	0
+rule	tagbody-unreachable-tag	0
+rule	case-key-eql-pitfall	0
+rule	cond-to-case-candidate	0
+rule	nested-cond-flattenable	0
+rule	when-unless-implicit-nil-misused	0
+rule	format-tilde-slash-unvalidated-function-designator	0
+rule	insecure-temp-file-fixed-name-shared-directory	0
+rule	path-traversal-via-concatenated-filename	0
+rule	read-eval-star-rebound-to-t	0
+rule	sql-query-string-built-via-format	0
+rule	world-writable-file-mode-in-open-call	0
+rule	redundant-full-sequence-traversal-fusable-maps	0
+rule	unnecessary-sort-before-extremum-extraction	0
+rule	char-code-limit-loop-assumption	0
+rule	namestring-round-trip-assumption	0
+rule	sort-not-guaranteed-stable	0
+rule	nested-function-parameter-shadows-enclosing-parameter	0
+rule	docstring-example-stale-arity	0
+rule	check-type-redundant-with-declare	0
+rule	clojure-pre-post-vacuous	0
+rule	clojure-pre-referencing-percent	0
+rule	typed-racket-arity-mismatch	0
+rule	intern-dynamic-package-target	0
+rule	introspection-probe-unchecked	0
+rule	symbol-function-fset-dynamic-name	0
 finding	redundant-quote	warning	suspicious	fixable=true	nested.lisp	840	quoting number 5 is redundant	redundant-quote/07bb8307b4864109/0
 finding	redundant-progn	warning	suspicious	fixable=true	nested.lisp	268	redundant progn: progn wraps a single form; it is equivalent to that form	redundant-progn/9715182cb9f63314/0
 finding	redundant-progn	warning	suspicious	fixable=true	nested.lisp	833	redundant progn: progn wraps a single form; it is equivalent to that form	redundant-progn/8d949e5fcf0552a8/0

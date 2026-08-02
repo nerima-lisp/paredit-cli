@@ -267,7 +267,7 @@ impl SupportStatus {
 /// here, the stack floor is the first thing to check — and note that an
 /// inherited `RUST_MIN_STACK` from the environment silently overrides
 /// `.cargo/config.toml`, because cargo's `[env]` is unforced.
-const INTROSPECTION_COMMANDS: [&str; 290] = [
+const INTROSPECTION_COMMANDS: [&str; 309] = [
     "inspect diff",
     "inspect check",
     "inspect dialect",
@@ -575,6 +575,25 @@ const INTROSPECTION_COMMANDS: [&str; 290] = [
     "inspect asdf-self-referential-depends-on",
     "inspect asdf-system-missing-version",
     "inspect defpackage-without-in-package",
+    "inspect block-name-shadows-outer-block",
+    "inspect dotimes-dolist-index-var-mutated",
+    "inspect go-to-undefined-tag",
+    "inspect multiple-value-bind-all-ignored",
+    "inspect return-from-unmatched-block",
+    "inspect return-outside-implicit-nil-block",
+    "inspect tagbody-unreachable-tag",
+    "inspect case-key-eql-pitfall",
+    "inspect cond-to-case-candidate",
+    "inspect nested-cond-flattenable",
+    "inspect when-unless-implicit-nil-misused",
+    "inspect deeply-nested-anonymous-lambda",
+    "inspect nested-function-parameter-shadows-enclosing-parameter",
+    "inspect overly-long-parameter-list",
+    "inspect positional-argument-count-exceeds-readability",
+    "inspect stringly-typed-dispatch",
+    "inspect intern-dynamic-package-target",
+    "inspect introspection-probe-unchecked",
+    "inspect symbol-function-fset-dynamic-name",
 ];
 
 const FORMAT_COMMANDS: [&str; 3] = [
@@ -923,7 +942,11 @@ const SEMANTIC_OPERATIONS: [SemanticOperation; 3] = [
 /// three dialects (`def-test`/`deftest`/`define-test`, `ert-deftest`, and
 /// `clojure.test`'s `deftest`), while two of `lint-concurrency`'s seven encode
 /// Clojure's `atom` and `future`/`promise` semantics, which have no Common
-/// Lisp counterpart at all. Each answer is read from the rule's own
+/// Lisp counterpart at all. Four more arrived with the `lint-call-shape` and
+/// `lint-introspection` batch: `lambda` nesting and `string=` dispatch read the
+/// same in Emacs Lisp, `symbol-function`/`fset` name both dialects' function
+/// cells, and `boundp`/`fboundp`-style probes are spelled in Clojure too. Each
+/// answer is read from the rule's own
 /// [`LintRule::dialect_scope`] — the very declaration the engine's dispatcher
 /// consults before it walks anything — so this matrix cannot claim a dialect
 /// the rule would decline, or stay silent about one it handles.
@@ -952,6 +975,21 @@ fn lint_rule_dialect_scope(command_path: &str) -> Option<RuleDialectScope> {
         }
         "inspect future-promise-never-realized" => {
             paredit_feature_lint_concurrency::future_promise_never_realized::rule::RULE
+                .dialect_scope()
+        }
+        "inspect deeply-nested-anonymous-lambda" => {
+            paredit_feature_lint_call_shape::deeply_nested_anonymous_lambda::rule::RULE
+                .dialect_scope()
+        }
+        "inspect stringly-typed-dispatch" => {
+            paredit_feature_lint_call_shape::stringly_typed_dispatch::rule::RULE.dialect_scope()
+        }
+        "inspect introspection-probe-unchecked" => {
+            paredit_feature_lint_introspection::introspection_probe_unchecked::rule::RULE
+                .dialect_scope()
+        }
+        "inspect symbol-function-fset-dynamic-name" => {
+            paredit_feature_lint_introspection::symbol_function_fset_dynamic_name::rule::RULE
                 .dialect_scope()
         }
         _ => return None,
@@ -986,7 +1024,7 @@ pub(super) fn support_status(command_path: &str, dialect: &str) -> SupportStatus
         "inspect leftover-trace-call" => {
             Some(matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp))
         }
-        // The eight commands whose rule declares a dialect scope other than
+        // The twelve commands whose rule declares a dialect scope other than
         // Common Lisp alone answer from that declaration directly.
         other => lint_rule_dialect_scope(other).map(|scope| scope.includes(dialect)),
     };

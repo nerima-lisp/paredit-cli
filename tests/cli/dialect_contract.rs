@@ -88,7 +88,7 @@ fn schema_v2_registry_is_an_exact_bijection_with_clap_leaves() {
     let unique_registry_paths = registry_paths.iter().copied().collect::<BTreeSet<_>>();
 
     assert_eq!(registry_paths.len(), unique_registry_paths.len());
-    assert_eq!(registry_paths.len(), 413);
+    assert_eq!(registry_paths.len(), 432);
     assert_eq!(
         clap_contract_leaf_paths(&v1),
         unique_registry_paths
@@ -142,9 +142,9 @@ fn schema_v2_keeps_its_three_value_vocabulary() {
     assert_eq!(report["schema_version"], 2);
 
     let contract = &report["dialect_contract"];
-    assert_eq!(contract["command_count"], 413);
+    assert_eq!(contract["command_count"], 432);
     assert_eq!(contract["dialect_count"], 10);
-    assert_eq!(contract["cell_count"], 4130);
+    assert_eq!(contract["cell_count"], 4320);
     assert_eq!(contract["dialects"], serde_json::json!(DIALECTS));
     assert_eq!(
         contract["statuses"],
@@ -165,14 +165,14 @@ fn schema_v2_keeps_its_three_value_vocabulary() {
         category_counts,
         BTreeMap::from([
             ("format", 3),
-            ("introspection", 290),
+            ("introspection", 309),
             ("semantic", 87),
             ("structural", 33),
         ])
     );
 
     let cells = support_cells(contract);
-    assert_eq!(cells.len(), 4130);
+    assert_eq!(cells.len(), 4320);
     let vocabulary = cells.values().map(String::as_str).collect::<BTreeSet<_>>();
     assert!(
         vocabulary.is_subset(&BTreeSet::from(["supported", "unsupported"])),
@@ -186,7 +186,7 @@ fn schema_v3_answers_every_cell_and_names_the_tier_it_used() {
     assert_eq!(report["schema_version"], 3);
 
     let contract = &report["dialect_contract"];
-    assert_eq!(contract["cell_count"], 4130);
+    assert_eq!(contract["cell_count"], 4320);
     assert_eq!(
         contract["statuses"],
         serde_json::json!(["supported", "silent", "unsupported", "unknown"])
@@ -215,7 +215,7 @@ fn schema_v3_answers_every_cell_and_names_the_tier_it_used() {
 
     // The whole point of the matrix: no cell may answer "unknown".
     let cells = support_cells(contract);
-    assert_eq!(cells.len(), 4130);
+    assert_eq!(cells.len(), 4320);
     let unanswered = cells
         .iter()
         .filter(|(_, status)| *status == "unknown")
@@ -276,7 +276,7 @@ fn schema_v3_summarises_how_deep_each_dialect_goes() {
             .values()
             .map(|count| count.as_u64().expect("count"))
             .sum();
-        assert_eq!(total, 413, "{dialect} counts do not cover every command");
+        assert_eq!(total, 432, "{dialect} counts do not cover every command");
 
         // The summary has to agree with the matrix it summarises.
         for (status, count) in by_status {

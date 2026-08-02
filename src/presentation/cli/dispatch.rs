@@ -858,6 +858,67 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
             command::InspectCommand::DefpackageWithoutInPackage(args) => {
                 defpackage_without_in_package_report::workflow::defpackage_without_in_package_report(args)?;
             }
+            command::InspectCommand::BlockNameShadowsOuterBlock(args) => {
+                block_name_shadows_outer_block_report::workflow::block_name_shadows_outer_block_report(args)?;
+            }
+            command::InspectCommand::DotimesDolistIndexVarMutated(args) => {
+                dotimes_dolist_index_var_mutated_report::workflow::dotimes_dolist_index_var_mutated_report(args)?;
+            }
+            command::InspectCommand::GoToUndefinedTag(args) => {
+                go_to_undefined_tag_report::workflow::go_to_undefined_tag_report(args)?;
+            }
+            command::InspectCommand::MultipleValueBindAllIgnored(args) => {
+                multiple_value_bind_all_ignored_report::workflow::multiple_value_bind_all_ignored_report(args)?;
+            }
+            command::InspectCommand::ReturnFromUnmatchedBlock(args) => {
+                return_from_unmatched_block_report::workflow::return_from_unmatched_block_report(
+                    args,
+                )?;
+            }
+            command::InspectCommand::ReturnOutsideImplicitNilBlock(args) => {
+                return_outside_implicit_nil_block_report::workflow::return_outside_implicit_nil_block_report(args)?;
+            }
+            command::InspectCommand::TagbodyUnreachableTag(args) => {
+                tagbody_unreachable_tag_report::workflow::tagbody_unreachable_tag_report(args)?;
+            }
+            command::InspectCommand::CaseKeyEqlPitfall(args) => {
+                case_key_eql_pitfall_report::workflow::case_key_eql_pitfall_report(args)?;
+            }
+            command::InspectCommand::CondToCaseCandidate(args) => {
+                cond_to_case_candidate_report::workflow::cond_to_case_candidate_report(args)?;
+            }
+            command::InspectCommand::NestedCondFlattenable(args) => {
+                nested_cond_flattenable_report::workflow::nested_cond_flattenable_report(args)?;
+            }
+            command::InspectCommand::WhenUnlessImplicitNilMisused(args) => {
+                when_unless_implicit_nil_misused_report::workflow::when_unless_implicit_nil_misused_report(args)?;
+            }
+            command::InspectCommand::DeeplyNestedAnonymousLambda(args) => {
+                deeply_nested_anonymous_lambda_report::workflow::deeply_nested_anonymous_lambda_report(args)?;
+            }
+            command::InspectCommand::NestedFunctionParameterShadowsEnclosingParameter(args) => {
+                nested_function_parameter_shadows_enclosing_parameter_report::workflow::nested_parameter_shadow_report(args)?;
+            }
+            command::InspectCommand::OverlyLongParameterList(args) => {
+                overly_long_parameter_list_report::workflow::overly_long_parameter_list_report(
+                    args,
+                )?;
+            }
+            command::InspectCommand::PositionalArgumentCountExceedsReadability(args) => {
+                positional_argument_count_exceeds_readability_report::workflow::positional_argument_count_report(args)?;
+            }
+            command::InspectCommand::StringlyTypedDispatch(args) => {
+                stringly_typed_dispatch_report::workflow::stringly_typed_dispatch_report(args)?;
+            }
+            command::InspectCommand::InternDynamicPackageTarget(args) => {
+                intern_dynamic_package_target_report::workflow::intern_dynamic_package_target_report(args)?;
+            }
+            command::InspectCommand::IntrospectionProbeUnchecked(args) => {
+                introspection_probe_unchecked_report::workflow::introspection_probe_unchecked_report(args)?;
+            }
+            command::InspectCommand::SymbolFunctionFsetDynamicName(args) => {
+                symbol_function_fset_dynamic_name_report::workflow::symbol_function_fset_dynamic_name_report(args)?;
+            }
         },
         Command::Edit { command } => match command {
             command::EditCommand::Format(args) => basic_edit::workflow::format(args)?,

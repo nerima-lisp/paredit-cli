@@ -1,6 +1,6 @@
 # Architecture
 
-`paredit-cli` is a Cargo workspace: a thin composition root plus 24 packages
+`paredit-cli` is a Cargo workspace: a thin composition root plus 57 packages
 under `packages/core/` and `packages/feature/`. Knowing which package owns a
 thing is the fastest way to know where a change belongs.
 
@@ -17,7 +17,7 @@ core/syntax ──▶ core/semantics ──▶ core/edit ──▶ core/cli
      └──▶ core/workspace          core/lint-engine ──┘
                     │
                     ▼
-              feature/*  (29 packages, mostly independent of each other)
+              feature/*  (48 packages, mostly independent of each other)
                     │
                     ▼
               paredit-cli  (command tree, dispatch, REGISTRY)
@@ -65,12 +65,12 @@ src/
 A contract test walks `src/` and refuses anything else.
 
 The lint `REGISTRY` is the canonical example of what *must* live here. It names
-all 229 rules, and every rule depends on the engine; putting the registry in
+all 268 rules, and every rule depends on the engine; putting the registry in
 either would be a cycle. So the engine takes a `RuleCatalog` as an argument and
 never learns which rules exist, the rules never learn the registry does, and
-the registry sits in the root reaching nineteen feature packages for their `META`
-and `RULE`. That is the criterion: **a module that enumerates or aggregates several
-features** belongs in neither core nor any one feature.
+the registry sits in the root reaching twenty-three feature packages for their
+`META` and `RULE`. That is the criterion: **a module that enumerates or
+aggregates several features** belongs in neither core nor any one feature.
 
 There is no `domain`, `application` or `infrastructure` module, and the names
 are the reason. They used to hold 415 lines of `pub use`
@@ -127,7 +127,7 @@ semantic enum (`ReportLimit::{Complete, Limited(NonZeroUsize)}`,
 Derive redundant presentation values (booleans, counts) at the serialization
 boundary instead of storing them.
 
-## Lint rules: one trait, one registry line, nineteen packages
+## Lint rules: one trait, one registry line, twenty-three packages
 
 The lint suite is the clearest example of the split's shape, and the most
 frequently extended part of the tree.
@@ -141,9 +141,10 @@ frequently extended part of the tree.
 | `policy` | Dialect scope, rule selection and gate decisions: logic that needs no tree. |
 | `engine` | The single pass, which walks the document once and dispatches each node to every rule whose `head_filter` matches. |
 
-224 of the 229 shipped rules live in eighteen themed packages, split six ways.
-A nineteenth, `feature/lint-custom`, holds no rules at all: it is the pattern
-language and the second pass that run the rules a *project* writes for itself.
+263 of the 268 shipped rules live in twenty-two themed packages, split seven
+ways. A twenty-third, `feature/lint-custom`, holds no rules at all: it is the
+pattern language and the second pass that run the rules a *project* writes for
+itself.
 
 The remaining five — `macro-variable-capture`, `macro-multiple-evaluation`,
 `macro-parameter-reordering`, `macro-deep-quasiquote-nesting` and
@@ -210,6 +211,30 @@ rules scoped to a dialect for a construct Common Lisp has no counterpart for at
 all, so there is nothing to generalize `atom`s, `future`s and `promise`s
 *to*. All 17 are `ReportOnly`.
 
+The seventh grouping is the four newest —
+`feature/lint-{call-shape,documentation,contract-annotation,introspection}` —
+split by *what the rule reads instead of the operator*. Every grouping above
+keys on the form's head; these four do not. `lint-call-shape` (5 rules) reads
+the size and nesting of an argument list rather than what is being called;
+`lint-documentation` (4) reads the prose in a docstring or comment and checks it
+against the code beside it; `lint-contract-annotation` (4) reads a *separate*
+annotation form — Typed Racket's `(: name (-> …))`, Clojure's `:pre`/`:post`,
+Common Lisp's `check-type` and `declare` — and compares it with the definition
+it describes; `lint-introspection` (3) reads a name that will not exist until
+run time, built by `intern` or looked up by `find-symbol`, which is precisely
+the case no other rule can follow.
+
+This group is the least Common-Lisp-centric in the tree, and it is where the
+dialect matrix gains cases it did not have. `typed-racket-arity-mismatch` is
+the first built-in rule scoped to **Racket** alone; two more of
+`lint-contract-annotation`'s four are Clojure only, leaving just one Common
+Lisp rule in that package. `todo-fixme-no-attribution` goes the other way and
+declares **all eleven** dialects, because a `TODO` with nobody's name on it
+reads the same in every one. All 16 are `ReportOnly`, and 8 of them are tagged
+`pedantic` — a threshold on parameter count or lambda nesting, and a house
+style for docstrings and `TODO`s, are conventions a codebase either adopted or
+did not, so `recommended` withholds them and `--preset pedantic` turns them on.
+
 A rule declares its `dialect_scope`, and the dispatcher skips one whose scope
 excludes the file's dialect before walking anything. `inspect capabilities`'
 dialect matrix reads that same declaration, so a rule's standalone command
@@ -223,12 +248,24 @@ the split is what lets the command and the rule share one detection. The four
 newer packages give each rule a single module: they ship as lint rules only,
 reachable through `inspect lint --rule <name>`, so there is one consumer and
 the three-file split would be indirection with nothing on the other end. The
-seven newest —
+seven after those —
 `feature/lint-{repl-debug,object-system,condition-system,iteration-flow,testing,concurrency,build-system}`
 — return to the directory layout, for the original reason: every one of their
 rules also ships a standalone `inspect <rule>` command.
 
-**`REGISTRY` is in neither.** It names all 229 rules, and every rule depends on
+The four newest show that the directory layout and the standalone command are
+two decisions rather than one. `feature/lint-{call-shape,introspection}` take
+the directory *with* `cli/`, as before — 8 rules, 8 commands. But
+`feature/lint-{documentation,contract-annotation}` take the directory *without*
+it: their 8 rules are reachable only through `inspect lint --rule <name>`, and
+the `rule.rs`/`domain.rs` split still earns its keep, because the detection is
+the part worth testing apart from the phrasing. A rule's layout now says what
+its *detection* needs; the presence of `cli/` says whether it also answers on
+its own. The batch that introduced these four added 39 rules but only 19
+commands — the other 20 come from those two packages and from new
+single-module rules in `feature/lint-{safety,performance,portability}`.
+
+**`REGISTRY` is in neither.** It names all 268 rules, and every rule depends on
 the engine, so putting it in the engine or in a rule package would be a cycle.
 It sits in the root crate, and the engine receives a `RuleCatalog` as an
 argument — which is why the engine can be a package at all.

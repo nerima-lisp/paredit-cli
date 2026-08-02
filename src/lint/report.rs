@@ -409,7 +409,11 @@ mod tests {
                 "if-arity",
                 "the-arity",
                 "equality-arity",
-                "accessor-arity"
+                "accessor-arity",
+                // The declaration half of an arity mismatch: every caller
+                // checked against this annotation is checked against the wrong
+                // number of arguments.
+                "typed-racket-arity-mismatch"
             ]
         );
     }
@@ -424,7 +428,8 @@ mod tests {
                 "modify-macro-arity",
                 "the-arity",
                 "equality-arity",
-                "accessor-arity"
+                "accessor-arity",
+                "typed-racket-arity-mismatch"
             ]
         );
     }

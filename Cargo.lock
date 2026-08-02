@@ -674,13 +674,17 @@ dependencies = [
  "paredit-feature-generate",
  "paredit-feature-inline",
  "paredit-feature-lint-build-system",
+ "paredit-feature-lint-call-shape",
  "paredit-feature-lint-concurrency",
  "paredit-feature-lint-condition-system",
  "paredit-feature-lint-conditional",
+ "paredit-feature-lint-contract-annotation",
  "paredit-feature-lint-control-flow",
  "paredit-feature-lint-convention",
  "paredit-feature-lint-custom",
+ "paredit-feature-lint-documentation",
  "paredit-feature-lint-form-shape",
+ "paredit-feature-lint-introspection",
  "paredit-feature-lint-iteration-flow",
  "paredit-feature-lint-numeric",
  "paredit-feature-lint-object-system",
@@ -978,6 +982,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "paredit-feature-lint-call-shape"
+version = "1.4.0"
+dependencies = [
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
+ "serde_json",
+]
+
+[[package]]
 name = "paredit-feature-lint-concurrency"
 version = "1.4.0"
 dependencies = [
@@ -1015,6 +1030,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "paredit-feature-lint-contract-annotation"
+version = "1.4.0"
+dependencies = [
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
+ "serde_json",
+]
+
+[[package]]
 name = "paredit-feature-lint-control-flow"
 version = "1.4.0"
 dependencies = [
@@ -1047,6 +1073,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "paredit-feature-lint-documentation"
+version = "1.4.0"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
+]
+
+[[package]]
 name = "paredit-feature-lint-form-shape"
 version = "1.4.0"
 dependencies = [
@@ -1060,6 +1094,17 @@ dependencies = [
  "proptest",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "paredit-feature-lint-introspection"
+version = "1.4.0"
+dependencies = [
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
+ "serde_json",
 ]
 
 [[package]]

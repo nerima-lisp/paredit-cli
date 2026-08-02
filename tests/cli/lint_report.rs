@@ -291,12 +291,11 @@ fn cli_lint_list_rules_prints_the_catalog_without_files() {
         .arg("json")
         .assert()
         .success()
-        // 207 (through PR #81) + 16 of this branch's 17 rules = 223 — the
-        // whole suite's 229 less the 6 `pedantic` rules the default
-        // `recommended` preset holds back. This branch contributes the sixth,
-        // `asdf-system-missing-version`, which is why the rise is 16 and not
-        // 17.
-        .stdout(predicate::str::contains("\"rule_count\": 223"))
+        // 223 (through PR #82) + 31 of this branch's 39 rules = 254 — the
+        // whole suite's 268 less the 14 `pedantic` rules the default
+        // `recommended` preset holds back. This branch contributes 8 of those
+        // 14, which is why the rise is 31 and not 39.
+        .stdout(predicate::str::contains("\"rule_count\": 254"))
         .stdout(predicate::str::contains("\"self-assignment\""))
         .stdout(predicate::str::contains(
             "a setq/setf/psetq/psetf that assigns a place to itself",
@@ -965,13 +964,13 @@ fn cli_lint_list_rules_marks_severity() {
     assert_eq!(severity_of("redundant-quote"), "warning");
     assert_eq!(severity_of("literal-place"), "error");
     let warnings = rules.iter().filter(|r| r["severity"] == "warning").count();
-    // The default preset is `recommended`, which holds back the six
+    // The default preset is `recommended`, which holds back the fourteen
     // `pedantic` rules; `--preset all` is what lists the whole suite.
-    // 145 (through PR #81) + 13 of this branch's 17 rules — 3 are
-    // `Severity::Error` and the 14th warning, `asdf-system-missing-version`,
-    // is the `pedantic` rule this preset withholds — = 158, which is the
-    // suite's 164 warnings less the 6 `pedantic` rules, all of them warnings.
-    assert_eq!(warnings, 158);
+    // 158 (through PR #82) + 25 of this branch's 39 rules — 6 are
+    // `Severity::Error` and 8 of the remaining 33 warnings are the `pedantic`
+    // rules this preset withholds — = 183, which is the suite's 197 warnings
+    // less the 14 `pedantic` rules, all of them warnings.
+    assert_eq!(warnings, 183);
 }
 
 #[test]

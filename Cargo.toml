@@ -133,6 +133,10 @@ paredit-feature-lint-iteration-flow = { path = "packages/feature/lint-iteration-
 paredit-feature-lint-testing = { path = "packages/feature/lint-testing" }
 paredit-feature-lint-concurrency = { path = "packages/feature/lint-concurrency" }
 paredit-feature-lint-build-system = { path = "packages/feature/lint-build-system" }
+paredit-feature-lint-call-shape = { path = "packages/feature/lint-call-shape" }
+paredit-feature-lint-documentation = { path = "packages/feature/lint-documentation" }
+paredit-feature-lint-contract-annotation = { path = "packages/feature/lint-contract-annotation" }
+paredit-feature-lint-introspection = { path = "packages/feature/lint-introspection" }
 paredit-feature-emacs-lisp = { path = "packages/feature/emacs-lisp" }
 paredit-feature-conditional-conversion = { path = "packages/feature/conditional-conversion" }
 paredit-feature-external-check = { path = "packages/feature/external-check" }

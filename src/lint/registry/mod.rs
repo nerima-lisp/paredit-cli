@@ -15,8 +15,11 @@ use super::rule::RuleEntry;
 /// deliberate, reviewed change rather than a silent drift in the catalogue.
 // 212 (through PR #81's `lint-object-system`, `lint-condition-system` and
 // `lint-iteration-flow`) + 6 (`lint-testing`) + 7 (`lint-concurrency`) + 4
-// (`lint-build-system`) = 229.
-pub const RULE_COUNT: usize = 229;
+// (`lint-build-system`) = 229, + this batch's 39: 7 (`lint-control-flow`), 4
+// (`lint-conditional`), 6 (`lint-safety`), 3 (`lint-performance`), 3
+// (`lint-portability`), 5 (`lint-call-shape`), 4 (`lint-documentation`), 4
+// (`lint-contract-annotation`) and 3 (`lint-introspection`) = 268.
+pub const RULE_COUNT: usize = 268;
 
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
@@ -950,5 +953,161 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(
         &paredit_feature_lint_build_system::defpackage_without_in_package::rule::META,
         &paredit_feature_lint_build_system::defpackage_without_in_package::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_control_flow::block_name_shadows_outer_block::rule::META,
+        &paredit_feature_lint_control_flow::block_name_shadows_outer_block::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_control_flow::dotimes_dolist_index_var_mutated::rule::META,
+        &paredit_feature_lint_control_flow::dotimes_dolist_index_var_mutated::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_control_flow::go_to_undefined_tag::rule::META,
+        &paredit_feature_lint_control_flow::go_to_undefined_tag::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_control_flow::multiple_value_bind_all_ignored::rule::META,
+        &paredit_feature_lint_control_flow::multiple_value_bind_all_ignored::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_control_flow::return_from_unmatched_block::rule::META,
+        &paredit_feature_lint_control_flow::return_from_unmatched_block::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_control_flow::return_outside_implicit_nil_block::rule::META,
+        &paredit_feature_lint_control_flow::return_outside_implicit_nil_block::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_control_flow::tagbody_unreachable_tag::rule::META,
+        &paredit_feature_lint_control_flow::tagbody_unreachable_tag::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_conditional::case_key_eql_pitfall::rule::META,
+        &paredit_feature_lint_conditional::case_key_eql_pitfall::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_conditional::cond_to_case_candidate::rule::META,
+        &paredit_feature_lint_conditional::cond_to_case_candidate::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_conditional::nested_cond_flattenable::rule::META,
+        &paredit_feature_lint_conditional::nested_cond_flattenable::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_conditional::when_unless_implicit_nil_misused::rule::META,
+        &paredit_feature_lint_conditional::when_unless_implicit_nil_misused::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_safety::format_tilde_slash_unvalidated_function_designator::META,
+        &paredit_feature_lint_safety::format_tilde_slash_unvalidated_function_designator::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_safety::insecure_temp_file_fixed_name_shared_directory::META,
+        &paredit_feature_lint_safety::insecure_temp_file_fixed_name_shared_directory::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_safety::path_traversal_via_concatenated_filename::META,
+        &paredit_feature_lint_safety::path_traversal_via_concatenated_filename::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_safety::read_eval_star_rebound_to_t::META,
+        &paredit_feature_lint_safety::read_eval_star_rebound_to_t::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_safety::sql_query_string_built_via_format::META,
+        &paredit_feature_lint_safety::sql_query_string_built_via_format::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_safety::world_writable_file_mode_in_open_call::META,
+        &paredit_feature_lint_safety::world_writable_file_mode_in_open_call::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_performance::redundant_full_sequence_traversal_fusable_maps::META,
+        &paredit_feature_lint_performance::redundant_full_sequence_traversal_fusable_maps::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_performance::repeated_hash_table_lookup_same_key::META,
+        &paredit_feature_lint_performance::repeated_hash_table_lookup_same_key::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_performance::unnecessary_sort_before_extremum_extraction::META,
+        &paredit_feature_lint_performance::unnecessary_sort_before_extremum_extraction::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_portability::char_code_limit_loop::META,
+        &paredit_feature_lint_portability::char_code_limit_loop::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_portability::namestring_round_trip::META,
+        &paredit_feature_lint_portability::namestring_round_trip::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_portability::sort_not_guaranteed_stable::META,
+        &paredit_feature_lint_portability::sort_not_guaranteed_stable::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_call_shape::deeply_nested_anonymous_lambda::rule::META,
+        &paredit_feature_lint_call_shape::deeply_nested_anonymous_lambda::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_call_shape::nested_function_parameter_shadows_enclosing_parameter::rule::META,
+        &paredit_feature_lint_call_shape::nested_function_parameter_shadows_enclosing_parameter::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_call_shape::overly_long_parameter_list::rule::META,
+        &paredit_feature_lint_call_shape::overly_long_parameter_list::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_call_shape::positional_argument_count_exceeds_readability::rule::META,
+        &paredit_feature_lint_call_shape::positional_argument_count_exceeds_readability::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_call_shape::stringly_typed_dispatch::rule::META,
+        &paredit_feature_lint_call_shape::stringly_typed_dispatch::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_documentation::docstring_example_stale_arity::rule::META,
+        &paredit_feature_lint_documentation::docstring_example_stale_arity::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_documentation::docstring_summary_line_too_long::rule::META,
+        &paredit_feature_lint_documentation::docstring_summary_line_too_long::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_documentation::missing_package_docstring::rule::META,
+        &paredit_feature_lint_documentation::missing_package_docstring::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_documentation::todo_fixme_no_attribution::rule::META,
+        &paredit_feature_lint_documentation::todo_fixme_no_attribution::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_contract_annotation::check_type_redundant_with_declare::rule::META,
+        &paredit_feature_lint_contract_annotation::check_type_redundant_with_declare::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_contract_annotation::clojure_pre_post_vacuous::rule::META,
+        &paredit_feature_lint_contract_annotation::clojure_pre_post_vacuous::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_contract_annotation::clojure_pre_referencing_percent::rule::META,
+        &paredit_feature_lint_contract_annotation::clojure_pre_referencing_percent::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_contract_annotation::typed_racket_arity_mismatch::rule::META,
+        &paredit_feature_lint_contract_annotation::typed_racket_arity_mismatch::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_introspection::intern_dynamic_package_target::rule::META,
+        &paredit_feature_lint_introspection::intern_dynamic_package_target::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_introspection::introspection_probe_unchecked::rule::META,
+        &paredit_feature_lint_introspection::introspection_probe_unchecked::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_introspection::symbol_function_fset_dynamic_name::rule::META,
+        &paredit_feature_lint_introspection::symbol_function_fset_dynamic_name::rule::RULE,
     ),
 ];
