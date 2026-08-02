@@ -34,10 +34,6 @@ impl DialectReaderPolicy {
         Self { dialect }
     }
 
-    pub(super) const fn is_legacy(self) -> bool {
-        matches!(self.dialect, Dialect::Unknown)
-    }
-
     pub(super) const fn additional_discarded_forms_for_prefix(self, prefix: ReaderPrefix) -> usize {
         if matches!(
             (self.dialect, prefix),

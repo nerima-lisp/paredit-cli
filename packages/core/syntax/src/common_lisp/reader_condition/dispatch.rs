@@ -20,9 +20,11 @@ pub struct CommonLispReaderConditionalDispatch {
 
 /// The complete source region consumed by one reader conditional.
 ///
-/// This covers the dispatch atom, feature expression, and guarded datum when
-/// all three are present. Incomplete syntax is represented by the dispatch
-/// span alone so structural transformations can still reject it safely.
+/// `span` always covers all three components — the dispatch, the feature
+/// expression, and the guarded datum — because the reader consumes all three
+/// as one node and refuses the document when any is missing. There is no
+/// dispatch-span-only variant to handle: incomplete syntax never reaches a
+/// tree.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommonLispReaderConditionalForm {
     pub kind: CommonLispReaderConditionalKind,

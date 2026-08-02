@@ -107,9 +107,11 @@ noticed a parser that became quadratic in document length.
 Both the benchmark and `tests/parse_memory.rs` build the same synthetic
 document: one `defun` template repeated to reach a target size, in two shapes.
 `plain` is ordinary Common Lisp. `reader-conditional` is the same forms with
-`#+sbcl` in front of the body, which under `Dialect::CommonLisp` folds the
-conditional *and the whole form it guards* into a single opaque atom — so
-nearly the same bytes produce about a quarter of the nodes. Keeping both arms
+`#+sbcl` in front of the body, which folds the conditional *and the whole form
+it guards* into a single opaque atom — so nearly the same bytes produce about
+a quarter of the nodes. Every dialect reader does this, the permissive
+`Dialect::Unknown` one included; it used to be specific to
+`Dialect::CommonLisp`. Keeping both arms
 means a change that stopped folding shows up as the two arms converging,
 instead of as a silent 3x increase in memory.
 

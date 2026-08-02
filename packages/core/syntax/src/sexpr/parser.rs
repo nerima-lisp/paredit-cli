@@ -413,17 +413,6 @@ impl<'a> Parser<'a> {
         prefixes: Vec<PrefixToken>,
     ) -> std::result::Result<(), ParseError> {
         let start = self.pos;
-        if self.policy.is_legacy()
-            && matches!(
-                self.policy
-                    .classify_reader_macro(self.bytes, self.pos.get()),
-                Some(ReaderMacro::MultiDatum { .. })
-            )
-        {
-            self.advance_by(2);
-            self.push_atom(prefixes, start, self.pos);
-            return Ok(());
-        }
         self.consume_atom_body()?;
         self.push_atom(prefixes, start, self.pos);
         Ok(())
@@ -599,10 +588,30 @@ impl<'a> Parser<'a> {
             .policy
             .classify_reader_macro(self.bytes, self.pos.get())
         {
+            // `Dialect::Unknown` reaches this arm too. It used to be excluded,
+            // so `#+sbcl (require :sb-posix)` scanned as three independent
+            // siblings -- the two-byte token `#+`, the feature expression, and
+            // the guarded form -- and the formatter, seeing three top-level
+            // forms, separated them with blank lines. That is a corrupting
+            // transform, not merely a coarse one.
+            //
+            // The exclusion predated `MultiDatum`. It existed to stop `#+sbcl`
+            // from gluing into one atom while `#+(and sbcl x86-64)` split at
+            // the list delimiter, which the fixed-width `#+` token did achieve;
+            // consuming the whole conditional as one opaque form achieves it
+            // too, and agrees with the ten named dialects instead of being the
+            // one reader that disagrees.
+            //
+            // It was also self-contradictory: `skip_form` never had the guard,
+            // so a `#+` inside a `#;` datum comment already consumed its
+            // feature expression and guarded form as one unit in
+            // `Dialect::Unknown`. The two paths disagreed about the extent of
+            // the same reader form, which is precisely what
+            // `DialectReaderPolicy` exists to prevent.
             Some(ReaderMacro::MultiDatum {
                 width,
                 payload_forms,
-            }) if !self.policy.is_legacy() => {
+            }) => {
                 self.opaque_reader_form_with_prefixes(prefixes, width, payload_forms)?;
                 return Ok(());
             }

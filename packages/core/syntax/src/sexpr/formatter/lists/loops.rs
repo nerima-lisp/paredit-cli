@@ -8,14 +8,16 @@ impl Formatter {
         tree: &SyntaxTree,
         node_id: NodeId,
         depth: usize,
-        head: &str,
         output: &mut String,
     ) {
         let node = tree.node(node_id);
         let delimiter = self.list_delimiter(node);
-        let continuation_column = self.continuation_column(depth, head.len().saturating_add(2));
         output.push(delimiter.open());
         self.format_node(tree, node.children[0], depth + 1, output);
+        // Clauses line up under the first one, one column past the head as
+        // actually written — not past its byte length, which is not a column
+        // count for a non-ASCII head.
+        let continuation_column = Self::last_line_width(output).saturating_add(1);
 
         let mut position = 1;
         let mut conditional_clause_open = false;
@@ -26,12 +28,10 @@ impl Formatter {
 
             if position == 1 {
                 output.push(' ');
+            } else if nested_action {
+                Self::break_to_column(self.add_indent(continuation_column), output);
             } else {
-                output.push('\n');
-                output.push_str(&" ".repeat(continuation_column));
-                if nested_action {
-                    output.push_str(&self.indent(1));
-                }
+                Self::break_to_column(continuation_column, output);
             }
 
             let clause_start = position;

@@ -11,18 +11,13 @@ use libfuzzer_sys::fuzz_target;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::SyntaxTree;
 
-const DIALECTS: [Dialect; 10] = [
-    Dialect::CommonLisp,
-    Dialect::EmacsLisp,
-    Dialect::Lfe,
-    Dialect::Scheme,
-    Dialect::Racket,
-    Dialect::Clojure,
-    Dialect::Hy,
-    Dialect::Carp,
-    Dialect::Janet,
-    Dialect::Fennel,
-];
+/// Every dialect, including [`Dialect::Unknown`].
+///
+/// `Dialect::Unknown` is the reader for a file whose extension says nothing and
+/// for `--dialect`-less stdin, so it runs on real input constantly. Omitting it
+/// here left the permissive reader unfuzzed, and it is the one reader whose
+/// rules no dialect test pins.
+const DIALECTS: [Dialect; Dialect::ALL.len()] = Dialect::ALL;
 
 fuzz_target!(|data: &[u8]| {
     let Ok(source) = std::str::from_utf8(data) else {

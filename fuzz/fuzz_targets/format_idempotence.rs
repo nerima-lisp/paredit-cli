@@ -13,18 +13,17 @@ use libfuzzer_sys::fuzz_target;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{Formatter, SyntaxTree};
 
-const DIALECTS: [Dialect; 10] = [
-    Dialect::CommonLisp,
-    Dialect::EmacsLisp,
-    Dialect::Lfe,
-    Dialect::Scheme,
-    Dialect::Racket,
-    Dialect::Clojure,
-    Dialect::Hy,
-    Dialect::Carp,
-    Dialect::Janet,
-    Dialect::Fennel,
-];
+/// Every dialect, including [`Dialect::Unknown`].
+///
+/// This was a hand-written copy of `Dialect::ALL` with `Unknown` dropped, and
+/// the omission cost a real defect: `Dialect::Unknown` is a *different reader*,
+/// not a placeholder, and it tore `#+sbcl (require :sb-posix)` into three
+/// siblings that the formatter then split across blank lines. No named dialect
+/// had the bug, so nothing in this harness could see it.
+///
+/// Deferring to `Dialect::ALL` also means a dialect added later is fuzzed
+/// without anyone remembering to extend this list.
+const DIALECTS: [Dialect; Dialect::ALL.len()] = Dialect::ALL;
 
 fuzz_target!(|data: &[u8]| {
     let Ok(source) = std::str::from_utf8(data) else {

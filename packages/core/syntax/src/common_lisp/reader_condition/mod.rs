@@ -1,9 +1,15 @@
 //! Common Lisp reader-conditional dispatch detection.
 //!
-//! Legacy S-expression trees represent `#+` and `#-` as atom siblings of their
-//! feature expression and guarded datum. Dialect-aware Common Lisp trees keep
-//! the complete conditional as one opaque atom. This module owns the semantic
-//! query across both representations.
+//! Every reader keeps a complete conditional — the `#+`/`#-` dispatch, its
+//! feature expression, and the datum it guards — together as one opaque atom.
+//! The permissive `Dialect::Unknown` reader used to be the exception, tearing
+//! the three apart into sibling atoms; it no longer is, so this module has one
+//! representation to query rather than two.
+//!
+//! An incomplete conditional never reaches here at all: a `#+` with nothing to
+//! guard is a parse error in every dialect, so a tree that exists always has
+//! both components. See `an_incomplete_conditional_is_refused_by_both_readers`
+//! in this module's tests for why refusing is the intended behaviour.
 
 mod dispatch;
 mod query;
