@@ -338,7 +338,7 @@ alias:
 
 Each frame shows the current node's path and kind, its own source collapsed
 to one line, and every immediate child indexed underneath. There is no
-editing here — the other ~130 commands under `edit` and `refactor` already
+editing here — the other ~120 commands under `edit` and `refactor` already
 cover the transform side, each behind its own safety checks (reparse guards,
 hash-anchored writes) that a from-scratch in-loop editor would have to
 either duplicate or bypass. `tui` is scoped to *finding* the `--path` those

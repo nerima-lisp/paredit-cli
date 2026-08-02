@@ -1,7 +1,7 @@
 ---
 name: paredit-cli
 description: This skill should be used when refactoring Common Lisp, Emacs Lisp, LFE, Scheme, Racket, Clojure, Hy, Carp, Janet, or Fennel source files, or any other Lisp-like S-expression code. Use when renaming scoped symbols, functions, control targets, or packages; moving definitions; extracting or inlining local code; reshaping bindings, conditionals, calls, or parameters; or removing unused code. Use whenever an edit to balanced-parenthesis code is needed and the `paredit` binary is available, instead of hand-editing delimiters.
-version: 1.5.0
+version: 1.6.0
 ---
 
 <purpose>
@@ -14,7 +14,7 @@ version: 1.5.0
   paredit detects the Lisp dialect (Common Lisp, Emacs Lisp, LFE, Scheme, Racket, Clojure, Hy, Carp, Janet, Fennel)
   from file extension or an explicit --dialect flag, and exposes every read and write
   operation under `paredit inspect ...`, `paredit edit ...`, `paredit refactor ...`,
-  `paredit query ...`, `paredit fix ...`, or `paredit migrate ...`.
+  `paredit query ...`, `paredit fix ...`, `paredit migrate ...`, or `paredit schema ...`.
 
   The core rule: never hand-edit balanced delimiters during a refactor. Validate the file,
   locate the exact form or symbol with a report command, apply one structural edit, then
@@ -28,6 +28,7 @@ version: 1.5.0
   - `paredit query ...` — search, count, and rewrite by S-expression pattern across a workspace.
   - `paredit fix ...` — apply the lint auto-fixes (the write side of `inspect lint`).
   - `paredit migrate ...` — run a named, ordered, dialect-scoped codemod recipe.
+  - `paredit schema ...` — validate an S-expression data file against a `defschema` schema.
 
   Discovery: `paredit inspect capabilities --output json` prints a machine-readable catalog of
   every command, flag, default, and enum value in one call — use it instead of crawling --help.
@@ -93,6 +94,14 @@ version: 1.5.0
     <command>paredit migrate run nil-conditionals --diff src</command>
     <command>paredit migrate run elisp-cl-lib --write lisp</command>
     <command>paredit migrate run nil-conditionals --check --output json .</command>
+  </group>
+
+  <group name="data_validation">
+    <description>Validate an S-expression data file (an alist or plist instance) against a `defschema`
+      schema — its own small, dependency-light schema language written as ordinary Lisp forms, never
+      evaluated on either side of the check.</description>
+    <command>paredit schema check instance.lisp --schema .paredit/schemas/config.lisp --output json</command>
+    <command>paredit schema check instance.lisp --schema schemas.lisp --schema-name config --fail-on-violation</command>
   </group>
 
   <group name="rename">
