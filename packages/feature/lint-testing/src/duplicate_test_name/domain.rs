@@ -28,22 +28,45 @@
 //!
 //! # Cost
 //!
-//! Linear in the file: two passes, neither of which compares one test against
-//! another.
+//! Linear in the file, and — this is the part that took three attempts to get
+//! right — linear with a small constant, because the *view* is borrowed rather
+//! than rebuilt.
 //!
-//! The first pass counts readable test definitions for the denominator. The
-//! second walks the *top-level* forms once and hashes each name, so a repeat is
-//! a hash-map hit rather than a search — the difference between reading a name
-//! once and reading it once per definition that might share it.
+//! Every function here takes an already-materialized root [`ExpressionView`]
+//! and none of them calls [`SyntaxTree::root_view`]. That is not a style
+//! preference. `root_view` deep-materializes the document, allocating two
+//! `Vec`s — children and reader prefixes — for *every node in the file*, and it
+//! is uncached, so each call rebuilds all of it. The lint dispatcher already
+//! builds exactly one root view per file and hands it to every `WholeTree`
+//! rule, so a rule that takes the view pays nothing and a rule that calls
+//! `root_view` itself pays for a second whole document.
 //!
-//! That distinction was not academic. The first version of this rule ran a
-//! whole-file byte scan per definition and then compared each definition
+//! This rule did the latter, twice — once in each pass — and on the
+//! `clean/forms/1024` benchmark that cost 1195µs against a 5403µs pass, or
+//! +22%, which is the whole of the `bench-compare` regression this rule was
+//! reverted for. The rule path now runs [`shadowing_test_definitions`] alone:
+//! one walk over the *top-level* forms of a view it was given. The denominator
+//! pass is not run there at all, because the rule reports findings and discards
+//! the count; only the standalone `inspect duplicate-test-name` report, which
+//! publishes the denominator, pays for it.
+//!
+//! Within each pass, nothing compares one test against another. Names are
+//! hashed as they are read, so a repeat is a hash-map hit rather than a search
+//! — the difference between reading a name once and reading it once per
+//! definition that might share it.
+//!
+//! That distinction was not academic either. The first version of this rule ran
+//! a whole-file byte scan per definition and then compared each definition
 //! against every earlier one, which is T×T for a file of T tests: a 146 KB file
 //! of 4000 `deftest` forms took 13.8s where the rest of the suite took 0.03s,
 //! and — because `inspect lint` collects every rule's findings and filters
 //! afterwards — no `--rule`, `--exclude` or `--category` could get a user out of
 //! paying it. Nothing here may reintroduce a per-definition scan of the whole
 //! source; `a_file_of_many_tests_stays_linear` fails outright if it does.
+//!
+//! So there are two cost invariants, and they pull in opposite directions —
+//! the first fix for one introduced the other. Neither may be traded for the
+//! other: no per-definition whole-file work, and no per-file document rebuild.
 
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
@@ -53,7 +76,7 @@ use paredit_core_lint_engine::LintResult;
 
 use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
-use paredit_core_syntax::sexpr::{ByteSpan, SyntaxTree};
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, SyntaxTree};
 use paredit_core_syntax::view_query::list_head;
 use serde_json::{Value, json};
 
@@ -106,11 +129,14 @@ impl Finding for DuplicateTestNameItem {
 /// code — the denominator, which is a count of what was *examined* and so is
 /// not restricted to the top level the findings are.
 ///
-/// One pre-order walk. Each node is read once and nothing is compared against
-/// anything.
-fn count_test_definitions(tree: &SyntaxTree, dialect: Dialect) -> usize {
+/// One pre-order walk over the *whole* document. Each node is read once and
+/// nothing is compared against anything, but unlike
+/// [`shadowing_test_definitions`] this does descend into every form, so it is
+/// the more expensive of the two passes and the lint rule does not run it: see
+/// the module docs on why the denominator is the standalone report's alone.
+fn count_test_definitions(root: &ExpressionView, dialect: Dialect) -> usize {
     let mut count = 0;
-    for_each_evaluated_subview(&tree.root_view(), |view| {
+    for_each_evaluated_subview(root, |view| {
         if list_head(view).is_some()
             && read_test_form(view, dialect).is_some_and(|form| form.name_text().is_some())
         {
@@ -128,12 +154,19 @@ fn count_test_definitions(tree: &SyntaxTree, dialect: Dialect) -> usize {
 /// already seen in one lookup, and never revisited — so a third definition of a
 /// name points back at the *first*, which is the one that would have run had
 /// nothing shadowed it.
-fn shadowing_definitions(tree: &SyntaxTree, dialect: Dialect) -> Vec<DuplicateTestNameItem> {
-    let root = tree.root_view();
+///
+/// Takes the root view rather than the [`SyntaxTree`] because the lint rule's
+/// caller — the dispatcher — already has one and building a second is the
+/// dominant cost of this rule; see the module docs.
+#[must_use]
+pub fn shadowing_test_definitions(
+    root: &ExpressionView,
+    dialect: Dialect,
+) -> Vec<DuplicateTestNameItem> {
     let mut first_definition: HashMap<String, usize> = HashMap::new();
     let mut violations = Vec::new();
 
-    for_each_evaluated_root_child(&root, |child| {
+    for_each_evaluated_root_child(root, |child| {
         // Only a plain-symbol name is comparable; `read_test_form` has already
         // declined every shape this cannot name.
         let Some(test_name) = read_test_form(child, dialect).and_then(|form| form.name_text())
@@ -157,6 +190,11 @@ fn shadowing_definitions(tree: &SyntaxTree, dialect: Dialect) -> Vec<DuplicateTe
 
 /// Collects every shadowed test name in one file, with the number of readable
 /// test definitions beside them.
+///
+/// This is the standalone `inspect duplicate-test-name` path, which has no
+/// dispatcher to borrow a root view from and so builds one — *once*, shared by
+/// both passes. The lint rule does not come through here; it calls
+/// [`shadowing_test_definitions`] directly on the view it is handed.
 pub fn build_duplicate_test_name_report(
     path: &Path,
     dialect: Dialect,
@@ -164,9 +202,10 @@ pub fn build_duplicate_test_name_report(
 ) -> LintResult<FileFindings<DuplicateTestNameItem>> {
     let modelled = TEST_DIALECTS.contains(&dialect);
     let (test_form_count, violations) = if modelled {
+        let root = tree.root_view();
         (
-            count_test_definitions(tree, dialect),
-            shadowing_definitions(tree, dialect),
+            count_test_definitions(&root, dialect),
+            shadowing_test_definitions(&root, dialect),
         )
     } else {
         (0, Vec::new())
@@ -497,6 +536,84 @@ mod tests {
             elapsed < std::time::Duration::from_secs(20),
             "4000 test definitions took {elapsed:?}; the analysis is no longer linear"
         );
+    }
+
+    // -- the other cost invariant --------------------------------------------
+
+    /// The rule path must answer from the view it is given and never rebuild
+    /// the document.
+    ///
+    /// A ratio rather than a budget, because a ratio is what survives a loaded
+    /// machine: both sides are timed on the same input in the same process, so
+    /// a busy CPU slows them together and the quotient does not move. What
+    /// moves it is the regression — `check` calling
+    /// [`build_duplicate_test_name_report`] again, which is how this rule was
+    /// written when `bench-compare` measured it at +22% on files containing no
+    /// test at all.
+    ///
+    /// The two sides are not comparable work and are not meant to be. The
+    /// report walks every node for the denominator and materializes the
+    /// document to do it; the rule walks the top level of a view it already
+    /// has. That is precisely the gap being asserted, and it is large — a
+    /// twentieth or less in practice — so the half-of budget below fails only
+    /// on a rule that has gone back to doing the report's work.
+    #[test]
+    fn the_rule_path_does_not_rebuild_the_document() {
+        let source = many_tests(4000, None);
+        let tree = SyntaxTree::parse_with_dialect(&source, Dialect::CommonLisp).expect("parse");
+        let root = tree.root_view();
+
+        let started = std::time::Instant::now();
+        let violations = shadowing_test_definitions(&root, Dialect::CommonLisp);
+        let rule_path = started.elapsed();
+
+        let started = std::time::Instant::now();
+        let report =
+            build_duplicate_test_name_report(Path::new("t.lisp"), Dialect::CommonLisp, &tree)
+                .expect("build report");
+        let report_path = started.elapsed();
+
+        assert!(violations.is_empty());
+        assert!(report.findings.is_empty());
+        assert!(
+            rule_path * 2 < report_path,
+            "the rule path took {rule_path:?} against the report's {report_path:?}; it is doing \
+             the report's work again rather than reading the view it was handed"
+        );
+    }
+
+    /// And it must still answer the same thing. Equivalence is what stops the
+    /// cost invariant above from being satisfied by a rule that has quietly
+    /// stopped finding things.
+    #[test]
+    fn the_rule_path_and_the_report_path_agree() {
+        for source in [
+            "(deftest a)(deftest a)",
+            "(deftest a)(deftest b)",
+            "(deftest a)(deftest b)(deftest a)(deftest b)",
+            "'(deftest a)(deftest a)",
+            "(deftest a (deftest a))",
+            "",
+            "(defun f () 1)",
+        ] {
+            let tree = SyntaxTree::parse_with_dialect(source, Dialect::CommonLisp).expect("parse");
+            let report =
+                build_duplicate_test_name_report(Path::new("t.lisp"), Dialect::CommonLisp, &tree)
+                    .expect("build report");
+            let direct = shadowing_test_definitions(&tree.root_view(), Dialect::CommonLisp);
+            assert_eq!(
+                report
+                    .findings
+                    .iter()
+                    .map(|item| (item.span, item.test_name.clone(), item.shadowed_offset))
+                    .collect::<Vec<_>>(),
+                direct
+                    .iter()
+                    .map(|item| (item.span, item.test_name.clone(), item.shadowed_offset))
+                    .collect::<Vec<_>>(),
+                "the rule and the report disagree on `{source}`"
+            );
+        }
     }
 
     // -- report envelope -----------------------------------------------------

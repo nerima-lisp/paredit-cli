@@ -7,7 +7,7 @@
 
 use paredit_core_lint_engine::LintResult;
 
-use crate::duplicate_test_name::domain::build_duplicate_test_name_report;
+use crate::duplicate_test_name::domain::shadowing_test_definitions;
 use crate::support::TEST_DIALECTS;
 use paredit_core_cli::report::Finding;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
@@ -56,18 +56,29 @@ impl LintRule for Rule {
         RuleDialectScope::new(&TEST_DIALECTS)
     }
 
-    /// The report already walks evaluated code only, so — unlike this
+    /// The analysis already walks evaluated code only, so — unlike this
     /// package's five head-filtered rules — there is no `is_unevaluated_at`
-    /// call to make here: a `'(deftest …)` never reaches `findings` at all.
+    /// call to make here: a `'(deftest …)` never reaches the findings at all.
+    ///
+    /// `view` is the root view, which under `WholeTree` the dispatcher has
+    /// already materialized for this file and hands to every such rule. Using
+    /// it is the entire point of being `WholeTree`: this rule first called
+    /// `build_duplicate_test_name_report(.., context.tree())` instead, which
+    /// rebuilt the whole document twice per file — two `Vec`s per node, and
+    /// `root_view` is uncached — and that alone was +22% on the `clean/forms`
+    /// benchmark, on files with no test definition in them at all.
+    ///
+    /// The denominator the standalone report publishes is deliberately not
+    /// computed here. It needs a second walk, this time into every form rather
+    /// than across the top level, and a rule has nowhere to put it: the old
+    /// code paid for that walk on every file and then dropped the number.
     fn check(
         &self,
         context: &RuleContext<'_>,
-        _view: &ExpressionView,
+        view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
     ) -> LintResult<()> {
-        let report =
-            build_duplicate_test_name_report(context.path(), context.dialect(), context.tree())?;
-        for item in report.findings {
+        for item in shadowing_test_definitions(view, context.dialect()) {
             sink.report(item.span, item.message());
         }
         Ok(())

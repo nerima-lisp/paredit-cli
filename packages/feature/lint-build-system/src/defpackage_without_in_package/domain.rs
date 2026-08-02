@@ -76,19 +76,32 @@ pub const IN_PACKAGE: &str = "in-package";
 /// them, and neither is a substring of the other, so both must be tried.
 const PACKAGE_DECLARATION_NEEDLES: [&str; 2] = ["defpackage", "define-package"];
 
+/// The substring both of [`PACKAGE_DECLARATION_NEEDLES`] contain, and the
+/// cheapest question that can settle them together.
+const PACKAGE_SUBSTRING: &str = "package";
+
 /// Whether the file could contain a package declaration at all.
 ///
 /// The positive-polarity half of the guard pair, and the one that makes the
 /// walk affordable: a file that declares no package cannot produce a finding
-/// and cannot contribute to the denominator, so it is settled by two byte
-/// scans. Pairing it with the negative [`IN_PACKAGE`] scan is what keeps the
+/// and cannot contribute to the denominator, so it is settled by byte scans
+/// alone. Pairing it with the negative [`IN_PACKAGE`] scan is what keeps the
 /// walk off every shape except the one this rule is actually about — a file
 /// that declares a package and does not enter it.
+///
+/// Because this rule is `WholeTree` it is dispatched on *every* file, so the
+/// no-match path is the one that runs almost always and is the only one whose
+/// constant matters. Both needles contain `package`, so a file that does not
+/// mention `package` at all cannot match either, and asking the short question
+/// first settles that file in one pass over the source instead of two. A file
+/// that does mention it answers the prefilter at the first occurrence, so the
+/// extra scan is paid only up to that point and never over the whole file.
 #[must_use]
 pub fn declares_a_package(source: &str) -> bool {
-    PACKAGE_DECLARATION_NEEDLES
-        .iter()
-        .any(|needle| mentions(source, needle))
+    mentions(source, PACKAGE_SUBSTRING)
+        && PACKAGE_DECLARATION_NEEDLES
+            .iter()
+            .any(|needle| mentions(source, needle))
 }
 
 #[derive(Debug, Clone)]
@@ -604,6 +617,43 @@ mod tests {
             "(DEFINE-PACKAGE :a)",
         ] {
             assert!(declares_a_package(source), "byte scan missed `{source}`");
+        }
+    }
+
+    /// The `package` prefilter is an optimisation and must not be observable.
+    ///
+    /// It is only sound because both needles contain `package`; a third needle
+    /// that did not would be silently dropped by it. This pins the property
+    /// rather than the current needle list, so adding such a needle fails here
+    /// instead of in a missed finding.
+    #[test]
+    fn every_declaration_needle_contains_the_prefiltered_substring() {
+        for needle in PACKAGE_DECLARATION_NEEDLES {
+            assert!(
+                needle.contains(PACKAGE_SUBSTRING),
+                "`{needle}` does not contain `{PACKAGE_SUBSTRING}`, so the prefilter in \
+                 `declares_a_package` would discard it"
+            );
+        }
+    }
+
+    /// A file that mentions `package` only in a shape neither needle matches
+    /// still has to be answered by the full scans, not by the prefilter.
+    #[test]
+    fn the_prefilter_does_not_answer_for_the_full_scans() {
+        for source in [
+            "(in-package :app)",
+            "(find-package :app)",
+            "(defun package-name-of (x) x)",
+        ] {
+            assert!(
+                mentions(source, PACKAGE_SUBSTRING),
+                "the prefilter should not settle `{source}`"
+            );
+            assert!(
+                !declares_a_package(source),
+                "`{source}` is not a package declaration"
+            );
         }
     }
 }
