@@ -24,10 +24,25 @@
 //! - a **doubling ratio** across a 8× range of file sizes. Linear work gives
 //!   ≈8×; the quadratic shape gives ≈64×.
 //!
-//! The assertion is deliberately loose — an 8× range asserted under 20× — so
-//! that only an asymptotic regression can trip it. Wall-clock numbers on a
-//! shared machine swing by large factors between runs, and a tight bound here
-//! would fail for reasons that have nothing to do with this code.
+//! # What runs unattended
+//!
+//! Only the **invocation counts**. They are decided by the head index and the
+//! dialect scope before any `check` body runs, so they are the same number on
+//! an idle machine and a loaded one.
+//!
+//! The **doubling ratio is a benchmark, not a test**, and is `#[ignore]`d. It
+//! was once asserted under a deliberately loose 20× bound on the theory that
+//! looseness buys stability. It does not: a ratio between two wall-clock
+//! durations is unstable under parallel load at any threshold, and the smaller
+//! the denominator the worse it gets. A sibling package's version of the same
+//! idea failed CI on a busy runner. Loosening the bound again would only move
+//! the next failure, so the ratio now prints instead of asserting, and is run
+//! on purpose:
+//!
+//! ```text
+//! cargo test -p paredit-feature-lint-contract-annotation \
+//!   -- --ignored --nocapture ignored_bench_
+//! ```
 
 use std::path::Path;
 use std::time::Duration;
@@ -168,9 +183,15 @@ fn clojure_source(count: usize) -> String {
 
 const SIZES: [usize; 4] = [1000, 2000, 4000, 8000];
 
-/// The doubling ratio over an 8× range. Linear is ≈8; the quadratic shape this
-/// exists to catch is ≈64.
-const MAX_RATIO_OVER_8X: u128 = 20;
+/// Every node in `source`, so an invocation count can be read against the
+/// number of nodes a per-node rule would have been called on.
+fn node_count(source: &str, dialect: Dialect) -> u64 {
+    fn walk(view: &ExpressionView) -> u64 {
+        1 + view.children.iter().map(walk).sum::<u64>()
+    }
+    let tree = SyntaxTree::parse_with_dialect(source, dialect).expect("parse");
+    tree.root_view().children.iter().map(walk).sum()
+}
 
 fn report(label: &str, rows: &[(&'static str, Duration, u64)], size: usize, rules: &[&str]) {
     for rule in rules {
@@ -194,58 +215,89 @@ fn ratio(small: u128, large: u128) -> u128 {
     large / small.max(1)
 }
 
+/// The head index must hand each rule exactly one node per definition, and no
+/// more. A rule invoked per *node* rather than per head is one of the two ways
+/// this cost goes wrong, and it is the way that can be pinned exactly: the
+/// count is a property of the head index, not of the machine.
+///
+/// The node count is the control. Without it, "1000 invocations at n=1000" is
+/// also what a per-node dispatch would report on a file that happened to have
+/// 1000 nodes.
 #[test]
-fn cost_typed_racket_arity_mismatch_is_linear_in_the_file() {
-    let rules = ["typed-racket-arity-mismatch"];
-    let mut micros = Vec::new();
+fn cost_each_rule_is_dispatched_once_per_definition() {
     for size in SIZES {
-        let source = racket_source(size);
-        let rows = measure(&source, Dialect::Racket);
-        report("racket", &rows, size, &rules);
-
-        // The head index must hand the rule exactly one node per `define`, and
-        // no more: a rule invoked per *node* rather than per head is the other
-        // way this cost goes wrong.
+        let racket = racket_source(size);
+        let nodes = node_count(&racket, Dialect::Racket);
+        assert!(
+            nodes > (size as u64) * 4,
+            "the racket fixture has {nodes} nodes for {size} definitions; a per-head count \
+             cannot be told apart from a per-node one"
+        );
+        let rows = measure(&racket, Dialect::Racket);
+        report("racket", &rows, size, &["typed-racket-arity-mismatch"]);
         assert_eq!(
             invocations_of(&rows, "typed-racket-arity-mismatch"),
             size as u64,
-            "one invocation per define, not per node"
+            "one invocation per define, not per node ({nodes} nodes)"
         );
-        micros.push(micros_of(&rows, "typed-racket-arity-mismatch"));
-    }
 
-    let ratio = ratio(micros[0], micros[3]);
-    println!("racket  typed-racket-arity-mismatch 8x ratio = {ratio}");
-    assert!(
-        ratio < MAX_RATIO_OVER_8X,
-        "8x more definitions cost {ratio}x more: the annotation lookup is scanning the file, \
-         not binary-searching it ({micros:?}us over {SIZES:?})"
-    );
-}
-
-#[test]
-fn cost_clojure_pre_post_vacuous_is_linear_in_the_file() {
-    let rules = ["clojure-pre-post-vacuous"];
-    let mut micros = Vec::new();
-    for size in SIZES {
-        let source = clojure_source(size);
-        let rows = measure(&source, Dialect::Clojure);
-        report("clojure", &rows, size, &rules);
-
+        let clojure = clojure_source(size);
+        let nodes = node_count(&clojure, Dialect::Clojure);
+        assert!(
+            nodes > (size as u64) * 4,
+            "the clojure fixture has {nodes} nodes for {size} definitions"
+        );
+        let rows = measure(&clojure, Dialect::Clojure);
+        report("clojure", &rows, size, &["clojure-pre-post-vacuous"]);
         assert_eq!(
             invocations_of(&rows, "clojure-pre-post-vacuous"),
             size as u64,
-            "one invocation per defn, not per node"
+            "one invocation per defn, not per node ({nodes} nodes)"
         );
-        micros.push(micros_of(&rows, "clojure-pre-post-vacuous"));
     }
+}
 
-    let ratio = ratio(micros[0], micros[3]);
-    println!("clojure clojure-pre-post-vacuous 8x ratio = {ratio}");
-    assert!(
-        ratio < MAX_RATIO_OVER_8X,
-        "8x more definitions cost {ratio}x more ({micros:?}us over {SIZES:?})"
-    );
+/// The other way the cost goes wrong: the right number of invocations, each of
+/// which re-derives a whole-file answer. Invocation counts cannot see that —
+/// only the growth rate can, and the growth rate is wall-clock.
+///
+/// So this prints and does not assert. Over the 8× range in [`SIZES`], linear
+/// work gives ≈8 and the quadratic shape this exists to catch gives ≈64. Run it
+/// on an idle machine when changing how either rule reaches outside its node:
+///
+/// ```text
+/// cargo test -p paredit-feature-lint-contract-annotation \
+///   -- --ignored --nocapture ignored_bench_doubling_ratio
+/// ```
+#[test]
+#[ignore = "a benchmark: wall-clock ratios are unstable under parallel load"]
+fn ignored_bench_doubling_ratio() {
+    for (label, dialect, rule, generate) in [
+        (
+            "racket",
+            Dialect::Racket,
+            "typed-racket-arity-mismatch",
+            racket_source as fn(usize) -> String,
+        ),
+        (
+            "clojure",
+            Dialect::Clojure,
+            "clojure-pre-post-vacuous",
+            clojure_source as fn(usize) -> String,
+        ),
+    ] {
+        let mut micros = Vec::new();
+        for size in SIZES {
+            let rows = measure(&generate(size), dialect);
+            report(label, &rows, size, &[rule]);
+            micros.push(micros_of(&rows, rule));
+        }
+        println!(
+            "{label:>7} {rule} 8x ratio = {} ({micros:?}us over {SIZES:?}) \
+             -- linear is ~8, a per-match whole-file scan is ~64",
+            ratio(micros[0], micros[3])
+        );
+    }
 }
 
 /// The zero-finding path, which is what the CI `bench-compare` gate measures:

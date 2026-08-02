@@ -11,10 +11,25 @@
 //!   rules came to account for 98% of a lint run. The tell is the ratio between
 //!   two runs at N and 2N: about 2.0 for linear, about 3.7 for quadratic.
 //!
-//! [`ignored_cost_report`] prints the numbers; the two tests assert the
-//! property. The report is `#[ignore]` because timing assertions in CI are
-//! flaky, and the property tests use budgets hundreds of times the real cost so
-//! only an asymptotic regression can trip them.
+//! # What is asserted, and what is only measured
+//!
+//! Everything that runs unattended asserts **invocation counts**, which are
+//! deterministic: they are decided by the head index before any `check` runs,
+//! so they read the same on a loaded machine as on an idle one.
+//!
+//! Nothing that runs unattended asserts a **duration**. An earlier version of
+//! this module asserted `clean * 3 <= dense` and defended it as
+//! machine-independent because it compared two measurements rather than a
+//! clock. That reasoning is wrong: the ratio between two short durations is
+//! itself unstable under load, and it is least stable exactly where the
+//! numerator is smallest — which is the case the assertion was about. It passed
+//! locally and failed in CI. The same objection applies to a doubling ratio.
+//!
+//! So the timing probes are still here, and they still print the numbers that
+//! found a 97x, a 5.5x, a 5.3x and a 5.1x cost bug in this batch — but they are
+//! `#[ignore]`d benchmarks, run on purpose, not gates that fail a pull request
+//! at 3am because a runner was busy. Do not "fix" a future flake by loosening a
+//! budget; a wall-clock budget fails eventually at any threshold.
 
 #[cfg(test)]
 mod tests {
@@ -116,6 +131,24 @@ mod tests {
         (timings.total(), per_rule)
     }
 
+    /// The invocation count the dispatcher attributed to `rule`.
+    fn invocations_of(rows: &[(&'static str, u128, u64)], rule: &str) -> u64 {
+        rows.iter()
+            .find(|(name, _, _)| *name == rule)
+            .map(|(_, _, invocations)| *invocations)
+            .expect("the rule is in the catalogue")
+    }
+
+    /// Every node in the tree, so an invocation count can be read against the
+    /// number of nodes a per-node rule would have been called on.
+    fn node_count(source: &str) -> u64 {
+        fn walk(view: &paredit_core_syntax::sexpr::ExpressionView) -> u64 {
+            1 + view.children.iter().map(walk).sum::<u64>()
+        }
+        let tree = SyntaxTree::parse_with_dialect(source, Dialect::CommonLisp).expect("parse");
+        tree.root_view().children.iter().map(walk).sum()
+    }
+
     /// The numbers, printed. Run with:
     /// `cargo test -p paredit-feature-lint-documentation cost_report -- --ignored --nocapture`
     #[test]
@@ -150,13 +183,24 @@ mod tests {
     /// per-match re-derivation quadruples (~3.7 in practice, once constant
     /// overheads are counted).
     ///
-    /// The budget is 2.8 — comfortably above the noise a linear rule produces
-    /// on a loaded machine, and comfortably below what a quadratic one does.
-    /// Measured at 4000 definitions rather than a few hundred, because the
-    /// difference between the two shapes is invisible while the constant
-    /// factors dominate.
+    /// **A benchmark, not a test.** The ratio between two wall-clock durations
+    /// is unstable under parallel load no matter how loose the budget, so this
+    /// does not run unattended. Run it deliberately, on an idle machine, when
+    /// changing how a rule derives its answer:
+    ///
+    /// ```text
+    /// cargo test -p paredit-feature-lint-documentation \
+    ///   -- --ignored --nocapture ignored_bench_doubling_ratio
+    /// ```
+    ///
+    /// A printed ratio near 2.0 is linear; near 3.7 means a rule re-derives a
+    /// whole-file answer once per match. The deterministic half of this
+    /// property — that a rule is called once per matching head rather than once
+    /// per node — is asserted in
+    /// [`each_rule_is_dispatched_once_per_matching_head`], which does run in CI.
     #[test]
-    fn every_rules_cost_grows_linearly_in_the_number_of_matches() {
+    #[ignore = "a benchmark: wall-clock ratios are unstable under parallel load"]
+    fn ignored_bench_doubling_ratio() {
         // Warm the allocator and the branch predictors, so the first
         // measurement is not systematically the slow one.
         let _ = measure(&dense_source(200));
@@ -173,25 +217,85 @@ mod tests {
         );
     }
 
-    /// The `clean/forms/*` shape: a file with no comment, no docstring, and no
-    /// package declaration must cost each rule essentially nothing, because
-    /// that is the per-file price every rule in the suite pays on every file it
-    /// has nothing to say about.
+    /// The `clean/forms/*` shape, stated deterministically.
     ///
-    /// Asserted against the *dense* file rather than against a clock, so the
-    /// test does not depend on the machine: matching nothing must be far
-    /// cheaper than matching everything.
+    /// That benchmark lints a zero-finding file, so what it measures is the
+    /// per-file price every rule pays on a file it has nothing to say about.
+    /// The price is decided before any `check` body runs: the head index either
+    /// dispatches a rule or it does not. So the property is an invocation
+    /// count, not a duration — and the count is a *stronger* claim than "clean
+    /// is three times cheaper than dense", because it says where the cost went
+    /// rather than how much of it there was.
+    ///
+    /// On a file of 4000 bare `defun`s:
+    ///
+    /// - `missing-package-docstring` is dispatched **zero** times. Its heads are
+    ///   `defpackage`/`define-package`, neither of which occurs, so the head
+    ///   index rejects it outright and its `check` never runs at all.
+    /// - the two `defun`-headed rules are dispatched **exactly 4000** times —
+    ///   once per matching head, and emphatically not once per node. The node
+    ///   count below is what makes that number mean something: a rule walking
+    ///   the tree itself would show the larger figure.
+    /// - `todo-fixme-no-attribution` is dispatched **once**: it is
+    ///   [`HeadFilter::WholeTree`], so it legitimately runs on a clean file, and
+    ///   one invocation is the whole of what it costs.
     #[test]
-    fn matching_nothing_is_far_cheaper_than_matching_everything() {
-        let _ = measure(&clean_source(200));
+    fn each_rule_is_dispatched_once_per_matching_head() {
+        const DEFINITIONS: u64 = 4000;
 
-        let clean = measure(&clean_source(4000)).0.as_micros().max(1);
-        let dense = measure(&dense_source(4000)).0.as_micros().max(1);
-
+        let clean = clean_source(DEFINITIONS as usize);
+        let nodes = node_count(&clean);
         assert!(
-            clean * 3 <= dense,
-            "a zero-finding file cost {clean} µs against {dense} µs for a dense one; the \
-             rejection path is not cheap enough for the clean/forms benchmarks"
+            nodes > DEFINITIONS * 4,
+            "the clean fixture has {nodes} nodes for {DEFINITIONS} definitions; the per-head \
+             counts below cannot be told apart from per-node ones"
         );
+
+        let (_, rows) = measure(&clean);
+
+        assert_eq!(
+            invocations_of(&rows, "missing-package-docstring"),
+            0,
+            "a file with no defpackage must not reach this rule's check at all"
+        );
+        for rule in [
+            "docstring-example-stale-arity",
+            "docstring-summary-line-too-long",
+        ] {
+            assert_eq!(
+                invocations_of(&rows, rule),
+                DEFINITIONS,
+                "{rule} must be dispatched once per defun, not once per node \
+                 (the file has {nodes} nodes)"
+            );
+        }
+        assert_eq!(
+            invocations_of(&rows, "todo-fixme-no-attribution"),
+            1,
+            "a WholeTree rule is handed the tree once"
+        );
+    }
+
+    /// The same counts on the file where every rule has something to say, so
+    /// the zeroes and ones above are the head index talking rather than a
+    /// catalogue that failed to register a rule.
+    #[test]
+    fn the_dense_file_dispatches_the_rules_the_clean_file_does_not() {
+        const DEFINITIONS: u64 = 500;
+
+        let (_, rows) = measure(&dense_source(DEFINITIONS as usize));
+
+        assert_eq!(
+            invocations_of(&rows, "missing-package-docstring"),
+            1,
+            "the dense fixture declares exactly one package"
+        );
+        for rule in [
+            "docstring-example-stale-arity",
+            "docstring-summary-line-too-long",
+        ] {
+            assert_eq!(invocations_of(&rows, rule), DEFINITIONS, "{rule}");
+        }
+        assert_eq!(invocations_of(&rows, "todo-fixme-no-attribution"), 1);
     }
 }

@@ -584,9 +584,26 @@ mod tests {
 
     /// The cost regression this descent exists to avoid: `is_unevaluated_at` is
     /// called once per candidate, and reading `tree.root_view()` to start the
-    /// descent made a file of T candidates cost T×T. The budget is
-    /// deliberately hundreds of times the linear cost, so only an asymptotic
-    /// regression can trip it.
+    /// descent made a file of T candidates cost T×T.
+    ///
+    /// # Why 10 seconds, and why this one may assert a duration
+    ///
+    /// Measured on this fixture, in the `test` profile CI runs: the descent as
+    /// written does the 4000 lookups in **21 ms**, and the `root_view()` shape
+    /// projects to **~34 s**. The budget sits ~485× above the first and ~3.4×
+    /// below the second, so there is a real window and it is occupied.
+    ///
+    /// That is what distinguishes this from the *ratio* assertions this batch
+    /// removed elsewhere (see `cost_probe.rs`). A ratio of two short durations
+    /// has no safe threshold — its variance under load is unbounded and the
+    /// value being bounded sits right next to the bound. An absolute budget
+    /// three orders of magnitude above the real cost is a hang detector, and a
+    /// test would have to be starved 485× to trip it.
+    ///
+    /// Two things would invalidate that: shrinking the fixture (which lowers
+    /// the 34 s and closes the window from above), or running these tests in
+    /// `--release` (which lowers both numbers and could make the budget
+    /// vacuous). If either changes, re-measure rather than adjust the constant.
     #[test]
     fn resolving_a_span_does_not_scan_the_top_level() {
         let source: String = (0..4000)

@@ -400,22 +400,88 @@ mod tests {
         );
     }
 
-    /// The cost regression guard, and the report behind it.
+    /// Every node in `source`, so an invocation count can be read against the
+    /// number of nodes a per-node dispatch would have produced.
+    fn node_count(source: &str) -> u64 {
+        fn walk(view: &paredit_core_syntax::sexpr::ExpressionView) -> u64 {
+            1 + view.children.iter().map(walk).sum::<u64>()
+        }
+        let tree = SyntaxTree::parse_with_dialect(source, Dialect::CommonLisp).expect("parse");
+        tree.root_view().children.iter().map(walk).sum()
+    }
+
+    /// **Invocation counts.** Each rule must be called once per node its head
+    /// filter matches, and no more. A rule that started walking the tree itself
+    /// would show one invocation and a large elapsed time instead.
     ///
-    /// Run with `--nocapture` to read the per-rule table; the assertions are
-    /// what runs unattended. Two properties are checked, and neither is a
-    /// wall-clock budget — those swing by an order of magnitude under parallel
-    /// load and would be flaky by construction:
+    /// This is the half of the cost property that is deterministic: the head
+    /// index decides it before any `check` body runs, so the numbers are the
+    /// same on a loaded machine and an idle one. The growth-rate half is in
+    /// [`ignored_bench_doubling_ratio`], which does not run unattended.
     ///
-    /// - **Linearity.** Doubling the definition count must roughly double the
-    ///   cost. A rule that rescans the file per match would show ~3.7 per
-    ///   doubling, which is the shape two shipped rules had. The bound is
-    ///   deliberately loose, so only an asymptotic regression trips it.
-    /// - **Invocation counts.** Each rule must be called once per node its head
-    ///   filter matches, and no more. A rule that started walking the tree
-    ///   itself would show one invocation and a large elapsed time instead.
+    /// The node count is the control: without it, "800 invocations" is also
+    /// what a per-node dispatch would report on a file of 800 nodes.
     #[test]
-    fn the_added_rules_are_linear_in_the_number_of_definitions() {
+    fn each_added_rule_is_dispatched_once_per_matching_head() {
+        let source = generated(400, true);
+        let nodes = node_count(&source);
+        assert!(
+            nodes > 400 * 10,
+            "the fixture has {nodes} nodes for 400 definitions; a per-head count cannot be \
+             told apart from a per-node one"
+        );
+
+        let rows = measure(&source);
+        let calls = |rule: &str| {
+            rows.iter()
+                .find(|(name, _, _)| *name == rule)
+                .expect("measured")
+                .2
+        };
+        // 400 definitions, each with one `mapcar`, one `map`, one `first`, one
+        // `last`, and one `defun`.
+        assert_eq!(
+            calls("redundant-full-sequence-traversal-fusable-maps"),
+            800,
+            "one call per mapcar/map, not per node ({nodes} nodes)"
+        );
+        assert_eq!(
+            calls("unnecessary-sort-before-extremum-extraction"),
+            800,
+            "one call per first/last, not per node ({nodes} nodes)"
+        );
+        assert_eq!(
+            calls("repeated-hash-table-lookup-same-key"),
+            400,
+            "one call per defun, not per node ({nodes} nodes)"
+        );
+    }
+
+    /// The growth rate, and the byte-scan gate — both wall-clock, so both are
+    /// benchmarks rather than tests.
+    ///
+    /// **Linearity.** Doubling the definition count should roughly double the
+    /// cost. A rule that rescans the file per match shows ~3.7 per doubling,
+    /// which is the shape two shipped rules had, and which this table found in
+    /// four rules in this batch.
+    ///
+    /// **The byte-scan gate.** A definition that never spells `gethash` must not
+    /// pay for the body walk; `loop-invariant-allocation` in the same pass is
+    /// the control. This one previously asserted `lookup < control * 4` and was
+    /// defended as machine-independent because it compares two measurements
+    /// rather than a clock. That defence does not hold: the ratio of two short
+    /// durations is itself unstable under load, and worst where the numerator
+    /// is smallest — which is the case being asserted. There is no deterministic
+    /// equivalent, because the gate short-circuits *inside* `check`, where the
+    /// invocation count cannot see it. So it prints.
+    ///
+    /// ```text
+    /// cargo test -p paredit-feature-lint-performance \
+    ///   -- --ignored --nocapture ignored_bench_doubling_ratio
+    /// ```
+    #[test]
+    #[ignore = "a benchmark: wall-clock ratios are unstable under parallel load"]
+    fn ignored_bench_doubling_ratio() {
         // Warm the allocator and the caches so the first measurement is not the
         // one that pays for them.
         measure(&generated(64, true));
@@ -433,41 +499,10 @@ mod tests {
                 wide.as_micros(),
             );
         }
+        println!("  linear is ~2.00; a per-match whole-file scan is ~3.70");
 
-        for ((name, elapsed, _), (_, wide, _)) in small.iter().zip(&large) {
-            let ratio = wide.as_secs_f64() / elapsed.as_secs_f64().max(f64::EPSILON);
-            assert!(
-                ratio < 3.0,
-                "{name} cost {ratio:.2}x for 2x the input; linear is ~2.0 and a \
-                 per-match whole-file scan is ~3.7"
-            );
-        }
-
-        // 400 definitions, each with one `mapcar`, one `map`, one `first`, one
-        // `last`, and one `defun`.
-        let calls = |rule: &str| {
-            small
-                .iter()
-                .find(|(name, _, _)| *name == rule)
-                .expect("measured")
-                .2
-        };
-        assert_eq!(calls("redundant-full-sequence-traversal-fusable-maps"), 800);
-        assert_eq!(calls("unnecessary-sort-before-extremum-extraction"), 800);
-        assert_eq!(calls("repeated-hash-table-lookup-same-key"), 400);
-    }
-
-    /// The byte-scan gate: a definition that never spells `gethash` must not pay
-    /// for the body walk.
-    ///
-    /// Compared against the control rule in the same pass rather than against a
-    /// wall-clock number, so the assertion means the same thing on a loaded
-    /// machine as on an idle one.
-    #[test]
-    fn a_body_without_gethash_costs_no_more_than_the_control_rule() {
         measure(&generated(64, false));
         let gated = measure(&generated(600, false));
-
         let elapsed = |rule: &str| {
             gated
                 .iter()
@@ -475,18 +510,11 @@ mod tests {
                 .expect("measured")
                 .1
         };
-        let lookup = elapsed("repeated-hash-table-lookup-same-key");
-        let control = elapsed("loop-invariant-allocation");
         println!(
-            "\n  gated lookup rule: {}µs over 600 definitions; \
-             control loop-invariant-allocation: {}µs",
-            lookup.as_micros(),
-            control.as_micros()
-        );
-        assert!(
-            lookup < control * 4,
-            "a body with no `gethash` cost {lookup:?} against a control of {control:?}; \
-             the byte-scan gate is not short-circuiting"
+            "\n  gated lookup rule: {}µs over 600 definitions with no `gethash`; \
+             control loop-invariant-allocation: {}µs (comparable means the gate short-circuits)",
+            elapsed("repeated-hash-table-lookup-same-key").as_micros(),
+            elapsed("loop-invariant-allocation").as_micros()
         );
     }
 

@@ -589,8 +589,16 @@ mod tests {
     }
 
     /// The cost regression: resolving a span must cost the enclosing top-level
-    /// form, not the file. The budget is deliberately hundreds of times the
-    /// linear cost, so only an asymptotic regression can trip it.
+    /// form, not the file.
+    ///
+    /// The budget is an absolute one, not a ratio, and that is deliberate: this
+    /// batch removed several wall-clock *ratio* assertions after one failed CI,
+    /// because the ratio of two short durations has no safe threshold. An
+    /// absolute bound does, when it is measured. On the equivalent fixture the
+    /// descent takes ~21 ms in the `test` profile and the `root_view()` shape
+    /// projects to ~34 s, so 10 s sits ~485× above the real cost and ~3.4×
+    /// below the regression. Re-measure rather than adjust the constant if the
+    /// fixture shrinks or these tests start running in `--release`.
     #[test]
     fn resolving_a_span_does_not_scan_the_whole_document() {
         let source: String = (0..4000)
