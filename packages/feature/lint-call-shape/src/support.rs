@@ -176,7 +176,8 @@ pub fn for_each_evaluated_positioned<'a>(
     root: &'a ExpressionView,
     mut visit: impl FnMut(ParentSlot<'a>, &'a ExpressionView) -> bool,
 ) {
-    let mut stack: Vec<PendingVisit<'a>> = vec![(None, root, QuoteState::EVALUATED)];
+    let mut stack: Vec<PendingVisit<'a>> = Vec::with_capacity(WALK_STACK_HINT);
+    stack.push((None, root, QuoteState::EVALUATED));
     while let Some((parent, view, outer)) = stack.pop() {
         let state = outer.after_prefixes(view);
         if !state.is_data() && !visit(parent, view) {
@@ -189,6 +190,51 @@ pub fn for_each_evaluated_positioned<'a>(
         };
         for (index, child) in view.children.iter().enumerate().rev() {
             stack.push((Some((view, index)), child, inside));
+        }
+    }
+}
+
+/// How much room a walk's stack is given up front.
+///
+/// These walks are started once per matched definition, and the stack held one
+/// element to begin with — so an ordinary definition reallocated it three or
+/// four times, growing 1 → 2 → 4 → 8 → 16, and every one of those was a heap
+/// allocation and a copy charged to that definition. Sized for the widest
+/// frontier an ordinary definition reaches; a wider one still grows, once.
+const WALK_STACK_HINT: usize = 32;
+
+/// [`for_each_evaluated_positioned`], restricted to nodes that have children.
+///
+/// For a caller whose finding is always a *call* — a head with arguments — an
+/// atom and an empty list are both dead ends: neither has a head to prune on,
+/// neither has arguments to count, and neither has children to descend into.
+/// Skipping them is therefore invisible to such a caller, and on ordinary code
+/// they are most of the nodes there are. `(defun f (a b) "doc" (+ a (* b 2)))`
+/// has fourteen nodes and five with children, so this walk does a third of the
+/// stack traffic of the full one.
+///
+/// Quote state is unaffected: a childless node encloses nothing, so never
+/// pushing it cannot change the state any other node is visited under.
+pub fn for_each_evaluated_branch_positioned<'a>(
+    root: &'a ExpressionView,
+    mut visit: impl FnMut(ParentSlot<'a>, &'a ExpressionView) -> bool,
+) {
+    let mut stack: Vec<PendingVisit<'a>> = Vec::with_capacity(WALK_STACK_HINT);
+    stack.push((None, root, QuoteState::EVALUATED));
+    while let Some((parent, view, outer)) = stack.pop() {
+        let state = outer.after_prefixes(view);
+        if !state.is_data() && !visit(parent, view) {
+            continue;
+        }
+        let inside = if is_quote_form(view) {
+            state.quoted()
+        } else {
+            state
+        };
+        for (index, child) in view.children.iter().enumerate().rev() {
+            if !child.children.is_empty() {
+                stack.push((Some((view, index)), child, inside));
+            }
         }
     }
 }
@@ -214,29 +260,30 @@ fn child_containing(view: &ExpressionView, target: ByteSpan) -> Option<(usize, &
 
 /// The index of the top-level form containing `target`, read from spans alone.
 ///
-/// No node is materialized: `select_path(…)?.span()` is a node-id lookup and a
-/// span read, neither of which allocates. Top-level forms are in document order
-/// and do not overlap, so the only candidate is the last one beginning at or
-/// before `target`.
+/// No node is materialized: [`SyntaxTree::root_child_span`] is a slice index
+/// and a span read, neither of which allocates. Top-level forms are in document
+/// order and do not overlap, so the only candidate is the last one beginning at
+/// or before `target`.
+///
+/// The obvious spelling of that read — `select_path(&Path::root_child(i))` —
+/// looks equally free and is not: `Path::root_child` builds an owned
+/// `Vec<ChildIndex>`, so the search below cost `log2(forms)` heap allocations
+/// *per call*. On the `clean/forms/*` benchmarks — a file of ordinary top-level
+/// `defun`s, where the only caller is a pre-check that answers "yes, top level"
+/// and stops — that was the single largest cost this package added.
 fn root_child_index_containing(tree: &SyntaxTree, target: ByteSpan) -> Option<usize> {
-    let start_of = |index: usize| {
-        tree.select_path(&Path::root_child(index))
-            .ok()
-            .map(|selection| selection.span().start().get())
-    };
     let mut low = 0;
     let mut high = tree.root_children().len();
     while low < high {
         let middle = low + (high - low) / 2;
-        if start_of(middle)? <= target.start().get() {
+        if tree.root_child_span(middle)?.start().get() <= target.start().get() {
             low = middle + 1;
         } else {
             high = middle;
         }
     }
     let index = low.checked_sub(1)?;
-    let selection = tree.select_path(&Path::root_child(index)).ok()?;
-    span_contains(selection.span(), target).then_some(index)
+    span_contains(tree.root_child_span(index)?, target).then_some(index)
 }
 
 /// Whether `target` *is* one of the file's top-level forms.
@@ -247,10 +294,9 @@ fn root_child_index_containing(tree: &SyntaxTree, target: ByteSpan) -> Option<us
 /// `defun`s never materializes anything at all.
 #[must_use]
 pub fn is_top_level(tree: &SyntaxTree, target: ByteSpan) -> bool {
-    root_child_index_containing(tree, target).is_some_and(|index| {
-        tree.select_path(&Path::root_child(index))
-            .is_ok_and(|selection| selection.span() == target)
-    })
+    root_child_index_containing(tree, target)
+        .and_then(|index| tree.root_child_span(index))
+        .is_some_and(|span| span == target)
 }
 
 /// The *span* of the top-level form containing `target`, without materializing
@@ -264,7 +310,7 @@ pub fn is_top_level(tree: &SyntaxTree, target: ByteSpan) -> bool {
 #[must_use]
 pub fn root_child_span_containing(tree: &SyntaxTree, target: ByteSpan) -> Option<ByteSpan> {
     let index = root_child_index_containing(tree, target)?;
-    Some(tree.select_path(&Path::root_child(index)).ok()?.span())
+    tree.root_child_span(index)
 }
 
 /// How many times `needle` occurs in `haystack`, ignoring ASCII case.
@@ -487,6 +533,21 @@ pub fn required_parameters(lambda_list: &ExpressionView) -> Vec<&ExpressionView>
         .iter()
         .take_while(|child| !is_lambda_list_keyword(child))
         .collect()
+}
+
+/// How many required parameters `lambda_list` has, without collecting them.
+///
+/// [`required_parameters`] builds a `Vec` for its caller to own. A caller that
+/// only wants the count — `overly-long-parameter-list` asks for it once per
+/// definition, and on all but a handful answers "short enough" and stops — was
+/// paying a heap allocation per definition to read a number off it.
+#[must_use]
+pub fn required_parameter_count(lambda_list: &ExpressionView) -> usize {
+    lambda_list
+        .children
+        .iter()
+        .take_while(|child| !is_lambda_list_keyword(child))
+        .count()
 }
 
 /// The *name* a required parameter binds, or `None` for a destructuring pattern

@@ -51,7 +51,7 @@ use paredit_core_syntax::view_query::{
 };
 use serde_json::{Value, json};
 
-use crate::support::{for_each_evaluated_positioned, is_unevaluated_at, normalized_symbol};
+use crate::support::{for_each_evaluated_branch_positioned, is_unevaluated_at, normalized_symbol};
 
 /// Forms whose trailing children are *clauses*, which look exactly like calls.
 ///
@@ -366,7 +366,11 @@ pub fn examine_definition(
     *definition_count += 1;
 
     let mut candidates = Vec::new();
-    for_each_evaluated_positioned(view, |parent, node| {
+    // The branch-only walk: a finding here is always a call with at least
+    // five arguments, so a node with no children of its own can never be one
+    // and can never contain one. Two thirds of an ordinary definition's nodes
+    // are exactly that.
+    for_each_evaluated_branch_positioned(view, |parent, node| {
         if node.span == view.span {
             return true;
         }

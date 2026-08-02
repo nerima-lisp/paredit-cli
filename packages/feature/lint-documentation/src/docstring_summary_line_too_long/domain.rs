@@ -41,7 +41,9 @@ use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView};
 use paredit_core_syntax::view_query::{is_paren_list, list_head, unqualified};
 
-use crate::support::{docstring_place, docstring_view_of, string_literal_text, summary_line};
+use crate::support::{
+    docstring_place, docstring_view_of, has_child_string_literal, string_literal_text, summary_line,
+};
 
 /// The knob: how wide a docstring's first line may be before this rule speaks.
 ///
@@ -84,9 +86,26 @@ pub fn examine(view: &ExpressionView, limit: usize) -> Option<OverLongSummary> {
     }
     let head = list_head(view)?;
     let place = docstring_place(head)?;
-    let shape = definition_shape(Dialect::CommonLisp, view, head)?;
-    let name = shape.name(view)?.to_owned();
+    // The whole rule, decided on raw source bytes before anything is built.
+    // The width compared below is a *character* count of a prefix of the
+    // docstring's unescaped text, and for UTF-8 no string has more characters
+    // than bytes; unescaping only ever shortens, and the delimiting quotes are
+    // counted here and not there. So a literal no longer than the limit cannot
+    // hold a summary line past it.
+    //
+    // Asked of every direct child rather than of the docstring, because
+    // finding *the* docstring means building a `DefinitionShape` first — and
+    // the docstring is always a direct child, so a definition with no
+    // long-enough child literal has no long-enough docstring either.
+    //
+    // This is why the rule costs nothing on `clean/forms/*`: an ordinary
+    // one-line docstring loses here, on a length comparison, before a shape, an
+    // unescaped copy, or an owned name is built.
+    if !has_child_string_literal(view, |literal| literal.len() > limit) {
+        return None;
+    }
 
+    let shape = definition_shape(Dialect::CommonLisp, view, head)?;
     let docstring = docstring_view_of(shape, place, view)?;
     let text = string_literal_text(docstring)?;
     let summary = summary_line(&text);
@@ -98,9 +117,12 @@ pub fn examine(view: &ExpressionView, limit: usize) -> Option<OverLongSummary> {
     }
 
     let width = summary.chars().count();
-    (width > limit).then(|| OverLongSummary {
+    if width <= limit {
+        return None;
+    }
+    Some(OverLongSummary {
         span: docstring.span,
-        name,
+        name: shape.name(view)?.to_owned(),
         form: unqualified(head).to_ascii_lowercase(),
         width,
         limit,

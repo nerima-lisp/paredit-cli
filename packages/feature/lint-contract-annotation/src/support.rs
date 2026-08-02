@@ -167,28 +167,28 @@ fn child_containing(view: &ExpressionView, target: ByteSpan) -> Option<&Expressi
 /// the whole document. The span-directed lookups here are called once per
 /// candidate, which made a file of T candidates cost T×T.
 ///
-/// Costs a binary search over the top level — each step a node-id lookup and a
+/// Costs a binary search over the top level — each step a slice index and a
 /// span read, neither of which allocates — and materializes nothing at all.
+///
+/// [`SyntaxTree::root_child_span`] rather than
+/// `select_path(&Path::root_child(i))?.span()`, which reads the same and is
+/// not: `Path::root_child` builds an owned `Vec<ChildIndex>`, so that spelling
+/// costs `log2(forms)` heap allocations per call.
 fn root_child_index_containing(tree: &SyntaxTree, target: ByteSpan) -> Option<usize> {
-    let bounds_of = |index: usize| {
-        tree.select_path(&Path::root_child(index))
-            .ok()
-            .map(|selection| selection.span())
-    };
     // Top-level forms are in document order and do not overlap, so the only
     // candidate is the last one beginning at or before `target`.
     let mut low = 0;
     let mut high = tree.root_children().len();
     while low < high {
         let middle = low + (high - low) / 2;
-        if bounds_of(middle)?.start().get() <= target.start().get() {
+        if tree.root_child_span(middle)?.start().get() <= target.start().get() {
             low = middle + 1;
         } else {
             high = middle;
         }
     }
     let index = low.checked_sub(1)?;
-    span_contains(bounds_of(index)?, target).then_some(index)
+    span_contains(tree.root_child_span(index)?, target).then_some(index)
 }
 
 /// The top-level form containing `target`, materialized on its own.
@@ -234,17 +234,17 @@ pub fn preceding_top_level_form(tree: &SyntaxTree, target: ByteSpan) -> Option<E
 #[must_use]
 pub fn preceding_top_level_index(tree: &SyntaxTree, target: ByteSpan) -> Option<usize> {
     let index = root_child_index_containing(tree, target)?;
-    if tree.select_path(&Path::root_child(index)).ok()?.span() != target {
+    if tree.root_child_span(index)? != target {
         return None;
     }
     index.checked_sub(1)
 }
 
-/// One top-level form's span, without materializing it: a node-id lookup and a
+/// One top-level form's span, without materializing it: a slice index and a
 /// span read, no `ExpressionView` and so no allocation.
 #[must_use]
 pub fn top_level_span(tree: &SyntaxTree, index: usize) -> Option<ByteSpan> {
-    Some(tree.select_path(&Path::root_child(index)).ok()?.span())
+    tree.root_child_span(index)
 }
 
 /// One top-level form, materialized on its own — that form's subtree, never the

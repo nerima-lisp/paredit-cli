@@ -44,7 +44,7 @@ use paredit_core_syntax::view_query::{is_paren_list, list_head, symbol_in, unqua
 use serde_json::{Value, json};
 
 use crate::support::{
-    definition_lambda_list, is_unevaluated_at, normalized_symbol, required_parameters,
+    definition_lambda_list, is_unevaluated_at, normalized_symbol, required_parameter_count,
 };
 
 /// How many required parameters a definition may carry by default.
@@ -151,7 +151,7 @@ pub fn examine_definition(
     let Some(lambda_list) = definition_lambda_list(view, head) else {
         return;
     };
-    let required_parameter_count = required_parameters(lambda_list).len();
+    let required_parameter_count = required_parameter_count(lambda_list);
     if required_parameter_count <= max_required {
         return;
     }

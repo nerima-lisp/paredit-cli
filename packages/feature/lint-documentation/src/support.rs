@@ -219,6 +219,28 @@ pub fn is_string_literal(view: &ExpressionView) -> bool {
         && atom_text(view).is_some_and(|text| text.starts_with('"') && text.len() >= 2)
 }
 
+/// Whether any *direct* child of `view` is a string literal whose raw source
+/// satisfies `predicate`.
+///
+/// The pre-filter both docstring rules run before anything else. Every
+/// docstring position this package reads — a body head, or a fixed child index
+/// — is a direct child of the definition, so a definition with no qualifying
+/// child literal has no qualifying docstring, whatever
+/// [`crate::support::docstring_view_of`] would have picked. Reading the raw
+/// literal keeps it allocation-free: no `DefinitionShape` is built, no
+/// docstring is unescaped, and no name is owned.
+///
+/// This exists because both rules anchor on `defun`, so on a file of ordinary
+/// definitions they are invoked once per definition, and *everything* they did
+/// before reaching their real test was per-definition cost paid to conclude
+/// nothing. `clean/forms/*` is exactly that file.
+#[must_use]
+pub fn has_child_string_literal(view: &ExpressionView, predicate: impl Fn(&str) -> bool) -> bool {
+    view.children
+        .iter()
+        .any(|child| is_string_literal(child) && atom_text(child).is_some_and(&predicate))
+}
+
 /// The contents of a string literal, delimiters removed and the handful of
 /// escapes Common Lisp has (`\"` and `\\`) resolved.
 ///

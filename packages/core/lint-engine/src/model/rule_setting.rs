@@ -97,6 +97,23 @@ impl RuleSettings {
     /// The value for `setting` under `rule`, or the setting's declared default.
     #[must_use]
     pub fn get(&self, rule: &str, setting: RuleSetting) -> i64 {
+        // The overwhelmingly common case, answered before anything allocates:
+        // no `--rule-arg` was given at all, so there is nothing to find and the
+        // declared default is the answer.
+        //
+        // The lookup below needs an owned `(String, String)` because that is
+        // what the map is keyed by, so *every* read of a knob allocated twice
+        // — including reads of an empty map. A rule that reads a knob once per
+        // definition therefore paid two allocations per definition to learn a
+        // constant, which on a file of a thousand definitions is two thousand
+        // allocations for nothing. Three rules on the `clean/forms/*`
+        // benchmarks do exactly that.
+        //
+        // Identical by construction: an empty map cannot contain the key, so
+        // the branch below would have returned `setting.default()` too.
+        if self.overrides.is_empty() {
+            return setting.default();
+        }
         self.overrides
             .get(&(rule.to_owned(), setting.key().to_owned()))
             .copied()

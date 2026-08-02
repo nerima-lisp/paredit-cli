@@ -62,7 +62,9 @@ use paredit_core_syntax::view_query::{
     atom_text, is_paren_list, list_head, symbol_in, unqualified,
 };
 
-use crate::support::{DocstringPlace, docstring_view_of, string_literal_text};
+use crate::support::{
+    DocstringPlace, docstring_view_of, has_child_string_literal, string_literal_text,
+};
 
 /// One example call whose argument count the lambda list rejects.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -114,7 +116,26 @@ fn read(view: &ExpressionView) -> Option<Vec<StaleExample>> {
     if !symbol_in(head, &["defun", "defmacro"]) {
         return None;
     }
+    // The one question about a docstring that costs nothing: an example is a
+    // *parenthesized* call, so a docstring containing no `(` holds none,
+    // whatever the lambda list below would have said. Asked of raw source,
+    // because unescaping neither introduces a paren nor removes one — `\(` is
+    // still a `(` — so the raw bytes and the unescaped text agree exactly.
+    //
+    // Asked of every direct child rather than of the docstring, because
+    // finding *the* docstring means building a `DefinitionShape` first, and the
+    // docstring is always a direct child.
+    //
+    // Everything below allocates: a `DefinitionShape`, two `String`s for the
+    // name, and the unescaped docstring. On `clean/forms/*` — a file of
+    // definitions whose docstrings are ordinary prose — this guard is what
+    // keeps all of it unpaid.
+    if !has_child_string_literal(view, |literal| literal.contains('(')) {
+        return None;
+    }
+
     let shape = definition_shape(Dialect::CommonLisp, view, head)?;
+    let docstring_view = docstring_view_of(shape, DocstringPlace::BodyHead, view)?;
     let name = shape.name(view)?.to_owned();
     // An empty or qualifier-only name cannot head a call.
     let bare = unqualified(&name).to_ascii_lowercase();
@@ -140,7 +161,6 @@ fn read(view: &ExpressionView) -> Option<Vec<StaleExample>> {
     // still decidable, so only that half is checked.
     let maximum = if keyword_lambda_list { None } else { maximum };
 
-    let docstring_view = docstring_view_of(shape, DocstringPlace::BodyHead, view)?;
     let docstring = string_literal_text(docstring_view)?;
 
     let mut findings = Vec::new();
