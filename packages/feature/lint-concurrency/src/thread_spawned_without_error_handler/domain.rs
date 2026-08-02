@@ -153,7 +153,7 @@ fn inlined_body(view: &ExpressionView) -> Option<&[ExpressionView]> {
         return None;
     }
     let thunk = view.children.get(1)?;
-    if !list_head(thunk).is_some_and(|head| symbol_is(head, "lambda")) {
+    if list_head(thunk).is_none_or(|head| !symbol_is(head, "lambda")) {
         return None;
     }
     // Past `lambda` and its parameter list.

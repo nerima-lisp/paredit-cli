@@ -236,13 +236,13 @@ pub fn examine_defmethod(
     perform_method_count: &mut usize,
     violations: &mut Vec<AsdfPerformWithoutCallNextMethodItem>,
 ) {
-    if !is_paren_list(view) || !list_head(view).is_some_and(|head| symbol_is(head, "defmethod")) {
+    if !is_paren_list(view) || list_head(view).is_none_or(|head| !symbol_is(head, "defmethod")) {
         return;
     }
     let Some(name) = view.children.get(1) else {
         return;
     };
-    if !symbol_name(name).is_some_and(|text| text == PERFORM) {
+    if symbol_name(name).is_none_or(|text| text != PERFORM) {
         return;
     }
     let Some((qualifier_count, lambda_list)) = method_lambda_list(view) else {
