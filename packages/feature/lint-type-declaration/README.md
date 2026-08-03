@@ -108,12 +108,38 @@ The other four rest on premises that did not survive contact with SBCL:
   and correlating a `declaim` with its `defun` is the whole-file shape these cost
   tests exist to prevent.
 
-### Handover: four false-positive classes in `ignore-declaration-conflict`
+### Handover: false-positive classes in `ignore-declaration-conflict`
+
+> **Superseded, and two of its claims were wrong.** A later pass fixed the rule
+> and measured it over 1291 files (SBCL `src/` plus the installed Quicklisp
+> dist, 2224 `(ignore` occurrences). It found **45 findings, not 21**, and **2
+> of them are true positives** — `bordeaux-threads/apiv2/impl-corman.lisp:30`
+> and `:39`, where `(defun %thread-yield () (declare (ignore thread)))` carries
+> a declaration copy-pasted from a neighbouring definition. So "all of them are
+> false positives" below is wrong.
+>
+> More importantly the four classes below are only **17 of the 43** genuine
+> false positives. The two largest were missed entirely, and neither is a
+> body-walk bug — the rule simply could not read a lambda list:
+> **destructuring macro lambda lists** (21 findings; `parameter_names` took the
+> *first* child of a sublist, so `(defmacro m ((a b) …))` lost `b`) and
+> **`supplied-p` variables** (5). Together, 60% of the false positives.
+>
+> Two further corrections. The "macro arguments" class has **zero instances**,
+> and no guard was written for it — whether an unknown macro evaluates its
+> argument is not decidable at file scope. And the `QuoteState` offered below
+> uses `saturating_sub`, which cannot fix `srctran.lisp:5344`, where the
+> reference sits inside `,(…)` in a template the `lambda` itself is inside and
+> the unquote escapes *outward*; `quasi` has to be **signed**, with only depth
+> exactly 0 counting as a reference.
+>
+> Kept for the three classes it does describe correctly, and as a record of how
+> far a spot-check gets you.
 
 The duplicate was found *after* its false positives had been characterised, so
-the evidence is recorded here rather than thrown away. Run over the same 2217
-files, the shipped rule produces **21 findings**, and spot-checking says all of
-them are false positives on code SBCL compiles clean:
+the evidence is recorded here rather than thrown away. Run over 2217 files, the
+shipped rule produces **21 findings**, and spot-checking says all of them are
+false positives on code SBCL compiles clean:
 
 - **Quoted/templated declarations.** `body_uses` walks with
   `view_query::for_each_subview`, which is unfiltered, so a `(declare (ignore
