@@ -1,6 +1,7 @@
 use super::*;
 use crate::dialect::Dialect;
 use crate::sexpr::parser::MAX_DISCARDED_FORM_STACK_FRAMES;
+use crate::sexpr::reader_policy::{DialectReaderPolicy, LongStringExtent};
 
 #[test]
 fn parses_balanced_document() {
@@ -1224,4 +1225,223 @@ fn find_parse_errors_is_capped_on_pathological_input() {
     let source = "(f))\n".repeat(60);
     let errors = SyntaxTree::find_parse_errors(&source, Dialect::CommonLisp);
     assert_eq!(errors.len(), 50, "{errors:?}");
+}
+
+/// Janet's `root` state sends every backtick to the `longstring` consumer
+/// (`src/core/parse.c`), so a run of N backticks opens a string that the next
+/// run of N backticks closes. Backtick is absent from Janet's `symchars`
+/// table too, so it also ends whatever token preceded it.
+///
+/// Every expectation below was read off Janet 1.41.3's own reader before it
+/// was written here: these are the values `janet -e '(pp (parse ...))'`
+/// prints, not a restatement of what this parser happens to do.
+#[test]
+fn janet_long_strings_are_one_atom() {
+    struct Case {
+        input: &'static str,
+        /// Source text of each child of the single top-level list.
+        children: &'static [&'static str],
+        /// What Janet's own reader makes of the literal, for the record.
+        janet_value: &'static str,
+    }
+
+    let cases = [
+        // A *single* backtick opens one. This is the case most likely to be
+        // guessed wrong: the rule is not "two or more".
+        Case {
+            input: "(f `abc`)",
+            children: &["f", "`abc`"],
+            janet_value: r#""abc""#,
+        },
+        Case {
+            input: "(f ``abc``)",
+            children: &["f", "``abc``"],
+            janet_value: r#""abc""#,
+        },
+        // The triple-backtick docstring, the dominant Janet idiom, holding
+        // the bracket that used to unbalance the whole document.
+        Case {
+            input: "(f ```a [b, c) d``` tail)",
+            children: &["f", "```a [b, c) d```", "tail"],
+            janet_value: r#""a [b, c) d""#,
+        },
+        // A newline is an ordinary content byte; that is the entire point.
+        Case {
+            input: "(f ```line1\nline2```)",
+            children: &["f", "```line1\nline2```"],
+            janet_value: r#""line1\nline2""#,
+        },
+        // No escape processing at all: the `PFLAG_INSTRING` branch has no
+        // `\\` case, so this is a backslash followed by an `n`.
+        Case {
+            input: "(f `a\\nb`)",
+            children: &["f", "`a\\nb`"],
+            janet_value: r#""a\\nb""#,
+        },
+        // A double quote inside is content, not a nested string.
+        Case {
+            input: "(f `say \"hi\"`)",
+            children: &["f", "`say \"hi\"`"],
+            janet_value: r#""say \"hi\"""#,
+        },
+        // Runs shorter than the opener are content, not a close.
+        Case {
+            input: "(f ```a`b```)",
+            children: &["f", "```a`b```"],
+            janet_value: r#""a`b""#,
+        },
+        Case {
+            input: "(f ```a``b```)",
+            children: &["f", "```a``b```"],
+            janet_value: r#""a``b""#,
+        },
+        // The close is exactly N, not at least N. Janet returns 0 from
+        // `stringend`, so the character that revealed the end is re-dispatched
+        // and a longer run leaves its surplus to open the *next* datum: Janet
+        // reads this as `"ab"` followed by `" x"`, two values.
+        Case {
+            input: "(f ```ab```` x`)",
+            children: &["f", "```ab```", "` x`"],
+            janet_value: r#""ab" then " x""#,
+        },
+        // Backtick is not a symbol character, so it ends the token before it
+        // and opens a literal with no whitespace in between.
+        Case {
+            input: "(foo`bar`)",
+            children: &["foo", "`bar`"],
+            janet_value: r#"(foo "bar")"#,
+        },
+        Case {
+            input: "(`bar`foo)",
+            children: &["`bar`", "foo"],
+            janet_value: r#"("bar" foo)"#,
+        },
+        // `@` before one is Janet's mutable buffer literal: the same lexical
+        // extent with a different runtime type. `@` is already a reader prefix
+        // here, so it stays glued to the literal instead of scanning loose.
+        Case {
+            input: "(f @```abc```)",
+            children: &["f", "@```abc```"],
+            janet_value: r#"@"abc""#,
+        },
+    ];
+
+    for case in cases {
+        let tree = SyntaxTree::parse_with_dialect(case.input, Dialect::Janet)
+            .unwrap_or_else(|error| panic!("{}: {error}", case.input));
+        let form = &tree.root_view().children[0];
+        let children = form
+            .children
+            .iter()
+            .map(|child| child.span.slice(case.input))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            children, case.children,
+            "{} (janet reads {})",
+            case.input, case.janet_value
+        );
+    }
+}
+
+/// An unterminated long string is refused, not read to EOF as one giant atom.
+///
+/// Janet refuses it too: `janet_parser_eof` finds the `longstring` state still
+/// on the stack and reports "unexpected end of source". Reading the opener as
+/// an atom instead would hand every later command a tree in which the rest of
+/// the file is one enormous symbol -- silent corruption of exactly the kind
+/// this arm exists to remove -- so it fails loudly.
+///
+/// Note the middle two cases: because the opener is the *whole* run of
+/// backticks, ```` `` ```` is a two-backtick opener with no close rather than
+/// an empty string, so an empty long string cannot be written at all. Janet
+/// agrees, reporting "unexpected end of source, `` opened at line 1".
+#[test]
+fn janet_unterminated_long_string_is_refused() {
+    for input in ["(f ```abc)", "(f ``)", "(f ````)", "(f `abc)"] {
+        let error = SyntaxTree::parse_with_dialect(input, Dialect::Janet)
+            .expect_err("an unterminated long string must not parse");
+        assert!(
+            matches!(error, ParseError::UnterminatedString(_)),
+            "{input}: {error:?}"
+        );
+    }
+}
+
+/// The extent rule itself, tested on the one function both parser paths call.
+///
+/// The recording path (`atom_long_string_with_prefixes`) and the discarded-form
+/// scanner (`skip_form`) each ask `long_string_extent` where the literal ends,
+/// which is what stops them disagreeing. That sharing cannot be exercised
+/// end-to-end today because Janet has no datum comment -- `#` is always a line
+/// comment there, so nothing reaches `skip_form` under this dialect -- so the
+/// shared decision is pinned directly instead.
+#[test]
+fn janet_long_string_extent_matches_janets_reader() {
+    let policy = DialectReaderPolicy::new(Dialect::Janet);
+    let closed = |width| Some(LongStringExtent::Closed { width });
+
+    // Opener run length determines the required close.
+    assert_eq!(policy.long_string_extent(b"`abc`", 0), closed(5));
+    assert_eq!(policy.long_string_extent(b"``abc``", 0), closed(7));
+    assert_eq!(policy.long_string_extent(b"```abc```", 0), closed(9));
+    // Shorter interior runs are content.
+    assert_eq!(policy.long_string_extent(b"```a`b```", 0), closed(9));
+    assert_eq!(policy.long_string_extent(b"``a```b``", 0), closed(5));
+    // Exactly N closes, surplus backticks are left for the next datum.
+    assert_eq!(policy.long_string_extent(b"```ab```` x`", 0), closed(8));
+    // Scanning starts at `pos`, not at 0.
+    assert_eq!(policy.long_string_extent(b"(f `abc`)", 3), closed(5));
+    // No close, and an all-backtick run, are both unterminated.
+    assert_eq!(
+        policy.long_string_extent(b"```abc", 0),
+        Some(LongStringExtent::Unterminated)
+    );
+    assert_eq!(
+        policy.long_string_extent(b"``", 0),
+        Some(LongStringExtent::Unterminated)
+    );
+    // Not a long string at all.
+    assert_eq!(policy.long_string_extent(b"abc", 0), None);
+    assert_eq!(policy.long_string_extent(b"", 0), None);
+    // And never one outside Janet.
+    assert_eq!(
+        DialectReaderPolicy::new(Dialect::CommonLisp).long_string_extent(b"`abc`", 0),
+        None
+    );
+}
+
+/// A backtick keeps meaning quasiquote everywhere else. Janet is the only
+/// dialect that may change, and this pins the other nine so a later edit to
+/// `has_long_strings` cannot quietly widen.
+#[test]
+fn backtick_is_still_quasiquote_outside_janet() {
+    for dialect in [
+        Dialect::CommonLisp,
+        Dialect::EmacsLisp,
+        Dialect::Scheme,
+        Dialect::Racket,
+        Dialect::Clojure,
+        Dialect::Fennel,
+        Dialect::Lfe,
+        Dialect::Hy,
+        Dialect::Carp,
+        Dialect::Unknown,
+    ] {
+        let input = "(f `(a b))";
+        let tree = SyntaxTree::parse_with_dialect(input, dialect)
+            .unwrap_or_else(|error| panic!("{}: {error}", dialect.label()));
+        let form = &tree.root_view().children[0];
+        let children = form
+            .children
+            .iter()
+            .map(|child| child.span.slice(input))
+            .collect::<Vec<_>>();
+        assert_eq!(children, vec!["f", "`(a b)"], "{}", dialect.label());
+        assert_eq!(
+            form.children[1].reader_prefixes,
+            vec![ReaderPrefix::Quasiquote],
+            "{}",
+            dialect.label()
+        );
+    }
 }

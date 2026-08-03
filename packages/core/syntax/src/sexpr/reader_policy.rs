@@ -21,6 +21,15 @@ pub(super) enum ReaderMacro {
     },
 }
 
+/// How far a Janet long string reaches from its opening backtick run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum LongStringExtent {
+    /// Total byte width of the literal, both delimiter runs included.
+    Closed { width: usize },
+    /// An opening run with no closing run of the same length before EOF.
+    Unterminated,
+}
+
 /// Dialect-specific lexical decisions shared by normal parsing and discarded
 /// form scanning. Keeping these decisions in one place prevents the two paths
 /// from disagreeing about the extent of a reader form.
@@ -133,12 +142,76 @@ impl DialectReaderPolicy {
         Delimiter::from_open(byte).is_some() || Delimiter::from_close(byte).is_some()
     }
 
+    /// Whether a backtick opens a long string in this dialect.
+    ///
+    /// Janet is the only one. Its `root` state sends every backtick to the
+    /// `longstring` consumer (`src/core/parse.c`), and `symchars` leaves bit
+    /// 0x60 clear, so a backtick is not a symbol character either -- it both
+    /// opens a literal and ends whatever token preceded it.
+    ///
+    /// In every other dialect here a backtick is quasiquote (Common Lisp,
+    /// Scheme, Racket, Emacs Lisp, Fennel, and the permissive legacy reader)
+    /// or syntax-quote (Clojure), which `classify_reader_macro` already
+    /// returns as a one-byte `ReaderPrefix::Quasiquote`. Nothing below may
+    /// change for them.
+    pub(super) const fn has_long_strings(self) -> bool {
+        matches!(self.dialect, Dialect::Janet)
+    }
+
     pub(super) fn is_atom_boundary(self, bytes: &[u8], pos: usize) -> bool {
         bytes.get(pos).is_none_or(|byte| {
             self.is_whitespace(*byte)
                 || Self::is_raw_delimiter(*byte)
+                // Dialect first: `self.dialect` is loop-invariant across the
+                // per-byte calls this makes for every atom in the document, so
+                // for the nine dialects without long strings the test folds
+                // away instead of costing a comparison per byte.
+                || (self.has_long_strings() && *byte == b'`')
                 || self.line_comment_width(bytes, pos).is_some()
         })
+    }
+
+    /// How far the Janet long string starting at `pos` reaches, if one starts
+    /// there.
+    ///
+    /// Janet's `longstring` state (`src/core/parse.c`) counts the opening run
+    /// in `argn` while it keeps seeing backticks, then closes the literal on
+    /// the `argn`-th consecutive backtick it meets afterwards. Two consequences
+    /// follow, and both are load-bearing:
+    ///
+    /// * The opener is the *whole* run. ```` ```` ```` is a four-backtick
+    ///   opener, not two empty strings, so an empty long string cannot be
+    ///   written at all.
+    /// * The close is exactly `argn` backticks, not at least `argn`. Janet
+    ///   returns 0 from `stringend` so the character that revealed the end is
+    ///   re-dispatched, which means a longer run leaves its surplus to open
+    ///   the next datum: `` ```ab```` x` `` reads as `"ab"` then `" x"`. A run
+    ///   shorter than `argn` is content ("failed end candidate" pushes the
+    ///   backticks it had buffered back into the string).
+    ///
+    /// There is no escape processing inside one -- the `PFLAG_INSTRING` branch
+    /// has no `\\` case -- and a newline is an ordinary content byte, which is
+    /// the entire point of the form.
+    pub(super) fn long_string_extent(self, bytes: &[u8], pos: usize) -> Option<LongStringExtent> {
+        if !self.has_long_strings() || bytes.get(pos) != Some(&b'`') {
+            return None;
+        }
+        let open_len = backtick_run_length(bytes, pos);
+        let mut cursor = pos + open_len;
+        while cursor < bytes.len() {
+            if bytes[cursor] != b'`' {
+                cursor += 1;
+                continue;
+            }
+            let run = backtick_run_length(bytes, cursor);
+            if run >= open_len {
+                return Some(LongStringExtent::Closed {
+                    width: cursor + open_len - pos,
+                });
+            }
+            cursor += run;
+        }
+        Some(LongStringExtent::Unterminated)
     }
 
     /// How many bytes introduce a character literal at `pos`, if one starts
@@ -480,6 +553,14 @@ impl DialectReaderPolicy {
             _ => None,
         }
     }
+}
+
+/// How many consecutive backticks start at `pos`.
+fn backtick_run_length(bytes: &[u8], pos: usize) -> usize {
+    bytes[pos..]
+        .iter()
+        .take_while(|byte| **byte == b'`')
+        .count()
 }
 
 /// The Racket language directive, which the reader consumes to end of line.

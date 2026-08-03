@@ -2,7 +2,7 @@ use thiserror::Error;
 
 use crate::dialect::Dialect;
 
-use super::reader_policy::{DialectReaderPolicy, ReaderMacro};
+use super::reader_policy::{DialectReaderPolicy, LongStringExtent, ReaderMacro};
 use super::tree::{Comment, Node, NodeKind, ReaderPrefix, ReaderPrefixes, SyntaxTree};
 use super::types::{ByteOffset, ByteSpan, Delimiter, NodeId};
 
@@ -408,6 +408,35 @@ impl<'a> Parser<'a> {
         Err(ParseError::UnterminatedString(start.get()))
     }
 
+    fn atom_long_string_with_prefixes(
+        &mut self,
+        prefixes: Vec<PrefixToken>,
+    ) -> std::result::Result<(), ParseError> {
+        let start = self.pos;
+        let width = self.long_string_width(start.get())?;
+        self.advance_by(width);
+        self.push_atom(prefixes, start, self.pos);
+        Ok(())
+    }
+
+    /// Byte width of the Janet long string opening at `start`.
+    ///
+    /// An unterminated one is refused rather than read to EOF. Janet refuses
+    /// it too: `janet_parser_eof` finds the `longstring` state still on the
+    /// stack and reports "unexpected end of source". Reading it as an atom
+    /// instead would hand every later command a tree in which the remainder
+    /// of the file is one giant symbol -- silent corruption of exactly the
+    /// kind this fix exists to remove -- so it fails loudly, and reuses the
+    /// error the `"..."` path already raises for the same shape of mistake.
+    fn long_string_width(&self, start: usize) -> std::result::Result<usize, ParseError> {
+        match self.policy.long_string_extent(self.bytes, start) {
+            Some(LongStringExtent::Closed { width }) => Ok(width),
+            Some(LongStringExtent::Unterminated) | None => {
+                Err(ParseError::UnterminatedString(start))
+            }
+        }
+    }
+
     fn atom_with_prefixes(
         &mut self,
         prefixes: Vec<PrefixToken>,
@@ -629,6 +658,9 @@ impl<'a> Parser<'a> {
                 return Err(self.raw_delimiter_error());
             }
             b'"' => self.atom_string_with_prefixes(prefixes)?,
+            b'`' if self.policy.has_long_strings() => {
+                self.atom_long_string_with_prefixes(prefixes)?;
+            }
             _ => self.atom_with_prefixes(prefixes)?,
         }
         Ok(())
@@ -806,6 +838,19 @@ impl<'a> Parser<'a> {
                             return Err(self.raw_delimiter_error());
                         }
                         b'"' => self.skip_string()?,
+                        // Unreachable under Janet today: `#` is always a line
+                        // comment there, so `classify_janet` never returns a
+                        // `Discard` and nothing enters this scanner. It is
+                        // here because `DialectReaderPolicy` exists to stop
+                        // the recording and scanning paths disagreeing about
+                        // how far a reader form reaches, and a Janet datum
+                        // comment added later must not silently reintroduce
+                        // that disagreement. Both paths call the same
+                        // `long_string_extent`, which is what makes them agree.
+                        b'`' if self.policy.has_long_strings() => {
+                            let width = self.long_string_width(self.pos.get())?;
+                            self.advance_by(width);
+                        }
                         _ => self.skip_atom()?,
                     }
                 }
