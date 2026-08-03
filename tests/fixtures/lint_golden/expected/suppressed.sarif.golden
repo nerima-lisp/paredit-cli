@@ -4331,6 +4331,54 @@
               "shortDescription": {
                 "text": "a threading macro Carp's standard library marks deprecated"
               }
+            },
+            {
+              "fullDescription": {
+                "text": "Successive `for`/`as`/`with` clauses bind sequentially, like `let*`; clauses joined by `and` bind simultaneously, like `let` (CLHS 6.1.1.4). So a clause's initial value cannot read a variable bound in the same `and` group — at that moment the sibling still holds `nil`, or is not bound at all. Measured under SBCL 2.6.0, `(loop for a from 1 to 3 and b = (* a 10) collect (list a b))` returns `((1 10) (2 10) (3 20))` with no warning of any kind, where the author meant `((1 10) (2 20) (3 30))`; the `with` spelling instead fails outright with an UNBOUND-VARIABLE error."
+              },
+              "id": "loop-parallel-binding-reads-sibling",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "Successive `for`/`as`/`with` clauses bind sequentially, like `let*`; clauses joined by `and` bind simultaneously, like `let` (CLHS 6.1.1.4). So a clause's initial value cannot read a variable bound in the same `and` group — at that moment the sibling still holds `nil`, or is not bound at all. Measured under SBCL 2.6.0, `(loop for a from 1 to 3 and b = (* a 10) collect (list a b))` returns `((1 10) (2 10) (3 20))` with no warning of any kind, where the author meant `((1 10) (2 20) (3 30))`; the `with` spelling instead fails outright with an UNBOUND-VARIABLE error.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a loop clause joined by `and` whose initial value reads a variable bound in parallel with it"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Naming an `into` variable takes the accumulation out of the loop's implicit result (CLHS 6.1.3), and the variable's scope ends with the loop. If no `finally`, `do`, or conditional clause reads it, the value cannot escape and the loop returns `nil`. Measured under SBCL 2.6.0, `(loop for x in '(1 2 3) collect x into acc)` returns `NIL`. For a list accumulator SBCL adds a style warning; for a numeric one — `(loop for x in '(1 2 3) sum x into total)` — it emits nothing at all, because `total` is read by its own accumulation, so the compiler has no way to notice."
+              },
+              "id": "loop-into-accumulator-never-read",
+              "properties": {
+                "category": "dead-code",
+                "fixable": false,
+                "rationale": "Naming an `into` variable takes the accumulation out of the loop's implicit result (CLHS 6.1.3), and the variable's scope ends with the loop. If no `finally`, `do`, or conditional clause reads it, the value cannot escape and the loop returns `nil`. Measured under SBCL 2.6.0, `(loop for x in '(1 2 3) collect x into acc)` returns `NIL`. For a list accumulator SBCL adds a style warning; for a numeric one — `(loop for x in '(1 2 3) sum x into total)` — it emits nothing at all, because `total` is read by its own accumulation, so the compiler has no way to notice.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a loop accumulation whose `into` variable nothing reads, so the loop returns nil"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "An extended `loop` has at most one implicit result, produced by the accumulation clauses that name no `into` variable (CLHS 6.1.1.3). A `finally (return …)` returns from the loop's implicit `nil` block and pre-empts that result (CLHS 6.1.2.3) — and because an implicit accumulation has no name, the `finally` can never be returning it. So the accumulated value is built on every iteration and read by nothing. Measured under SBCL 2.6.0, `(loop for x in '(1 2 3) collect x finally (return :other))` returns `:OTHER` after fully consing `(1 2 3)`, and no warning is emitted."
+              },
+              "id": "loop-accumulation-discarded-by-finally-return",
+              "properties": {
+                "category": "dead-code",
+                "fixable": false,
+                "rationale": "An extended `loop` has at most one implicit result, produced by the accumulation clauses that name no `into` variable (CLHS 6.1.1.3). A `finally (return …)` returns from the loop's implicit `nil` block and pre-empts that result (CLHS 6.1.2.3) — and because an implicit accumulation has no name, the `finally` can never be returning it. So the accumulated value is built on every iteration and read by nothing. Measured under SBCL 2.6.0, `(loop for x in '(1 2 3) collect x finally (return :other))` returns `:OTHER` after fully consing `(1 2 3)`, and no warning is emitted.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a loop whose implicit accumulation is discarded by a `finally (return …)`"
+              }
             }
           ]
         }

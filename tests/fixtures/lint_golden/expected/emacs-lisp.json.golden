@@ -1976,6 +1976,24 @@
       "count": 0,
       "description": "a threading macro Carp's standard library marks deprecated",
       "rule": "carp-deprecated-thread-macro"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a loop clause joined by `and` whose initial value reads a variable bound in parallel with it",
+      "rule": "loop-parallel-binding-reads-sibling"
+    },
+    {
+      "category": "dead-code",
+      "count": 0,
+      "description": "a loop accumulation whose `into` variable nothing reads, so the loop returns nil",
+      "rule": "loop-into-accumulator-never-read"
+    },
+    {
+      "category": "dead-code",
+      "count": 0,
+      "description": "a loop whose implicit accumulation is discarded by a `finally (return …)`",
+      "rule": "loop-accumulation-discarded-by-finally-return"
     }
   ],
   "policy": {

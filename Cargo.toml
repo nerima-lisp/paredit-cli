@@ -147,6 +147,7 @@ paredit-feature-lint-type-declaration = { path = "packages/feature/lint-type-dec
 paredit-feature-lint-compile-time = { path = "packages/feature/lint-compile-time" }
 paredit-feature-lint-hy-lfe-idiom = { path = "packages/feature/lint-hy-lfe-idiom" }
 paredit-feature-lint-carp-idiom = { path = "packages/feature/lint-carp-idiom" }
+paredit-feature-lint-loop-facility = { path = "packages/feature/lint-loop-facility" }
 paredit-feature-emacs-lisp = { path = "packages/feature/emacs-lisp" }
 paredit-feature-conditional-conversion = { path = "packages/feature/conditional-conversion" }
 paredit-feature-external-check = { path = "packages/feature/external-check" }
