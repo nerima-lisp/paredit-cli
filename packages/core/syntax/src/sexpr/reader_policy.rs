@@ -599,11 +599,36 @@ impl DialectReaderPolicy {
     /// in `sexpr::formatter`, it affects every dialect, and it needs its own
     /// golden review — not a rider on a reader change.
     ///
-    /// Two smaller divergences are also knowingly left alone:
+    /// ### `,` is not a reader macro in Hy
     ///
-    /// * `,` still reads as `Unquote`. In Hy it is an ordinary identifier
-    ///   character — `(foo a, b)` reads the symbol `a,` — so a leading `,` is
-    ///   mis-shaped. It occurs at a token start essentially never.
+    /// Hy's `@reader_for` table has no `,` entry, and `NON_IDENT` — the
+    /// complete set of identifier terminators — is `set("()[]{};\"'`~")`,
+    /// which lists `~` and not `,`. So `,bar` is *one symbol*, not an unquote
+    /// of `bar`, and classifying `,` as a prefix was wrong at the root rather
+    /// than merely at a closing delimiter.
+    ///
+    /// It stayed invisible for as long as a dangling prefix was tolerated,
+    /// because the mis-parse only changed the tree's shape. Once a prefix with
+    /// no following form became a hard `MissingReaderForm`, it started refusing
+    /// ordinary Hy outright:
+    ///
+    /// * `(,)` — an expression whose single element is the symbol `,`, which
+    ///   Hy's tuple constructor uses for the empty tuple.
+    /// * A trailing comma before `}` or `]`, as in `{"a" 1 ,}` — idiomatic in
+    ///   Hy's Python-flavoured dict and list literals.
+    ///
+    /// An earlier version of this comment claimed a leading `,` "occurs at a
+    /// token start essentially never". Over 2825 real `.hy` files those two
+    /// shapes account for **13 outright parse failures**, including Hy's own
+    /// `contrib/walk.hy`, `hylang/simalq` and `kanaka/mal`.
+    ///
+    /// Dropping the comma is enough on its own: `is_atom_boundary` never
+    /// treated `,` as a terminator, so `,bar` and `1,` already scanned as
+    /// single atoms and now agree with Hy at token start too. `'` and `` ` ``
+    /// really are Hy reader macros taking exactly one following form, so a
+    /// closing delimiter after one is still refused — this corrects *which*
+    /// characters are prefixes, not what a prefix requires.
+    ///
     /// * `#;`, `#+` and `#-` are not Hy reader macros at all.
     const fn classify_hy(
         self,
@@ -613,6 +638,7 @@ impl DialectReaderPolicy {
     ) -> Option<ReaderMacro> {
         match (byte, next) {
             (b'#', Some(b'[')) => None,
+            (b',', _) => None,
             _ => self.classify_legacy(byte, next, third),
         }
     }
