@@ -4867,6 +4867,102 @@
               "shortDescription": {
                 "text": "a with-open-file whose result is a closure over, or an aggregate holding, the stream it closed"
               }
+            },
+            {
+              "id": "with-open-returns-lazy-seq",
+              "properties": {
+                "category": "resource",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a with-open whose value is a lazy sequence over the resource it closes"
+              }
+            },
+            {
+              "id": "def-inside-function-body",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a def/defn/defonce inside a function body, which interns a namespace Var at call time"
+              }
+            },
+            {
+              "id": "single-key-nested-path",
+              "properties": {
+                "category": "allocation",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "an assoc-in/update-in/get-in whose path holds one key, which the direct operator says"
+              }
+            },
+            {
+              "id": "apply-with-literal-collection",
+              "properties": {
+                "category": "allocation",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "an apply whose argument sequence is a literal, so the call can be written directly"
+              }
+            },
+            {
+              "id": "scheme-begin-single-form",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a begin wrapping a single expression, which is just that expression"
+              }
+            },
+            {
+              "id": "scheme-let-star-independent-bindings",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a let* whose initializers are all literals or free references, so no binding depends on another"
+              }
+            },
+            {
+              "id": "scheme-memq-assq-literal-key",
+              "properties": {
+                "category": "portability",
+                "fixable": true,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "memq or assq searching for a number or character literal, which R7RS 6.4 leaves unspecified"
+              }
+            },
+            {
+              "id": "scheme-named-let-never-recurs",
+              "properties": {
+                "category": "dead-code",
+                "fixable": true,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a named let whose loop name is never mentioned in its body, so it can never iterate"
+              }
             }
           ]
         }

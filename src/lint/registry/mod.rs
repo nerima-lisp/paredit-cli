@@ -43,7 +43,15 @@ use super::rule::RuleEntry;
 // rest are private keymaps dispatched by hand through `funcall`, never
 // `command-execute`. A denylist would not save it — the private-map cases are
 // indistinguishable from command maps.
-pub const RULE_COUNT: usize = 295;
+//
+// 295 + this batch's 8, both packages new: 4 (`lint-clojure-idiom`) and 4
+// (`lint-scheme-idiom`) = 303. It continues where the batch above left off —
+// none of the 8 runs on Common Lisp at all. The four Clojure rules declare
+// `RuleDialectScope::CLOJURE_ONLY`; the four Scheme ones name their dialects
+// explicitly, and three of them cover Scheme *and* Racket. That pair is a
+// first: every rule scoped away from Common Lisp until now named exactly one
+// dialect, which `contract.rs`'s dialect matrix had quietly assumed.
+pub const RULE_COUNT: usize = 303;
 
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
@@ -1241,5 +1249,37 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(
         &paredit_feature_lint_pathname_io::with_open_file_result_captures_stream::META,
         &paredit_feature_lint_pathname_io::with_open_file_result_captures_stream::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_clojure_idiom::with_open_returns_lazy_seq::rule::META,
+        &paredit_feature_lint_clojure_idiom::with_open_returns_lazy_seq::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_clojure_idiom::def_inside_function_body::rule::META,
+        &paredit_feature_lint_clojure_idiom::def_inside_function_body::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_clojure_idiom::single_key_nested_path::rule::META,
+        &paredit_feature_lint_clojure_idiom::single_key_nested_path::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_clojure_idiom::apply_with_literal_collection::rule::META,
+        &paredit_feature_lint_clojure_idiom::apply_with_literal_collection::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_scheme_idiom::begin_single_form::rule::META,
+        &paredit_feature_lint_scheme_idiom::begin_single_form::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_scheme_idiom::let_star_independent_bindings::rule::META,
+        &paredit_feature_lint_scheme_idiom::let_star_independent_bindings::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_scheme_idiom::memq_assq_literal_key::rule::META,
+        &paredit_feature_lint_scheme_idiom::memq_assq_literal_key::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_scheme_idiom::named_let_never_recurs::rule::META,
+        &paredit_feature_lint_scheme_idiom::named_let_never_recurs::rule::RULE,
     ),
 ];

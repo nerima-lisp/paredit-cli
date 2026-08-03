@@ -267,7 +267,7 @@ impl SupportStatus {
 /// here, the stack floor is the first thing to check — and note that an
 /// inherited `RUST_MIN_STACK` from the environment silently overrides
 /// `.cargo/config.toml`, because cargo's `[env]` is unforced.
-const INTROSPECTION_COMMANDS: [&str; 329] = [
+const INTROSPECTION_COMMANDS: [&str; 337] = [
     "inspect diff",
     "inspect check",
     "inspect dialect",
@@ -614,6 +614,14 @@ const INTROSPECTION_COMMANDS: [&str; 329] = [
     "inspect format-percent-ampersand-adjacent-redundancy",
     "inspect format-nested-directive-unbalanced",
     "inspect package-circular-in-package-chain",
+    "inspect with-open-returns-lazy-seq",
+    "inspect def-inside-function-body",
+    "inspect single-key-nested-path",
+    "inspect apply-with-literal-collection",
+    "inspect scheme-begin-single-form",
+    "inspect scheme-let-star-independent-bindings",
+    "inspect scheme-memq-assq-literal-key",
+    "inspect scheme-named-let-never-recurs",
 ];
 
 const FORMAT_COMMANDS: [&str; 3] = [
@@ -969,8 +977,13 @@ const SEMANTIC_OPERATIONS: [SemanticOperation; 3] = [
 /// more arrived with the `lint-sequence`/`lint-numeric` batch, and all three are
 /// scoped *away* from Common Lisp: `get-in` and `into` are Clojure's, and
 /// integer `/` truncating towards zero is Emacs Lisp's — in Common Lisp the same
-/// form is an exact ratio and nothing is lost. Each answer is read from the
-/// rule's own
+/// form is an exact ratio and nothing is lost. Eight more arrived with the
+/// `lint-clojure-idiom`/`lint-scheme-idiom` batch, and none of them runs on
+/// Common Lisp: `with-open`, an inline `def`, `get-in`/`assoc-in`/`update-in`
+/// and a spread `[…]` literal are Clojure's, while `begin`, `let*` shadowing
+/// rules, `memq`/`assq` and the named `let` are Scheme's. Three of the four
+/// Scheme rules name Racket alongside Scheme, which is the first scope here to
+/// name more than one dialect. Each answer is read from the rule's own
 /// [`LintRule::dialect_scope`] — the very declaration the engine's dispatcher
 /// consults before it walks anything — so this matrix cannot claim a dialect
 /// the rule would decline, or stay silent about one it handles.
@@ -1026,6 +1039,33 @@ fn lint_rule_dialect_scope(command_path: &str) -> Option<RuleDialectScope> {
         "inspect division-result-precision-loss" => {
             paredit_feature_lint_numeric::division_result_precision_loss::rule::RULE.dialect_scope()
         }
+        "inspect with-open-returns-lazy-seq" => {
+            paredit_feature_lint_clojure_idiom::with_open_returns_lazy_seq::rule::RULE
+                .dialect_scope()
+        }
+        "inspect def-inside-function-body" => {
+            paredit_feature_lint_clojure_idiom::def_inside_function_body::rule::RULE.dialect_scope()
+        }
+        "inspect single-key-nested-path" => {
+            paredit_feature_lint_clojure_idiom::single_key_nested_path::rule::RULE.dialect_scope()
+        }
+        "inspect apply-with-literal-collection" => {
+            paredit_feature_lint_clojure_idiom::apply_with_literal_collection::rule::RULE
+                .dialect_scope()
+        }
+        "inspect scheme-begin-single-form" => {
+            paredit_feature_lint_scheme_idiom::begin_single_form::rule::RULE.dialect_scope()
+        }
+        "inspect scheme-let-star-independent-bindings" => {
+            paredit_feature_lint_scheme_idiom::let_star_independent_bindings::rule::RULE
+                .dialect_scope()
+        }
+        "inspect scheme-memq-assq-literal-key" => {
+            paredit_feature_lint_scheme_idiom::memq_assq_literal_key::rule::RULE.dialect_scope()
+        }
+        "inspect scheme-named-let-never-recurs" => {
+            paredit_feature_lint_scheme_idiom::named_let_never_recurs::rule::RULE.dialect_scope()
+        }
         _ => return None,
     })
 }
@@ -1058,8 +1098,8 @@ pub(super) fn support_status(command_path: &str, dialect: &str) -> SupportStatus
         "inspect leftover-trace-call" => {
             Some(matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp))
         }
-        // The fifteen commands whose rule declares a dialect scope other than
-        // Common Lisp alone answer from that declaration directly.
+        // The twenty-three commands whose rule declares a dialect scope other
+        // than Common Lisp alone answer from that declaration directly.
         other => lint_rule_dialect_scope(other).map(|scope| scope.includes(dialect)),
     };
     match gated {
@@ -1285,16 +1325,38 @@ mod tests {
     /// mirror image: integer `/` truncates towards zero in Emacs Lisp, while in
     /// Common Lisp the identical form is an exact ratio, so the rule declares
     /// `RuleDialectScope::EMACS_LISP_ONLY` and would be *wrong* to fire on a
-    /// `.lisp` file. `a_dialect_specific_report_is_supported_for_exactly_one_dialect`
-    /// below is what keeps this list from becoming a place to hide a rule that
-    /// is merely under-supported.
-    const DIALECT_SPECIFIC_REPORTS: [&str; 6] = [
+    /// `.lisp` file.
+    ///
+    /// The last eight are `lint-clojure-idiom` and `lint-scheme-idiom`, the
+    /// first two packages written entirely outside Common Lisp. The four
+    /// Scheme ones are also what forced
+    /// `a_dialect_specific_report_is_supported_for_a_proper_subset_of_dialects`
+    /// below to stop asserting *exactly one* dialect: three of them declare
+    /// `[Scheme, Racket]`, because `begin`, `let*` and the named `let` read
+    /// identically in both. Only `scheme-memq-assq-literal-key` is Scheme
+    /// alone: Racket's `memq` is `eq?`-based too, but Racket *specifies* the
+    /// two cases R7RS 6.4 leaves open — fixnums compare `eq?` by guarantee and
+    /// characters have been normatively `eq?` since 9.0.0.10 — so every
+    /// finding on Racket would complain about code the language promises will
+    /// work. That test is
+    /// still what keeps this list from becoming a place to hide a rule that is
+    /// merely under-supported: a report named here has to be supported
+    /// *somewhere*, and not everywhere.
+    const DIALECT_SPECIFIC_REPORTS: [&str; 14] = [
         "inspect elisp-file",
         "inspect atom-swap-with-side-effect",
         "inspect future-promise-never-realized",
         "inspect nested-get-chain",
         "inspect redundant-into-empty-collection",
         "inspect division-result-precision-loss",
+        "inspect with-open-returns-lazy-seq",
+        "inspect def-inside-function-body",
+        "inspect single-key-nested-path",
+        "inspect apply-with-literal-collection",
+        "inspect scheme-begin-single-form",
+        "inspect scheme-let-star-independent-bindings",
+        "inspect scheme-memq-assq-literal-key",
+        "inspect scheme-named-let-never-recurs",
     ];
 
     #[test]
@@ -1325,14 +1387,28 @@ mod tests {
         }
     }
 
+    /// A report may only be listed as dialect-specific if it is genuinely
+    /// scoped: supported for at least one dialect, and not for all of them.
+    ///
+    /// This was `== 1` until `lint-scheme-idiom` arrived, on the accident that
+    /// every scoped rule until then named a single dialect. A rule that models
+    /// a construct two dialects share — `(begin expr)` in Scheme and Racket —
+    /// is not a weaker claim than one that names one, so the bound is the
+    /// proper-subset property rather than the arity. The lower bound is what
+    /// stops a merely under-supported report from being parked here; the upper
+    /// bound is what stops a general report from being.
     #[test]
-    fn a_dialect_specific_report_is_supported_for_exactly_one_dialect() {
+    fn a_dialect_specific_report_is_supported_for_a_proper_subset_of_dialects() {
         for path in DIALECT_SPECIFIC_REPORTS {
             let supported = DIALECTS
                 .iter()
                 .filter(|dialect| support_status(path, dialect) == SupportStatus::Supported)
                 .count();
-            assert_eq!(supported, 1, "{path}");
+            assert!(
+                (1..DIALECTS.len()).contains(&supported),
+                "{path} is supported for {supported} of {} dialects",
+                DIALECTS.len()
+            );
         }
     }
 

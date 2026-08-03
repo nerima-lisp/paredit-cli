@@ -3516,6 +3516,54 @@
       "count": 0,
       "description": "a with-open-file whose result is a closure over, or an aggregate holding, the stream it closed",
       "rule": "with-open-file-result-captures-stream"
+    },
+    {
+      "category": "resource",
+      "count": 0,
+      "description": "a with-open whose value is a lazy sequence over the resource it closes",
+      "rule": "with-open-returns-lazy-seq"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a def/defn/defonce inside a function body, which interns a namespace Var at call time",
+      "rule": "def-inside-function-body"
+    },
+    {
+      "category": "allocation",
+      "count": 0,
+      "description": "an assoc-in/update-in/get-in whose path holds one key, which the direct operator says",
+      "rule": "single-key-nested-path"
+    },
+    {
+      "category": "allocation",
+      "count": 0,
+      "description": "an apply whose argument sequence is a literal, so the call can be written directly",
+      "rule": "apply-with-literal-collection"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a begin wrapping a single expression, which is just that expression",
+      "rule": "scheme-begin-single-form"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a let* whose initializers are all literals or free references, so no binding depends on another",
+      "rule": "scheme-let-star-independent-bindings"
+    },
+    {
+      "category": "portability",
+      "count": 0,
+      "description": "memq or assq searching for a number or character literal, which R7RS 6.4 leaves unspecified",
+      "rule": "scheme-memq-assq-literal-key"
+    },
+    {
+      "category": "dead-code",
+      "count": 0,
+      "description": "a named let whose loop name is never mentioned in its body, so it can never iterate",
+      "rule": "scheme-named-let-never-recurs"
     }
   ],
   "policy": {

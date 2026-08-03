@@ -1,0 +1,23 @@
+use paredit_core_cli::CliResult;
+
+use paredit_core_cli::args::ReportFormat;
+use paredit_core_cli::runtime::Verbosity;
+
+use crate::single_key_nested_path::usecase::SingleKeyNestedPathItem;
+use paredit_core_cli::report::render::print_report;
+use paredit_core_cli::report::{FileFindings, ReportPolicy};
+
+pub fn print_single_key_nested_path_report(
+    reports: &[FileFindings<SingleKeyNestedPathItem>],
+    policy: &ReportPolicy,
+    output: ReportFormat,
+    verbosity: Verbosity,
+) -> CliResult<()> {
+    print_report(
+        "inspect single-key-nested-path",
+        reports,
+        policy,
+        output,
+        verbosity,
+    )
+}

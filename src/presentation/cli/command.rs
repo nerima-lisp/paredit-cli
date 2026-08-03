@@ -3,6 +3,7 @@ use super::{MigrateCommand, SchemaCommand, query_count, query_find, query_replac
 use super::{
     accessor_arity_report, add_ignore_declaration, analysis_report, api_diff_report,
     api_surface_report, append_list_to_cons_report, append_nil_report,
+    apply_with_literal_collection_report,
     args::{
         AnalyzeArgs, CanonicalizeArgs, CopyArgs, CursorArgs, EditTargetArgs, FormatArgs, KillArgs,
         NavigateArgs, NewlineArgs, NormalizeQuotesArgs, RaiseArgs, ReindentArgs, RepairArgs,
@@ -23,8 +24,9 @@ use super::{
     convert_if_to_when, convert_labels_to_flet, convert_let_star_to_let, convert_let_to_let_star,
     convert_sequential_binding, convert_unless_to_if, convert_when_to_if, data_check_report,
     de_morgan_report, dead_boolean_operand_report, debt_score_report,
-    deeply_nested_anonymous_lambda_report, defclass_required_slot_no_initform_or_initarg_report,
-    defclass_slot_shadowing_report, define_condition_empty_superclass_list_report,
+    deeply_nested_anonymous_lambda_report, def_inside_function_body_report,
+    defclass_required_slot_no_initform_or_initarg_report, defclass_slot_shadowing_report,
+    define_condition_empty_superclass_list_report,
     define_condition_missing_report_for_error_type_report, definition_movement, definition_removal,
     definition_report, defpackage_quoted_report, defpackage_without_in_package_report,
     dependency_report, destructive_literal_report, destructuring_bind_unused_whole_report,
@@ -99,28 +101,31 @@ use super::{
     redundant_the_report, refactor, refactor_checkpoint, refactor_step, remove_unused_binding,
     remove_unused_control, rename, rename_control, replace_forms, resolve_report,
     restart_case_clause_without_report_report, restart_report, return_from_unmatched_block_report,
-    return_outside_implicit_nil_block_report, self_assignment_report, self_comparison_report,
+    return_outside_implicit_nil_block_report, scheme_begin_single_form_report,
+    scheme_let_star_independent_bindings_report, scheme_memq_assq_literal_key_report,
+    scheme_named_let_never_recurs_report, self_assignment_report, self_comparison_report,
     self_recursive_tail_call_report, semantic_coverage_report, serial_consistency_report,
     set_membership_via_linear_scan_report, setf_arity_report, setq_non_variable_report,
     sharp_quoted_lambda_report, sign_comparison_report,
     signal_on_error_condition_returns_silently_report, signature_report, similarity_report,
-    single_arg_comparison_report, single_clause_cond_report, single_operand_arithmetic_report,
-    single_operand_boolean_report, single_operand_list_op_report, single_value_bind_report,
-    sleep_in_test_report, slot_value_bypasses_accessor_report, source_report, split_let,
-    split_let_star, step_zero_report, string_case_fold_report, stringly_typed_dispatch_report,
-    struct_cycle_report, structural_diff, structural_patch, subseq_zero_report,
-    symbol_function_fset_dynamic_name_report, symbol_index_report, system_conflict_report,
-    system_cycle_report, t_comparison_report, tagbody_unreachable_tag_report,
-    test_asserts_constant_report, test_map_report, test_without_assertion_report, the_arity_report,
-    thread_expression, thread_spawned_without_error_handler_report, todo_report, type_report,
-    typecase_nil_key_report, typep_predicate_report, undefined_package_report,
-    unreachable_case_clause_report, unreachable_cond_clause_report, unreachable_expression_report,
+    single_arg_comparison_report, single_clause_cond_report, single_key_nested_path_report,
+    single_operand_arithmetic_report, single_operand_boolean_report, single_operand_list_op_report,
+    single_value_bind_report, sleep_in_test_report, slot_value_bypasses_accessor_report,
+    source_report, split_let, split_let_star, step_zero_report, string_case_fold_report,
+    stringly_typed_dispatch_report, struct_cycle_report, structural_diff, structural_patch,
+    subseq_zero_report, symbol_function_fset_dynamic_name_report, symbol_index_report,
+    system_conflict_report, system_cycle_report, t_comparison_report,
+    tagbody_unreachable_tag_report, test_asserts_constant_report, test_map_report,
+    test_without_assertion_report, the_arity_report, thread_expression,
+    thread_spawned_without_error_handler_report, todo_report, type_report, typecase_nil_key_report,
+    typep_predicate_report, undefined_package_report, unreachable_case_clause_report,
+    unreachable_cond_clause_report, unreachable_expression_report,
     unsynchronized_shared_mutation_report, unthread_expression, unused_export_report,
     unused_local_callable_report, unused_nickname_report, unused_package_report,
     unwind_protect_no_cleanup_report, unwrap_call, use_widening_report, value_propagation_report,
     values_list_of_list_report, verbose_negation_report, when_unless_implicit_nil_misused_report,
     with_accessors_empty_binding_list_report, with_open_file_redundant_direction_default_report,
-    workspace_report, writability_report, zero_divisor_report,
+    with_open_returns_lazy_seq_report, workspace_report, writability_report, zero_divisor_report,
 };
 use clap::Subcommand;
 
@@ -804,6 +809,22 @@ pub(super) enum InspectCommand {
     FormatNestedDirectiveUnbalanced(format_nested_directive_unbalanced_report::args::FormatNestedDirectiveUnbalancedReportArgs),
     /// Report a top-level in-package that re-enters a package the file had already left.
     PackageCircularInPackageChain(package_circular_in_package_chain_report::args::CircularInPackageChainReportArgs),
+    /// Report a Clojure with-open whose value is a lazy sequence over the resource it closes.
+    WithOpenReturnsLazySeq(with_open_returns_lazy_seq_report::args::WithOpenLazySeqReportArgs),
+    /// Report a Clojure def/defn/defonce inside a function body, which interns a namespace Var at call time.
+    DefInsideFunctionBody(def_inside_function_body_report::args::DefInsideFunctionBodyReportArgs),
+    /// Report a Clojure assoc-in/update-in/get-in whose path holds one key, which the direct operator says.
+    SingleKeyNestedPath(single_key_nested_path_report::args::SingleKeyNestedPathReportArgs),
+    /// Report a Clojure apply whose argument sequence is a literal, so the call can be written directly.
+    ApplyWithLiteralCollection(apply_with_literal_collection_report::args::ApplyWithLiteralCollectionReportArgs),
+    /// Report a Scheme begin wrapping a single expression, which is just that expression.
+    SchemeBeginSingleForm(scheme_begin_single_form_report::args::BeginSingleFormReportArgs),
+    /// Report a Scheme let* whose initializers are all literals or free references, so no binding depends on another.
+    SchemeLetStarIndependentBindings(scheme_let_star_independent_bindings_report::args::LetStarIndependentBindingsReportArgs),
+    /// Report a Scheme memq or assq searching for a number or character literal, which R7RS 6.4 leaves unspecified.
+    SchemeMemqAssqLiteralKey(scheme_memq_assq_literal_key_report::args::MemqAssqLiteralKeyReportArgs),
+    /// Report a Scheme named let whose loop name is never mentioned in its body, so it can never iterate.
+    SchemeNamedLetNeverRecurs(scheme_named_let_never_recurs_report::args::NamedLetNeverRecursReportArgs),
 }
 
 /// Single-document structural editing commands. These print rewritten source

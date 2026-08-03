@@ -1,6 +1,6 @@
 # Architecture
 
-`paredit-cli` is a Cargo workspace: a thin composition root plus 60 packages
+`paredit-cli` is a Cargo workspace: a thin composition root plus 62 packages
 under `packages/core/` and `packages/feature/`. Knowing which package owns a
 thing is the fastest way to know where a change belongs.
 
@@ -17,7 +17,7 @@ core/syntax ──▶ core/semantics ──▶ core/edit ──▶ core/cli
      └──▶ core/workspace          core/lint-engine ──┘
                     │
                     ▼
-              feature/*  (51 packages, mostly independent of each other)
+              feature/*  (53 packages, mostly independent of each other)
                     │
                     ▼
               paredit-cli  (command tree, dispatch, REGISTRY)
@@ -65,10 +65,10 @@ src/
 A contract test walks `src/` and refuses anything else.
 
 The lint `REGISTRY` is the canonical example of what *must* live here. It names
-all 295 rules, and every rule depends on the engine; putting the registry in
+all 303 rules, and every rule depends on the engine; putting the registry in
 either would be a cycle. So the engine takes a `RuleCatalog` as an argument and
 never learns which rules exist, the rules never learn the registry does, and
-the registry sits in the root reaching twenty-six feature packages for their
+the registry sits in the root reaching twenty-eight feature packages for their
 `META` and `RULE`. That is the criterion: **a module that enumerates or
 aggregates several features** belongs in neither core nor any one feature.
 
@@ -127,7 +127,7 @@ semantic enum (`ReportLimit::{Complete, Limited(NonZeroUsize)}`,
 Derive redundant presentation values (booleans, counts) at the serialization
 boundary instead of storing them.
 
-## Lint rules: one trait, one registry line, twenty-six packages
+## Lint rules: one trait, one registry line, twenty-eight packages
 
 The lint suite is the clearest example of the split's shape, and the most
 frequently extended part of the tree.
@@ -141,8 +141,8 @@ frequently extended part of the tree.
 | `policy` | Dialect scope, rule selection and gate decisions: logic that needs no tree. |
 | `engine` | The single pass, which walks the document once and dispatches each node to every rule whose `head_filter` matches. |
 
-290 of the 295 shipped rules live in twenty-five themed packages, split seven
-ways. A twenty-sixth, `feature/lint-custom`, holds no rules at all: it is the
+298 of the 303 shipped rules live in twenty-seven themed packages, split seven
+ways. A twenty-eighth, `feature/lint-custom`, holds no rules at all: it is the
 pattern language and the second pass that run the rules a *project* writes for
 itself.
 
@@ -296,7 +296,32 @@ Emacs Lisp's truncating integer `/`. Each needs an arm in `contract.rs`'s
 `lint_rule_dialect_scope` and an entry in `DIALECT_SPECIFIC_REPORTS`, or the
 dialect matrix claims a Common Lisp support the rule declines.
 
-**`REGISTRY` is in neither.** It names all 295 rules, and every rule depends on
+The batch after *that* is the first whose packages are entirely outside Common
+Lisp rather than carving an exception out of it:
+`feature/lint-{clojure-idiom,scheme-idiom}`, 4 rules and 4 commands each, all
+eight with the directory-plus-`cli/` layout. Neither had a home — the Clojure
+rules are about `with-open`, an inline `def`, the
+`get-in`/`assoc-in`/`update-in` family and a spread `[…]` literal, and the
+Scheme ones about `begin`, `let*`, `memq`/`assq` and the named `let`, none of
+which any syntax-themed package could hold without becoming a second home for
+its subject. `lint-scheme-idiom` is also the first package whose rules are
+mostly `Fixability::Fixable`: three of its four repairs rewrite a single head
+symbol and the fourth copies an inner span verbatim, so spacing and comments
+survive.
+
+Those four are what made `DIALECT_SPECIFIC_REPORTS` grow a second dimension.
+Every scoped rule before them named exactly *one* dialect, and
+`contract.rs`'s companion test had hardened that accident into
+`assert_eq!(supported, 1)`. Three of the Scheme rules declare
+`[Scheme, Racket]`, because `begin`, `let*` and the named `let` read
+identically in both, so the test now asserts a *proper subset* of the ten
+dialects instead. Only `scheme-memq-assq-literal-key` is Scheme alone, and for
+a reason worth keeping: Racket's `memq` is `eq?`-based too, but Racket
+specifies the two cases R7RS 6.4 leaves open — fixnums compare `eq?` by
+guarantee and characters have been normatively `eq?` since 9.0.0.10 — so every
+finding there would complain about code the language promises will work.
+
+**`REGISTRY` is in neither.** It names all 303 rules, and every rule depends on
 the engine, so putting it in the engine or in a rule package would be a cycle.
 It sits in the root crate, and the engine receives a `RuleCatalog` as an
 argument — which is why the engine can be a package at all.
