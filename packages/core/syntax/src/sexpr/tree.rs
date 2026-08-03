@@ -198,12 +198,35 @@ pub enum ReaderPrefix {
     UnquoteSplicing,
     Function,
     ReadEval,
-    /// A bare `#` immediately before an open delimiter: Common Lisp/Scheme
-    /// vector literals (`#(1 2 3)`) and Clojure set (`#{1 2}`) or anonymous
-    /// function (`#(+ % 1)`) literals. All three dialects glue `#` directly
-    /// onto the following collection with no space, so this keeps the `#`
-    /// attached to its list instead of scanning as a disconnected atom.
+    /// A bare `#` immediately before the literal it introduces: Common
+    /// Lisp/Scheme vector literals (`#(1 2 3)`), Clojure set (`#{1 2}`) or
+    /// anonymous function (`#(+ % 1)`) literals, LFE tuples (`#(a b)`) and LFE
+    /// binary strings (`#"GET"`). Every one of them glues `#` directly onto the
+    /// following literal with no space, so this keeps the `#` attached instead
+    /// of scanning as a disconnected atom.
     HashLiteral,
+    /// LFE's binary literal opener, `#B(…)` or `#b(…)`.
+    ///
+    /// `lfe_scan.erl`'s `scan_hash2` returns `'#B('` as a *single* opening
+    /// token, and `lfe_parse.spell1` closes it with an ordinary `)`
+    /// (`sexpr -> '#B(' proper_list ')'`). Structurally that is the same shape
+    /// as `#(`, which is why it is a prefix on the list rather than a token of
+    /// its own — but it needs its own spelling, because rendering it as a bare
+    /// `#` would turn a binary into a tuple.
+    LfeBinary,
+    /// LFE's map literal opener, `#M(…)` or `#m(…)`.
+    ///
+    /// `sexpr -> '#M(' proper_list ')'` in `lfe_parse.spell1`; the elements are
+    /// alternating keys and values.
+    LfeMap,
+    /// LFE's struct literal opener, `#S(…)` or `#s(…)`.
+    ///
+    /// `lfe_scan.erl` scans `'#S('` and `lfe_parse.spell1` declares it a
+    /// terminal, but 2.2.0 has no production that uses it, so LFE's own parser
+    /// answers `{illegal,'#S('}`. It is lexed here anyway: the alternative is
+    /// to keep orphaning the `#S` from its list, which is worse for a file that
+    /// is already broken, and the spelling is fixed by the scanner.
+    LfeStruct,
     /// Clojure metadata sugar (`^{:doc "x"}`, `^:private`, `^String`)
     /// prefixing the map, keyword, or symbol that carries the metadata.
     Metadata,
@@ -225,6 +248,16 @@ impl ReaderPrefix {
             Self::Function => "#'",
             Self::ReadEval => "#.",
             Self::HashLiteral => "#",
+            // Upper case because that is what LFE's own printer emits
+            // (`lfe_io_write.erl` writes `["#B(",bytes(Bit, D),$)]`). The
+            // reader accepts either case, so a document written `#b(` keeps
+            // its own spelling wherever the source span is used — which is
+            // every structural edit and the formatter. Only the small number
+            // of call sites that *synthesise* prefix text from this constant
+            // normalise the case, and `#b(` and `#B(` are the same literal.
+            Self::LfeBinary => "#B",
+            Self::LfeMap => "#M",
+            Self::LfeStruct => "#S",
             Self::Metadata => "^",
             Self::ReaderConditional => "#?",
             Self::ReaderConditionalSplicing => "#?@",

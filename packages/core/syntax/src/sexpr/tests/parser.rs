@@ -1681,3 +1681,339 @@ fn clojure_namespaced_map_width_stops_at_the_namespace() {
     // Comments are not whitespace to Clojure's reader here.
     assert_eq!(width("#:foo ;; c\n{:a 1}"), None);
 }
+
+// ---------------------------------------------------------------------------
+// LFE reader
+//
+// The reference is LFE 2.2.0's own scanner, `src/lfe_scan.erl`, and its
+// grammar, `src/lfe_parse.spell1`. Every expected reading below is that
+// scanner's token stream, checked by running the case through
+// `lfe_scan:string/1` -- not a guess at what the notation ought to mean.
+// ---------------------------------------------------------------------------
+
+/// The source text of every child of the document's single top-level list.
+fn lfe_children(input: &'static str) -> Vec<&'static str> {
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::Lfe)
+        .unwrap_or_else(|error| panic!("{input:?}: {error}"));
+    tree.root_view().children[0]
+        .children
+        .iter()
+        .map(|child| child.span.slice(input))
+        .collect()
+}
+
+/// `#B(`, `#M(` and `#S(` are single *opening* tokens in `scan_hash2`:
+///
+/// ```erlang
+/// scan_hash2([C,$\(|Cs], Line, Col, [], St) when (C =:= $b) or (C =:= $B) ->
+///     {ok,{'#B(',Line},Cs,Line,Col,St};
+/// ```
+///
+/// closed by a plain `)`, since `lfe_parse.spell1` reads
+/// `sexpr -> '#B(' proper_list ')'`. Taking the two-byte dispatch as a prefix
+/// on the following list gives exactly that shape.
+///
+/// Before this, the `#B` scanned as its own atom and the list became its
+/// *sibling*, so `(f #B(1 2) X)` had four children where LFE sees three --
+/// silently, at exit 0, which made every arity-sensitive rule read the form
+/// wrong.
+#[test]
+fn lfe_hash_letter_collections_stay_attached_to_their_list() {
+    struct Case {
+        input: &'static str,
+        children: &'static [&'static str],
+        prefix: ReaderPrefix,
+    }
+
+    let cases = [
+        Case {
+            input: "(f #B(1 2) X)",
+            children: &["f", "#B(1 2)", "X"],
+            prefix: ReaderPrefix::LfeBinary,
+        },
+        // The scanner accepts either case, and the document keeps its own.
+        Case {
+            input: "(f #b(1 2) X)",
+            children: &["f", "#b(1 2)", "X"],
+            prefix: ReaderPrefix::LfeBinary,
+        },
+        Case {
+            input: "(g #M(a 1 b 2) Y)",
+            children: &["g", "#M(a 1 b 2)", "Y"],
+            prefix: ReaderPrefix::LfeMap,
+        },
+        Case {
+            input: "(g #m(a 1) Y)",
+            children: &["g", "#m(a 1)", "Y"],
+            prefix: ReaderPrefix::LfeMap,
+        },
+        // `lfe_scan` emits `'#S('` and `lfe_parse.spell1` declares it a
+        // terminal, but 2.2.0 has no production using it, so LFE itself
+        // answers `{illegal,'#S('}`. Lexing it anyway beats orphaning the `#S`
+        // from its list in a file that is already broken.
+        Case {
+            input: "(h #S(point x 1) Z)",
+            children: &["h", "#S(point x 1)", "Z"],
+            prefix: ReaderPrefix::LfeStruct,
+        },
+        // The tuple opener, which has always worked, pinned so the new arms
+        // cannot displace it.
+        Case {
+            input: "(i #(1 2) W)",
+            children: &["i", "#(1 2)", "W"],
+            prefix: ReaderPrefix::HashLiteral,
+        },
+    ];
+
+    for case in cases {
+        assert_eq!(lfe_children(case.input), case.children, "{}", case.input);
+        let tree = SyntaxTree::parse_with_dialect(case.input, Dialect::Lfe).expect("valid");
+        let literal = &tree.root_view().children[0].children[1];
+        assert_eq!(literal.kind, ExpressionKind::List, "{}", case.input);
+        assert_eq!(literal.reader_prefixes, vec![case.prefix], "{}", case.input);
+    }
+}
+
+/// `#b` and its friends only open a collection when a `(` follows.
+/// `scan_hash2` orders the binary-token clause before the based-number one for
+/// exactly this reason ("Scan binary tokens, these must come before the based
+/// number"), so `#b1010` stays the number ten.
+#[test]
+fn lfe_based_numbers_are_not_collection_openers() {
+    for input in [
+        "(f #b1010 x)",
+        "(f #B1010 x)",
+        "(f #x1f x)",
+        "(f #o17 x)",
+        "(f #d99 x)",
+        "(f #2r1010 x)",
+        "(f #*1010 x)",
+    ] {
+        let children = lfe_children(input);
+        assert_eq!(children.len(), 3, "{input}");
+        assert_eq!(children[0], "f", "{input}");
+        assert_eq!(children[2], "x", "{input}");
+    }
+}
+
+/// `scan_hash1([$"|Cs], Line, Col, [], St) -> scan_binary_string(...)` makes
+/// `#"..."` a single `binary` token.
+///
+/// Before this the `#` glued onto the string's *first word* and every later
+/// word became a sibling atom, so `#"text/plain; version=0.0.4"` split into
+/// three and one containing a `)` closed its enclosing list early. Binary
+/// strings are the most common of these constructs in real LFE.
+#[test]
+fn lfe_binary_strings_are_one_atom() {
+    let cases: &[(&str, &[&str])] = &[
+        ("(f #\"GET\" x)", &["f", "#\"GET\"", "x"]),
+        ("(f #\"a b\" x)", &["f", "#\"a b\"", "x"]),
+        ("(f #\"x)y\" x)", &["f", "#\"x)y\"", "x"]),
+        ("(f #\"\" x)", &["f", "#\"\"", "x"]),
+        (
+            "(f #\"text/plain; version=0.0.4\" x)",
+            &["f", "#\"text/plain; version=0.0.4\"", "x"],
+        ),
+        ("(f #\"esc \\\" q\" x)", &["f", "#\"esc \\\" q\"", "x"]),
+    ];
+
+    for (input, expected) in cases {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::Lfe)
+            .unwrap_or_else(|error| panic!("{input:?}: {error}"));
+        let children: Vec<&str> = tree.root_view().children[0]
+            .children
+            .iter()
+            .map(|child| child.span.slice(input))
+            .collect();
+        assert_eq!(&children, expected, "{input}");
+    }
+}
+
+/// LFE's whole character-literal grammar is one clause:
+///
+/// ```erlang
+/// scan_hash2([$\\,C|Cs], Line, Col, [], St) ->
+///     {ok,{number,Line,C},Cs,Line,Col+2,St};
+/// ```
+///
+/// Two bytes of prefix and exactly one character, taken verbatim. There are no
+/// named characters and no escape processing at all, so `#\newline` is the
+/// letter `n` followed by the symbol `ewline` -- `lfe_scan:string/1` answers
+/// `[{number,1,110},{symbol,1,ewline}]` for it.
+#[test]
+fn lfe_character_literal_is_exactly_one_character() {
+    let cases: &[(&str, &[&str])] = &[
+        // The delimiters. These used to restructure the tree outright: `#\(`
+        // scanned as the atom `#\` and then *opened a list*.
+        ("(list #\\( #\\))", &["list", "#\\(", "#\\)"]),
+        // A `;` would otherwise start a comment and eat the rest of the line.
+        ("(list #\\; a)", &["list", "#\\;", "a"]),
+        // A `"` would otherwise open a string and swallow the file.
+        ("(list #\\\" a)", &["list", "#\\\"", "a"]),
+        ("(list #\\\\ a)", &["list", "#\\\\", "a"]),
+        ("(list #\\| a)", &["list", "#\\|", "a"]),
+        ("(list #\\a #\\b)", &["list", "#\\a", "#\\b"]),
+        // One character means one character: the rest is a separate symbol.
+        ("(f #\\newline)", &["f", "#\\n", "ewline"]),
+        // A multi-byte character is one character, not one byte.
+        ("(f #\\\u{e9} x)", &["f", "#\\\u{e9}", "x"]),
+    ];
+
+    for (input, expected) in cases {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::Lfe)
+            .unwrap_or_else(|error| panic!("{input:?}: {error}"));
+        let children: Vec<&str> = tree.root_view().children[0]
+            .children
+            .iter()
+            .map(|child| child.span.slice(input))
+            .collect();
+        assert_eq!(&children, expected, "{input}");
+    }
+}
+
+/// `start_symbol_char($|) -> false` sends a *leading* `|` to `scan_qsymbol`,
+/// which runs to the closing `|` taking `\C` verbatim; whitespace and
+/// delimiters inside are ordinary content. But `symbol_char/1` has no `$|`
+/// clause, so it falls through to `(C > $\s) and (C =< $~)` -- true for `|`
+/// (124) -- and a `|` *inside* a token is an ordinary constituent.
+///
+/// Both halves matter. Without the first, `'|foo bar|` split at the space;
+/// with the first but not the second, `a|b c|d` would fuse into one symbol.
+#[test]
+fn lfe_bar_quoted_symbols_open_only_at_a_token_start() {
+    let cases: &[(&str, &[&str])] = &[
+        ("(f '|foo bar|)", &["f", "'|foo bar|"]),
+        ("(f |a(b| x)", &["f", "|a(b|", "x"]),
+        ("(f |x\\|y| x)", &["f", "|x\\|y|", "x"]),
+        ("(f || x)", &["f", "||", "x"]),
+        ("(f |;| x)", &["f", "|;|", "x"]),
+        // A newline inside is content: `scan_qsymbol1` has an explicit `$\n`
+        // clause that keeps collecting.
+        ("(f |multi\nline| x)", &["f", "|multi\nline|", "x"]),
+        // Mid-token, an ordinary constituent. Two symbols, not one.
+        ("(f a|b c|d)", &["f", "a|b", "c|d"]),
+    ];
+
+    for (input, expected) in cases {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::Lfe)
+            .unwrap_or_else(|error| panic!("{input:?}: {error}"));
+        let children: Vec<&str> = tree.root_view().children[0]
+            .children
+            .iter()
+            .map(|child| child.span.slice(input))
+            .collect();
+        assert_eq!(&children, expected, "{input}");
+    }
+}
+
+/// An unterminated `|` fails loudly rather than consuming the rest of the file
+/// as one symbol.
+///
+/// LFE refuses it too -- `scan_qsymbol1(eof, ...)` raises
+/// `{illegal_chars,[$| | Symcs]}` -- so this agrees with the reference reader
+/// rather than inventing a rule. Reading to EOF as one atom would be exactly
+/// the silent corruption this work exists to remove.
+#[test]
+fn lfe_unterminated_bar_quoted_symbol_is_refused() {
+    let error = SyntaxTree::parse_with_dialect("(f |unterminated\n(g 1)\n", Dialect::Lfe)
+        .expect_err("unterminated multiple escape");
+    assert_eq!(error, ParseError::UnterminatedSymbol(3));
+}
+
+/// `#\` with nothing after it is a truncated literal, not the character for
+/// nothing. LFE answers `{illegal_token,"#\\"}`.
+///
+/// Accepting it as a complete atom would make the formatter non-idempotent:
+/// it appends a trailing newline, the truncated literal claims it as its
+/// character, and the next pass appends another. Scheme and Racket already
+/// refuse the same input for the same reason.
+#[test]
+fn lfe_truncated_character_literal_is_refused() {
+    let error = SyntaxTree::parse_with_dialect("(f #\\", Dialect::Lfe)
+        .expect_err("truncated character literal");
+    assert_eq!(
+        error,
+        ParseError::UnsupportedReaderDispatch {
+            dispatch: "#".to_owned(),
+            position: 3,
+        }
+    );
+}
+
+/// Everything above is LFE-only.
+///
+/// `#(` is a vector in Scheme and Racket and a set or lambda in Clojure, so
+/// these bytes are live elsewhere with other meanings; a letter between the
+/// `#` and the `(` means something different or nothing in all ten. This pins
+/// them against a later edit widening `classify_lfe`'s arms by accident.
+#[test]
+fn lfe_hash_letter_collections_do_not_leak_into_other_dialects() {
+    for dialect in [
+        Dialect::CommonLisp,
+        Dialect::EmacsLisp,
+        Dialect::Scheme,
+        Dialect::Racket,
+        Dialect::Clojure,
+        Dialect::Fennel,
+        Dialect::Janet,
+        Dialect::Hy,
+        Dialect::Carp,
+        Dialect::Unknown,
+    ] {
+        let label = dialect.label();
+        // Refusing the input is fine; what must not happen is reading it as
+        // one prefixed list the way LFE now does.
+        let Ok(tree) = SyntaxTree::parse_with_dialect("(f #B(1 2) X)", dialect) else {
+            continue;
+        };
+        let prefixes: Vec<ReaderPrefix> = tree.root_view().children[0]
+            .children
+            .iter()
+            .flat_map(|child| child.reader_prefixes.clone())
+            .collect();
+        assert!(
+            !prefixes.contains(&ReaderPrefix::LfeBinary),
+            "{label} produced an LFE binary literal"
+        );
+    }
+}
+
+/// The two lexical switches this change added, pinned per dialect.
+///
+/// The table is worth more than the prose: `bar_quoting` replaced a boolean,
+/// and its mapping has to stay exactly what that boolean was for the ten
+/// dialects LFE is not.
+#[test]
+fn lfe_lexical_switches_are_scoped_to_lfe() {
+    use crate::sexpr::reader_policy::BarQuoting;
+
+    let expected = [
+        (Dialect::CommonLisp, BarQuoting::Anywhere, false),
+        (Dialect::EmacsLisp, BarQuoting::None, false),
+        (Dialect::Lfe, BarQuoting::TokenStart, true),
+        (Dialect::Scheme, BarQuoting::Anywhere, false),
+        (Dialect::Racket, BarQuoting::Anywhere, false),
+        (Dialect::Clojure, BarQuoting::None, false),
+        (Dialect::Hy, BarQuoting::None, false),
+        (Dialect::Carp, BarQuoting::None, false),
+        (Dialect::Janet, BarQuoting::None, false),
+        (Dialect::Fennel, BarQuoting::None, false),
+        (Dialect::Unknown, BarQuoting::Anywhere, false),
+    ];
+    assert_eq!(
+        expected.len(),
+        Dialect::ALL.len(),
+        "a dialect was added without a decision here"
+    );
+
+    for (dialect, bar, one_char) in expected {
+        let policy = DialectReaderPolicy::new(dialect);
+        assert_eq!(policy.bar_quoting(), bar, "{}", dialect.label());
+        assert_eq!(
+            policy.character_literal_is_exactly_one_char(),
+            one_char,
+            "{}",
+            dialect.label()
+        );
+    }
+}

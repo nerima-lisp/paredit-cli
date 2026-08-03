@@ -255,7 +255,16 @@ fn render_prefixed_expression(
             )?
         )),
         ReaderPrefix::ReadEval => Ok(view.span.slice(input).to_owned()),
+        // LFE's `#B(`/`#M(`/`#S(` render the same way: the dispatch, then the
+        // list. `as_source` spells them upper case, so a body written `#b(…)`
+        // comes back `#B(…)`; LFE's scanner accepts either and its own printer
+        // writes upper case, so this normalises the spelling of a literal
+        // rather than changing it. Every span-based path -- the formatter and
+        // all structural edits -- keeps the original bytes.
         ReaderPrefix::HashLiteral
+        | ReaderPrefix::LfeBinary
+        | ReaderPrefix::LfeMap
+        | ReaderPrefix::LfeStruct
         | ReaderPrefix::Metadata
         | ReaderPrefix::ReaderConditional
         | ReaderPrefix::ReaderConditionalSplicing => Ok(format!(

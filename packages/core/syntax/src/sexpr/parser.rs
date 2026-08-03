@@ -2,7 +2,7 @@ use thiserror::Error;
 
 use crate::dialect::Dialect;
 
-use super::reader_policy::{DialectReaderPolicy, LongStringExtent, ReaderMacro};
+use super::reader_policy::{BarQuoting, DialectReaderPolicy, LongStringExtent, ReaderMacro};
 use super::tree::{Comment, Node, NodeKind, ReaderPrefix, ReaderPrefixes, SyntaxTree};
 use super::types::{ByteOffset, ByteSpan, Delimiter, NodeId};
 
@@ -448,16 +448,31 @@ impl<'a> Parser<'a> {
     }
 
     fn consume_atom_body(&mut self) -> std::result::Result<(), ParseError> {
-        self.consume_character_literal();
+        let token_start = self.pos.get();
+        if self.consume_character_literal() {
+            return Ok(());
+        }
         while self.pos.get() < self.bytes.len() {
             let byte = self.current_byte();
             if self.policy.supports_single_escape() && byte == b'\\' {
                 self.consume_single_escape()?;
                 continue;
             }
-            if self.policy.supports_bar_quoted_symbols() && byte == b'|' {
-                self.consume_multiple_escape()?;
-                continue;
+            if byte == b'|' {
+                match self.policy.bar_quoting() {
+                    BarQuoting::Anywhere => {
+                        self.consume_multiple_escape()?;
+                        continue;
+                    }
+                    // LFE opens a quoted symbol only at a token's first byte;
+                    // anywhere else the `|` is an ordinary constituent, so
+                    // `a|b c|d` stays two symbols rather than becoming one.
+                    BarQuoting::TokenStart if self.pos.get() == token_start => {
+                        self.consume_multiple_escape()?;
+                        continue;
+                    }
+                    BarQuoting::TokenStart | BarQuoting::None => {}
+                }
             }
             if self.policy.is_atom_boundary(self.bytes, self.pos.get()) {
                 break;
@@ -467,18 +482,28 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn consume_character_literal(&mut self) {
+    /// Consumes a character literal at the cursor, if one starts there.
+    ///
+    /// Returns whether the literal is *complete* — whether the token ends where
+    /// the literal does, so no further scanning may happen. Only LFE says yes:
+    /// its literal is the two-byte `#\` and exactly one character, with no
+    /// named forms and no escapes, so `#\"` ends at the quote and the string
+    /// that follows is a separate token. Elsewhere the name may be several
+    /// characters (`#\space`, `?\C-x`, `\newline`) and the caller must keep
+    /// scanning to the next boundary.
+    fn consume_character_literal(&mut self) -> bool {
         let Some(prefix_width) = self
             .policy
             .character_literal_prefix_width(self.bytes, self.pos.get())
         else {
-            return;
+            return false;
         };
         self.advance_by(prefix_width);
         let Some(character) = self.input[self.pos.get()..].chars().next() else {
-            return;
+            return false;
         };
         self.advance_by(character.len_utf8());
+        self.policy.character_literal_is_exactly_one_char()
     }
 
     /// Consumes a Lisp single-escape (`\`) and the following character literally.

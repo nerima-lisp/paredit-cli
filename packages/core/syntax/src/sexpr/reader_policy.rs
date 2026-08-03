@@ -21,6 +21,18 @@ pub(super) enum ReaderMacro {
     },
 }
 
+/// Where a `|...|` region may begin inside a token.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum BarQuoting {
+    /// A `|` is an ordinary symbol constituent wherever it appears.
+    None,
+    /// CLHS 2.1.4.2 / R7RS 2.1: a multiple-escape may open anywhere in a token.
+    Anywhere,
+    /// LFE: a `|` opens a quoted symbol only where a token starts; anywhere
+    /// else it is an ordinary constituent.
+    TokenStart,
+}
+
 /// How far a Janet long string reaches from its opening backtick run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum LongStringExtent {
@@ -105,15 +117,31 @@ impl DialectReaderPolicy {
         )
     }
 
-    /// Whether `|...|` reads as one symbol rather than a token boundary.
+    /// Where `|...|` reads as one symbol rather than a token boundary.
     ///
     /// R7RS 2.1 gives Scheme the same vertical-line notation Common Lisp has
-    /// in CLHS 2.1.4.2, so `|Foo Bar|` is a single identifier in both.
-    pub(super) const fn supports_bar_quoted_symbols(self) -> bool {
-        matches!(
-            self.dialect,
-            Dialect::CommonLisp | Dialect::Scheme | Dialect::Racket | Dialect::Unknown
-        )
+    /// in CLHS 2.1.4.2, so `|Foo Bar|` is a single identifier in both, and in
+    /// both a `|` may open a quoted region part-way through a token.
+    ///
+    /// LFE has the notation but not that second property, and the difference
+    /// is explicit in `lfe_scan.erl`: `start_symbol_char($|) -> false` sends a
+    /// leading `|` to `scan_qsymbol`, while `symbol_char/1` has no `$|` clause
+    /// at all, so it falls through to `(C > $\s) and (C =< $~)` — true for
+    /// `|` (124). A `|` inside a token is therefore an ordinary constituent
+    /// and `a|b c|d` is the two symbols `a|b` and `c|d`, not one.
+    pub(super) const fn bar_quoting(self) -> BarQuoting {
+        match self.dialect {
+            Dialect::CommonLisp | Dialect::Scheme | Dialect::Racket | Dialect::Unknown => {
+                BarQuoting::Anywhere
+            }
+            Dialect::Lfe => BarQuoting::TokenStart,
+            Dialect::EmacsLisp
+            | Dialect::Clojure
+            | Dialect::Hy
+            | Dialect::Carp
+            | Dialect::Janet
+            | Dialect::Fennel => BarQuoting::None,
+        }
     }
 
     /// Whether a bare `\` escapes the next character *outside* `|...|`.
@@ -231,7 +259,11 @@ impl DialectReaderPolicy {
         let byte = *bytes.get(pos)?;
         let next = bytes.get(pos + 1).copied();
         let width = match self.dialect {
-            Dialect::Scheme | Dialect::Racket if byte == b'#' && next == Some(b'\\') => 2,
+            Dialect::Scheme | Dialect::Racket | Dialect::Lfe
+                if byte == b'#' && next == Some(b'\\') =>
+            {
+                2
+            }
             Dialect::Clojure if byte == b'\\' => 1,
             Dialect::EmacsLisp if byte == b'?' && next == Some(b'\\') => 2,
             Dialect::EmacsLisp if byte == b'?' => 1,
@@ -240,15 +272,40 @@ impl DialectReaderPolicy {
         bytes.get(pos + width).is_some().then_some(width)
     }
 
+    /// Whether a character literal is *exactly* its prefix plus one character,
+    /// so the token ends there rather than running on to the next boundary.
+    ///
+    /// LFE is the only dialect here where it is. `lfe_scan.erl` spells the
+    /// whole grammar in one clause:
+    ///
+    /// ```erlang
+    /// scan_hash2([$\\,C|Cs], Line, Col, [], St) ->
+    ///     {ok,{number,Line,C},Cs,Line,Col+2,St};
+    /// ```
+    ///
+    /// One character, taken verbatim. There are no named characters, and no
+    /// escape processing at all — `#\n` is the letter `n` (110), not a newline.
+    /// So `#\"abc"` is the character `"` followed by the string `abc`, and
+    /// running the token on to the next boundary instead would swallow the
+    /// string's opening quote and glue the rest of the file into one atom.
+    ///
+    /// Everywhere else the name may be longer than one character — Scheme's
+    /// `#\space`, Emacs Lisp's `?\C-x`, Clojure's `\newline` — so the token has
+    /// to keep scanning, and nothing below may change for them.
+    pub(super) const fn character_literal_is_exactly_one_char(self) -> bool {
+        matches!(self.dialect, Dialect::Lfe)
+    }
+
     pub(super) fn classify_reader_macro(self, bytes: &[u8], pos: usize) -> Option<ReaderMacro> {
         let byte = *bytes.get(pos)?;
         let next = bytes.get(pos + 1).copied();
         let third = bytes.get(pos + 2).copied();
 
         match self.dialect {
-            Dialect::Unknown | Dialect::Lfe | Dialect::Hy | Dialect::Carp => {
+            Dialect::Unknown | Dialect::Hy | Dialect::Carp => {
                 self.classify_legacy(byte, next, third)
             }
+            Dialect::Lfe => self.classify_lfe(bytes, pos),
             Dialect::CommonLisp => self.classify_common_lisp(bytes, pos),
             Dialect::EmacsLisp => self.classify_emacs_lisp(bytes, pos),
             Dialect::Scheme | Dialect::Racket => self.classify_scheme(bytes, pos),
@@ -298,6 +355,85 @@ impl DialectReaderPolicy {
             });
         }
         classify_shared_prefix(byte, next, third)
+    }
+
+    /// LFE's `#`-dispatch table, from `lfe_scan.erl`'s `scan_hash1`/`scan_hash2`.
+    ///
+    /// That is the complete set, in the scanner's own order. `scan_hash`
+    /// collects decimal digits first (`scan_hash_digits`), and every form
+    /// except `#<digits>r` requires that digit run to be empty:
+    ///
+    /// | source        | token                     | handled by                    |
+    /// |---------------|---------------------------|-------------------------------|
+    /// | `#(`          | `'#('` tuple open         | [`classify_shared_prefix`]    |
+    /// | `#B(` `#b(`   | `'#B('` binary open       | this arm                      |
+    /// | `#M(` `#m(`   | `'#M('` map open          | this arm                      |
+    /// | `#S(` `#s(`   | `'#S('` struct open       | this arm                      |
+    /// | `#"…"`        | `binary` string           | this arm                      |
+    /// | `#\C`         | `{number,_,C}` one char   | `character_literal_prefix_width` |
+    /// | `#'f/2`       | `'#\''` fun reference     | [`classify_shared_prefix`]    |
+    /// | `#.`          | `'#.'` read-eval          | [`classify_shared_prefix`]    |
+    /// | `#\|`          | block comment             | `supports_block_comments`      |
+    /// | `#*1010`      | base-2 number             | scans as a plain atom         |
+    /// | `#b…` `#o…` `#d…` `#x…` | based numbers   | scan as plain atoms           |
+    /// | `#<digits>r…` | base-2..36 number         | scans as a plain atom         |
+    /// | `` #` `` `#;` `#,` `#,@` | scanned, no grammar production | left as they were  |
+    ///
+    /// The based-number forms need nothing: `#x1f` has no delimiter in it, so
+    /// the ordinary atom scanner already takes the whole token. The last row is
+    /// deliberately untouched — `lfe_parse.spell1` declares no production for
+    /// those tokens, so LFE itself refuses them, and the existing readings are
+    /// neither more nor less wrong than they were.
+    ///
+    /// Everything else falls through to [`Self::classify_legacy`], which is
+    /// what LFE used before this function existed, so no reading changes except
+    /// the ones named above.
+    fn classify_lfe(self, bytes: &[u8], pos: usize) -> Option<ReaderMacro> {
+        let byte = *bytes.get(pos)?;
+        let next = bytes.get(pos + 1).copied();
+        let third = bytes.get(pos + 2).copied();
+
+        if byte != b'#' {
+            return self.classify_legacy(byte, next, third);
+        }
+
+        // `#B(`, `#M(`, `#S(` are single opening tokens in `scan_hash2`, each
+        // closed by a plain `)` in `lfe_parse.spell1`. Reading the two-byte
+        // dispatch as a prefix on the list that follows gives exactly that
+        // shape, and is how `#(` has always been read. Without it the `#B`
+        // scanned as its own atom and the list became a *sibling*, so
+        // `(f #B(1 2) X)` had four children where LFE sees three -- silently,
+        // at exit 0, which is why this is the defect that matters most.
+        if third == Some(b'(') {
+            match next {
+                Some(b'b' | b'B') => return prefix(ReaderPrefix::LfeBinary, 2),
+                Some(b'm' | b'M') => return prefix(ReaderPrefix::LfeMap, 2),
+                Some(b's' | b'S') => return prefix(ReaderPrefix::LfeStruct, 2),
+                _ => {}
+            }
+        }
+
+        // `#"…"` is one `binary` token (`scan_hash1([$"|Cs], …)` hands
+        // straight to `scan_binary_string`). Treating the `#` as a prefix on
+        // the string that follows keeps the whole literal in one node, where
+        // before the `#` glued onto the string's *first word* and every later
+        // word became a sibling atom: `#"text/plain; version=0.0.4"` split
+        // into three, and one containing a `)` closed its enclosing list early.
+        if next == Some(b'"') {
+            return prefix(ReaderPrefix::HashLiteral, 1);
+        }
+
+        // `#\` with nothing after it is a truncated character literal.
+        // Refusing it is what stops the formatter's trailing newline from
+        // becoming the literal's character on the next parse, which would make
+        // `format(format(x))` differ from `format(x)`. Scheme and Racket
+        // already refuse the same input for the same reason; LFE's own scanner
+        // refuses it too, as `{illegal_token,"#\\"}`.
+        if next == Some(b'\\') && third.is_none() {
+            return Some(ReaderMacro::UnsupportedDispatch { width: 1 });
+        }
+
+        self.classify_legacy(byte, next, third)
     }
 
     fn classify_common_lisp(self, bytes: &[u8], pos: usize) -> Option<ReaderMacro> {
