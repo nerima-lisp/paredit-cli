@@ -85,6 +85,37 @@ fn preserves_dialect_reader_prefix_spellings() {
     }
 }
 
+/// A Hy comma is a symbol, so the formatter must re-emit it as one — in
+/// particular it must not drop it, and must not glue it to a neighbour.
+///
+/// `treefmt` formats this repository's own Lisp with paredit, so a regression
+/// here is a build break rather than a cosmetic one. These are the shapes
+/// `hy_reads_a_comma_as_a_symbol_constituent_not_as_unquote` pins on the parse
+/// side; every one of them comes back byte-identical.
+#[test]
+fn preserves_hy_commas_verbatim() {
+    let cases = [
+        "(,)",
+        "(, 1 2)",
+        "[1 ,]",
+        r#"{"a" 1 ,}"#,
+        "(a , b)",
+        "[1, 2]",
+        "(= (first x) ',)",
+        "(setv x (,))",
+    ];
+
+    for input in cases {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::Hy)
+            .unwrap_or_else(|error| panic!("{input}: {error:?}"));
+        let once = Formatter::new(2).format(&tree);
+        assert_eq!(once, format!("{input}\n"), "{input}");
+        let reparsed =
+            SyntaxTree::parse_with_dialect(&once, Dialect::Hy).expect("output parses again");
+        assert_eq!(Formatter::new(2).format(&reparsed), once, "{input}");
+    }
+}
+
 #[test]
 fn preserves_multi_datum_reader_forms_verbatim() {
     let cases = [

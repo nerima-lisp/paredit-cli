@@ -633,6 +633,197 @@ fn rejects_a_reader_prefix_before_a_closing_delimiter() {
     }
 }
 
+/// Hy is absent from the matrix above because `,` is not a reader macro there,
+/// so there is no dangling prefix to refuse.
+///
+/// `hy/reader/hy_reader.py` registers its reader macros with `@reader_for`, and
+/// the comma has no entry: the list is `'`, `` ` ``, `~`, `(`, `[`, `{`, `#{`,
+/// `#(`, `#`, `#_`, `#*`, `#**`, `#^` and `#[`. It does not end a token either
+/// — `NON_IDENT = set("()[]{};\"'`~")` is the complete set of identifier
+/// terminators. A comma is therefore an ordinary symbol constituent, and Hy
+/// spells unquote `~`, not `,`:
+///
+/// ```text
+/// $ hy -c '(print (list (hy.read-many "(foo ,bar)")))'
+/// [Expression([Symbol('foo'), Symbol(',bar')])]
+/// ```
+///
+/// Every expectation below was read off Hy 1.3.1 with that command.
+#[test]
+fn hy_reads_a_comma_as_a_symbol_constituent_not_as_unquote() {
+    struct Case {
+        input: &'static str,
+        children: &'static [&'static str],
+        hy_reads: &'static str,
+    }
+
+    let cases = [
+        // The shape this test exists for. Hy's tuple constructor is the symbol
+        // `,`, so `(,)` is the empty tuple and appears throughout real Hy —
+        // including Hy's own `contrib/walk.hy`, `hylang/simalq` and
+        // `kanaka/mal`. Read as an unquote it was a hard parse failure.
+        Case {
+            input: "(,)",
+            children: &[","],
+            hy_reads: "Expression([Symbol(',')])",
+        },
+        Case {
+            input: "(, 1 2)",
+            children: &[",", "1", "2"],
+            hy_reads: "Expression([Symbol(','), Integer(1), Integer(2)])",
+        },
+        // A trailing comma before a closing bracket or brace, idiomatic in
+        // Hy's Python-flavoured list and dict literals.
+        Case {
+            input: "[1 ,]",
+            children: &["1", ","],
+            hy_reads: "List([Integer(1), Symbol(',')])",
+        },
+        Case {
+            input: "{\"a\" 1 ,}",
+            children: &["\"a\"", "1", ","],
+            hy_reads: "Dict([String('a'), Integer(1), Symbol(',')])",
+        },
+        // A comma between two forms is its own datum, not a prefix on the one
+        // after it. This parsed clean before and was silently the wrong tree:
+        // two children, the second an unquoted `b`.
+        Case {
+            input: "(a , b)",
+            children: &["a", ",", "b"],
+            hy_reads: "Expression([Symbol('a'), Symbol(','), Symbol('b')])",
+        },
+        // Glued to what follows it, a comma is part of that symbol.
+        Case {
+            input: "(foo ,bar)",
+            children: &["foo", ",bar"],
+            hy_reads: "Expression([Symbol('foo'), Symbol(',bar')])",
+        },
+        // Glued to what precedes it, likewise — `[1, 2]` is two data, not
+        // three, because the comma belongs to the token before it.
+        Case {
+            input: "[1, 2]",
+            children: &["1,", "2"],
+            hy_reads: "List([Integer(1), Integer(2)])",
+        },
+        // `,@` is not unquote-splicing either; `@` is not in `NON_IDENT`.
+        Case {
+            input: "(,@)",
+            children: &[",@"],
+            hy_reads: "Expression([Symbol(',@')])",
+        },
+        Case {
+            input: "(,,)",
+            children: &[",,"],
+            hy_reads: "Expression([Symbol(',,')])",
+        },
+        // The `contrib/walk.hy` shape: a quoted comma, where the quote is a
+        // real prefix and the comma is the datum it quotes.
+        Case {
+            input: "(= (first x) ',)",
+            children: &["=", "(first x)", "',"],
+            hy_reads: "Expression([Symbol('='), Expression([Symbol('.'), ...]), \
+                       Expression([Symbol('quote'), Symbol(',')])])",
+        },
+    ];
+
+    for case in cases {
+        let tree = SyntaxTree::parse_with_dialect(case.input, Dialect::Hy)
+            .unwrap_or_else(|error| panic!("{}: {error:?}", case.input));
+        let form = &tree.root_view().children[0];
+        let children = form
+            .children
+            .iter()
+            .map(|child| child.span.slice(case.input))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            children, case.children,
+            "{} (hy reads {})",
+            case.input, case.hy_reads
+        );
+        for child in &form.children {
+            assert!(
+                !child.reader_prefixes.iter().any(|prefix| matches!(
+                    prefix,
+                    ReaderPrefix::Unquote | ReaderPrefix::UnquoteSplicing
+                )),
+                "{}: a comma left an unquote prefix behind",
+                case.input
+            );
+        }
+    }
+}
+
+/// Dropping the comma does not soften Hy's other prefixes.
+///
+/// `'` and `` ` `` *are* Hy reader macros and each takes exactly one following
+/// form, so a closing delimiter after one is still the refusal
+/// `rejects_a_reader_prefix_before_a_closing_delimiter` established — this
+/// change is not a reinstatement of the permissive behaviour that predated it.
+#[test]
+fn hy_still_refuses_its_real_prefixes_before_a_closing_delimiter() {
+    for input in ["(a ')", "(a `)"] {
+        assert_eq!(
+            SyntaxTree::parse_with_dialect(input, Dialect::Hy).unwrap_err(),
+            ParseError::MissingReaderForm(3),
+            "input: {input}"
+        );
+    }
+    let tree = SyntaxTree::parse_with_dialect("(a 'b)", Dialect::Hy).expect("valid");
+    assert_eq!(
+        tree.root_view().children[0].children[1].reader_prefixes,
+        vec![ReaderPrefix::Quote]
+    );
+}
+
+/// The comma keeps meaning unquote in every dialect whose reader gives it that
+/// meaning, and keeps meaning whitespace in Clojure.
+///
+/// `classify_hy` is reached only from the `Dialect::Hy` arm of
+/// `classify_reader_macro`, so this cannot drift by construction; the test pins
+/// it anyway, because the arm it was split out of still serves `Unknown` and
+/// `Carp`.
+#[test]
+fn hy_comma_arm_does_not_change_other_dialects() {
+    for dialect in [
+        Dialect::CommonLisp,
+        Dialect::EmacsLisp,
+        Dialect::Scheme,
+        Dialect::Racket,
+        Dialect::Fennel,
+        Dialect::Lfe,
+        Dialect::Janet,
+        Dialect::Carp,
+        Dialect::Unknown,
+    ] {
+        let input = "(a ,b)";
+        let tree = SyntaxTree::parse_with_dialect(input, dialect)
+            .unwrap_or_else(|error| panic!("{}: {error:?}", dialect.label()));
+        let form = &tree.root_view().children[0];
+        assert_eq!(
+            form.children[1].reader_prefixes,
+            vec![ReaderPrefix::Unquote],
+            "{}",
+            dialect.label()
+        );
+        // And a comma with nothing after it is still the refusal, so #100's
+        // guarantee is untouched outside Hy.
+        assert_eq!(
+            SyntaxTree::parse_with_dialect("(a ,)", dialect).unwrap_err(),
+            ParseError::MissingReaderForm(3),
+            "{}",
+            dialect.label()
+        );
+    }
+
+    // Clojure reads a comma as whitespace, so `(a ,b)` is two data there and
+    // `(a ,)` is one -- neither is a prefix, and neither is an error.
+    let tree = SyntaxTree::parse_with_dialect("(a ,b)", Dialect::Clojure).expect("valid");
+    let form = &tree.root_view().children[0];
+    assert_eq!(form.children.len(), 2);
+    assert!(form.children[1].reader_prefixes.is_empty());
+    SyntaxTree::parse_with_dialect("(a ,)", Dialect::Clojure).expect("comma is whitespace");
+}
+
 /// A stray closing delimiter with no prefix in front of it still reports the
 /// delimiter, not a missing reader form — the prefix check added for
 /// `rejects_a_reader_prefix_before_a_closing_delimiter` must not swallow the
