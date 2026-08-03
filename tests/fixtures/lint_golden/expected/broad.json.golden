@@ -3660,6 +3660,12 @@
       "count": 0,
       "description": "`(except [] …)` catches every BaseException, Ctrl-C and SystemExit included",
       "rule": "hy-bare-except"
+    },
+    {
+      "category": "portability",
+      "count": 0,
+      "description": "a threading macro Carp's standard library marks deprecated",
+      "rule": "carp-deprecated-thread-macro"
     }
   ],
   "policy": {

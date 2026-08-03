@@ -5207,6 +5207,22 @@
               "shortDescription": {
                 "text": "`(catch Expr)` returns failures as ordinary terms, indistinguishable from success"
               }
+            },
+            {
+              "fullDescription": {
+                "text": "Carp's `core/ControlMacros.carp` declares `(deprecated => \"deprecated in favor of `->`.\")` and the same for `==>` against `-->`. That declaration only writes metadata: the compiler reads the `deprecated` key in `primitiveInfo` (the REPL's `(info …)` command) and in the HTML doc renderer, and nowhere on any compilation path. So the deprecated spelling builds cleanly with no diagnostic at all, which is why it outlives the deprecation — Carp's own `core/Binary.carp` still uses `==>`. The replacement is a rename rather than a rewrite: `=>` and `->` are both defined as `(defmacro _ [:rest forms] (thread-first-internal forms))`, with identical bodies."
+              },
+              "id": "carp-deprecated-thread-macro",
+              "properties": {
+                "category": "portability",
+                "fixable": true,
+                "rationale": "Carp's `core/ControlMacros.carp` declares `(deprecated => \"deprecated in favor of `->`.\")` and the same for `==>` against `-->`. That declaration only writes metadata: the compiler reads the `deprecated` key in `primitiveInfo` (the REPL's `(info …)` command) and in the HTML doc renderer, and nowhere on any compilation path. So the deprecated spelling builds cleanly with no diagnostic at all, which is why it outlives the deprecation — Carp's own `core/Binary.carp` still uses `==>`. The replacement is a rename rather than a rewrite: `=>` and `->` are both defined as `(defmacro _ [:rest forms] (thread-first-internal forms))`, with identical bodies.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a threading macro Carp's standard library marks deprecated"
+              }
             }
           ]
         }

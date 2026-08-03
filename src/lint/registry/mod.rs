@@ -145,7 +145,24 @@ use super::rule::RuleEntry;
 // inflating arity at exit 0. Same class as the Janet backtick defect fixed in
 // PR #91, and the same disposition: a reader repair belongs in `core/syntax`,
 // not in a rule package.
-pub const RULE_COUNT: usize = 320;
+//
+// 320 + 1 (`lint-carp-idiom`) = 321, completing dialect coverage: every one of
+// the ten dialects now has a rule written for it specifically. Only one rule
+// because the Carp compiler already rejects the ownership and format-arity
+// defects that looked most promising -- `docs/Memory.md` walks through each and
+// every one ends "the memory management system detects this and reports an
+// error", and `core/Format.carp:8-22` raises `macro-error` at expansion.
+// `carp-deprecated-thread-macro` survives precisely because it is the one that
+// *builds silently*: `deprecated` expands to `meta-set!`, and the key is read
+// only by the REPL's `(info ...)` and the HTML doc renderer, never by a
+// compilation path. Carp's own `core/Binary.carp:68,77` still uses `==>`.
+//
+// That batch's larger result is in its README: four Carp reader defects, of
+// which `@`/`&` not being reader prefixes is the worst -- `@(f x)` splits into
+// a bare sigil atom plus a sibling, inflating the enclosing call's arity in 116
+// of 248 files, and `@"..."` silently splits string literals. Same class as the
+// Hy, LFE and Janet gaps above; a repair belongs in `core/syntax`.
+pub const RULE_COUNT: usize = 321;
 
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
@@ -1443,5 +1460,9 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(
         &paredit_feature_lint_hy_lfe_idiom::catch_swallows_exit::rule::META,
         &paredit_feature_lint_hy_lfe_idiom::catch_swallows_exit::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_carp_idiom::deprecated_thread_macro::rule::META,
+        &paredit_feature_lint_carp_idiom::deprecated_thread_macro::rule::RULE,
     ),
 ];

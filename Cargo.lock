@@ -675,6 +675,7 @@ dependencies = [
  "paredit-feature-inline",
  "paredit-feature-lint-build-system",
  "paredit-feature-lint-call-shape",
+ "paredit-feature-lint-carp-idiom",
  "paredit-feature-lint-clojure-idiom",
  "paredit-feature-lint-compile-time",
  "paredit-feature-lint-concurrency",
@@ -999,6 +1000,14 @@ dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
  "serde_json",
+]
+
+[[package]]
+name = "paredit-feature-lint-carp-idiom"
+version = "1.4.0"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
 ]
 
 [[package]]

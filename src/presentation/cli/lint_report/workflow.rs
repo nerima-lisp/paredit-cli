@@ -2448,6 +2448,12 @@ mod tests {
             "(memq 101 smk)\n",                           // scheme-memq-assq-literal-key
             "(let sln ((slni 0)) (* slni 2))\n",          // scheme-named-let-never-recurs
         );
+        // The Carp half, added for the same reason the Scheme half was: its one
+        // fixable rule is `Dialect::Carp` only, so no fixture above reaches it.
+        // Note `=>` must not be shadowed by a local `->` definition in this
+        // file — the rule withholds its fix when it is, which would make this
+        // test fail for a reason that has nothing to do with the fix engine.
+        let carp_source = "(=> cdtm (f) (g))\n"; // carp-deprecated-thread-macro
 
         let active: Vec<&str> = RULES.to_vec();
         let mut produced: BTreeSet<&str> = BTreeSet::new();
@@ -2455,6 +2461,7 @@ mod tests {
             (source, Dialect::CommonLisp, "fixture.lisp"),
             (elisp_source, Dialect::EmacsLisp, "fixture.el"),
             (scheme_source, Dialect::Scheme, "fixture.scm"),
+            (carp_source, Dialect::Carp, "fixture.carp"),
         ] {
             let tree = paredit_core_syntax::sexpr::SyntaxTree::parse_with_dialect(text, dialect)
                 .expect("parse fixture");
