@@ -685,6 +685,7 @@ dependencies = [
  "paredit-feature-lint-custom",
  "paredit-feature-lint-documentation",
  "paredit-feature-lint-elisp-idiom",
+ "paredit-feature-lint-fennel-janet-idiom",
  "paredit-feature-lint-form-shape",
  "paredit-feature-lint-introspection",
  "paredit-feature-lint-iteration-flow",
@@ -700,6 +701,7 @@ dependencies = [
  "paredit-feature-lint-sequence",
  "paredit-feature-lint-string-char",
  "paredit-feature-lint-testing",
+ "paredit-feature-lint-type-declaration",
  "paredit-feature-lisp-analysis",
  "paredit-feature-migrate",
  "paredit-feature-package",
@@ -1105,6 +1107,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "paredit-feature-lint-fennel-janet-idiom"
+version = "1.4.0"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
+]
+
+[[package]]
 name = "paredit-feature-lint-form-shape"
 version = "1.4.0"
 dependencies = [
@@ -1278,6 +1288,14 @@ dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
  "serde_json",
+]
+
+[[package]]
+name = "paredit-feature-lint-type-declaration"
+version = "1.4.0"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
 ]
 
 [[package]]

@@ -287,5 +287,15 @@ rule	scheme-begin-single-form	0
 rule	scheme-let-star-independent-bindings	0
 rule	scheme-memq-assq-literal-key	0
 rule	scheme-named-let-never-recurs	0
+rule	var-never-set	0
+rule	fennel-deprecated-form	0
+rule	fennel-each-over-non-iterator	0
+rule	janet-empty-loop-body	0
+rule	janet-mutating-immutable-literal	0
+rule	declare-not-at-head-of-body	0
+rule	declaim-inside-body	0
+rule	type-declaration-contradicts-initform	0
+rule	the-form-with-impossible-type	0
+rule	type-declaration-on-rest-parameter	0
 finding	redundant-quote	warning	suspicious	fixable=true	suppressed.lisp	338	quoting number 6 is redundant	redundant-quote/07bb8007b4863bf0/0
 finding	declarative-style-score	warning	suspicious	fixable=false	suppressed.lisp	0	this file's declarative-style score is 0% (5 top-level forms), below the 80% threshold	declarative-style-score/2f534fdd67304360/0

@@ -1757,6 +1757,66 @@
       "count": 0,
       "description": "a named let whose loop name is never mentioned in its body, so it can never iterate",
       "rule": "scheme-named-let-never-recurs"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a Fennel or Janet `var` binding that nothing ever assigns to",
+      "rule": "var-never-set"
+    },
+    {
+      "category": "portability",
+      "count": 0,
+      "description": "a Fennel special the language reference lists under \"Deprecated Forms\"",
+      "rule": "fennel-deprecated-form"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a Fennel `each` whose iterator position holds a literal that cannot be called",
+      "rule": "fennel-each-over-non-iterator"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a Janet `loop`, `seq`, or `catseq` whose body is empty",
+      "rule": "janet-empty-loop-body"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a Janet mutating call whose target is a tuple, struct, or string literal",
+      "rule": "janet-mutating-immutable-literal"
+    },
+    {
+      "category": "malformed",
+      "count": 0,
+      "description": "a (declare ...) after the first body form, where it is a call to an undefined function",
+      "rule": "declare-not-at-head-of-body"
+    },
+    {
+      "category": "declaration",
+      "count": 0,
+      "description": "a (declaim ...) among a body's leading declarations, where (declare ...) was meant",
+      "rule": "declaim-inside-body"
+    },
+    {
+      "category": "declaration",
+      "count": 0,
+      "description": "a let binding whose declared type cannot contain the literal it is initialised to",
+      "rule": "type-declaration-contradicts-initform"
+    },
+    {
+      "category": "declaration",
+      "count": 0,
+      "description": "a (the TYPE EXPR) whose declared type cannot contain the value the expression plainly is",
+      "rule": "the-form-with-impossible-type"
+    },
+    {
+      "category": "declaration",
+      "count": 0,
+      "description": "a &rest parameter declared to be its element type, though it is always bound to a list",
+      "rule": "type-declaration-on-rest-parameter"
     }
   ],
   "policy": {

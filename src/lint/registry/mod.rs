@@ -51,7 +51,32 @@ use super::rule::RuleEntry;
 // explicitly, and three of them cover Scheme *and* Racket. That pair is a
 // first: every rule scoped away from Common Lisp until now named exactly one
 // dialect, which `contract.rs`'s dialect matrix had quietly assumed.
-pub const RULE_COUNT: usize = 303;
+//
+// 303 + this batch's 10, both packages new: 5 (`lint-fennel-janet-idiom`) and 5
+// (`lint-type-declaration`) = 313. Both are registry-only — neither ships a
+// `cli/` directory, so no standalone `inspect <rule>` command comes with them
+// and the command-oriented lists do not move.
+//
+// The Fennel/Janet five carry the dialect story one step further than the batch
+// above. Three name exactly one dialect (`fennel-deprecated-form` and
+// `fennel-each-over-non-iterator` Fennel, `janet-empty-loop-body` and
+// `janet-mutating-immutable-literal` Janet — four, rather), and `var-never-set`
+// names *two*, Fennel and Janet together, because `var` is the mutable binder
+// in both and the rule carries a per-dialect vocabulary table keyed off the
+// same `DIALECTS` constant it hands to `RuleDialectScope::new`. The
+// `..._for_a_proper_subset_of_dialects` relaxation the batch above made to
+// `contract.rs` already admits that shape.
+//
+// The `lint-type-declaration` five are Common Lisp only and lean on
+// `dialect_scope()`'s default. The package proposed six; the sixth,
+// `ignore-declared-variable-then-used`, was dropped before wiring as a true
+// duplicate of `lint-convention`'s shipped `ignore-declaration-conflict`. That
+// investigation left a handover in the package's README: the *shipped* rule
+// produces 21 findings over SBCL's sources and all 21 look like false
+// positives, with the fixed guards sitting in this package's `support.rs`
+// ready to lift across. That is a pre-existing defect and deliberately not
+// repaired here.
+pub const RULE_COUNT: usize = 313;
 
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
@@ -1281,5 +1306,45 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(
         &paredit_feature_lint_scheme_idiom::named_let_never_recurs::rule::META,
         &paredit_feature_lint_scheme_idiom::named_let_never_recurs::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_fennel_janet_idiom::var_never_set::rule::META,
+        &paredit_feature_lint_fennel_janet_idiom::var_never_set::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_fennel_janet_idiom::fennel_deprecated_form::rule::META,
+        &paredit_feature_lint_fennel_janet_idiom::fennel_deprecated_form::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_fennel_janet_idiom::fennel_each_over_non_iterator::rule::META,
+        &paredit_feature_lint_fennel_janet_idiom::fennel_each_over_non_iterator::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_fennel_janet_idiom::janet_empty_loop_body::rule::META,
+        &paredit_feature_lint_fennel_janet_idiom::janet_empty_loop_body::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_fennel_janet_idiom::janet_mutating_immutable_literal::rule::META,
+        &paredit_feature_lint_fennel_janet_idiom::janet_mutating_immutable_literal::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_type_declaration::declare_not_at_head_of_body::rule::META,
+        &paredit_feature_lint_type_declaration::declare_not_at_head_of_body::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_type_declaration::declaim_inside_body::rule::META,
+        &paredit_feature_lint_type_declaration::declaim_inside_body::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_type_declaration::type_declaration_contradicts_initform::rule::META,
+        &paredit_feature_lint_type_declaration::type_declaration_contradicts_initform::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_type_declaration::the_form_with_impossible_type::rule::META,
+        &paredit_feature_lint_type_declaration::the_form_with_impossible_type::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_type_declaration::type_declaration_on_rest_parameter::rule::META,
+        &paredit_feature_lint_type_declaration::type_declaration_on_rest_parameter::rule::RULE,
     ),
 ];

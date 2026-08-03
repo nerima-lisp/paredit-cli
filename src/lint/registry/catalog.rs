@@ -200,7 +200,14 @@ pub const PEDANTIC_RULES: [&str; tagged_count(RuleTag::Pedantic)] = {
 // both new packages, neither of which runs on Common Lisp. All 8 ship with a
 // standalone `inspect <rule>` command as well, so `INTROSPECTION_COMMANDS`
 // moves with this number where the batch above left it alone.
-const _: () = assert!(RULE_COUNT == 303);
+//
+// 303 + this batch's 10: 5 (`lint-fennel-janet-idiom`) and 5
+// (`lint-type-declaration`), both new packages. Neither ships a `cli/`
+// directory, so unlike the batch above this one adds no standalone command and
+// `INTROSPECTION_COMMANDS` stays where it was. `lint-type-declaration`
+// proposed six and ships five: `ignore-declared-variable-then-used` was dropped
+// as a true duplicate of `lint-convention`'s `ignore-declaration-conflict`.
+const _: () = assert!(RULE_COUNT == 313);
 // Unchanged at 99: every one of this branch's 37 rules is
 // `Fixability::ReportOnly`. Each one reports a judgment the tool cannot make
 // on the author's behalf — whether an annotation or the parameter list under it
@@ -232,6 +239,17 @@ const _: () = assert!(RULE_COUNT == 303);
 // `lint-clojure-idiom` rules are `ReportOnly`: each of them has a repair with
 // more than one shape (`doall` versus `into` versus `reduce`; `let` versus a
 // top-level `defonce`), and picking one would be picking for the author.
+//
+// Back to standing still: 103 after this batch's 10, every one of which is
+// `Fixability::ReportOnly`. The two packages decline for the same reason from
+// opposite ends. The Fennel/Janet rules report a mismatch between a spelling
+// and an intent — a `var` that could be a `local`, a `{…}` that should have
+// been `@{…}` — where the tool cannot tell which half the author meant, and
+// `var-never-set` says outright that its assignment search is blind to scope
+// and quoting. The declaration rules are the same shape: which of the type and
+// the initform is wrong, or whether a late `declare` wanted hoisting or wanted
+// to be a `the`, is the author's call and neither repair is right more often
+// than the other.
 const _: () = assert!(fixable_count() == 103);
 // 164 (through PR #82) + 31 of this branch's 37 rules. The other 6 are
 // `Severity::Error`: `when-unless-implicit-nil-misused` and the five
@@ -266,7 +284,21 @@ const _: () = assert!(fixable_count() == 103);
 // `def-inside-function-body` (the Var does not exist until the function runs,
 // and concurrent callers race on it — which is also clj-kondo's judgement,
 // where `:inline-def` is on by default).
-const _: () = assert!(warning_count() == 225);
+//
+// 225 + 7 of this batch's 10 = 232. The other 3 are `Severity::Error`, each
+// because a real implementation refuses or dies on the code rather than merely
+// disliking it: `fennel-each-over-non-iterator` (`each` compiles to Lua's
+// generic `for … in`, which *calls* the iterator, so a table or string literal
+// raises "attempt to call a table value" on the first round),
+// `janet-mutating-immutable-literal` (`put` and the `array/*` and `buffer/*`
+// families panic when handed the immutable twin of a mutable container — a
+// dropped `@` is code that reads correctly and dies on its first call), and
+// `declare-not-at-head-of-body` (past the first body form a `(declare …)` is
+// not a declaration at all but a call to an undefined function, which SBCL
+// 2.6.0 reports as a full `caught ERROR`). `var-never-set` carries
+// `RuleTag::Style`, which is not `Pedantic` and so does not hold it back from
+// any preset; it counts as a warning here like the other 6.
+const _: () = assert!(warning_count() == 232);
 const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
 // 6 (through PR #82) + 8 of this branch's rules: `lint-call-shape`'s four
 // threshold rules, whose limits are conventions a codebase either adopted or
@@ -284,6 +316,11 @@ const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
 // demonstrated failure and stay untagged. This batch's 8 leave it at 15 as
 // well: none of them carries a tag, so `PEDANTIC_RULES` and
 // `EXPERIMENTAL_RULES` are both unchanged by it.
+// This batch's 10 leave it at 15 too. Nine carry no tag at all, and the tenth,
+// `var-never-set`, carries `RuleTag::Style` — which says the rule's subject is
+// layout or naming rather than behaviour, and which no preset filters on. Only
+// `Pedantic` and `Experimental` gate admission, so `PEDANTIC_RULES` and
+// `EXPERIMENTAL_RULES` are both unchanged.
 const _: () = assert!(PEDANTIC_RULES.len() == 15);
 
 fn meta_of(name: &str) -> Option<&'static crate::lint::model::RuleMeta> {
