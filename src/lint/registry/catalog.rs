@@ -223,7 +223,9 @@ pub const PEDANTIC_RULES: [&str; tagged_count(RuleTag::Pedantic)] = {
 // 321 + 3 (`lint-loop-facility`). Four of seven proposals died against SBCL:
 // `loop` checks more than expected, so only the clauses with *no* compiler
 // diagnostic earn a rule.
-const _: () = assert!(RULE_COUNT == 324);
+// 324 + 4: 3 (`lint-generic-dispatch`), 1 (`lint-binding-analysis`). Both
+// batches dropped most of what they proposed against a running SBCL.
+const _: () = assert!(RULE_COUNT == 328);
 // Unchanged at 99: every one of this branch's 37 rules is
 // `Fixability::ReportOnly`. Each one reports a judgment the tool cannot make
 // on the author's behalf — whether an annotation or the parameter list under it
@@ -369,7 +371,13 @@ const _: () = assert!(fixable_count() == 104);
 // makes the loop return `nil`. The third is a `Warning`: discarding an
 // accumulation via `finally (return ...)` wastes the consing but the returned
 // value is whatever the author asked for.
-const _: () = assert!(warning_count() == 237);
+// 237 + 2 = 239. The other 2 are `Severity::Error` and both fail loudly or
+// silently rather than reading badly: an incongruent `(:method ...)` option
+// makes SBCL signal while evaluating the `defgeneric`, so the file does not
+// load at all; and a primary `initialize-instance` reaching neither
+// `call-next-method` nor `shared-initialize` hands back an instance with
+// **every slot unbound**, silently.
+const _: () = assert!(warning_count() == 239);
 const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
 // 6 (through PR #82) + 8 of this branch's rules: `lint-call-shape`'s four
 // threshold rules, whose limits are conventions a codebase either adopted or

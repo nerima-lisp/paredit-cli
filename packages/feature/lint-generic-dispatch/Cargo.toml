@@ -1,0 +1,19 @@
+[package]
+name = "paredit-feature-lint-generic-dispatch"
+description = "Lint rules for the CLOS generic-function dispatch protocol"
+readme = "README.md"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+paredit-core-syntax = { path = "../../core/syntax" }
+paredit-core-lint-engine = { path = "../../core/lint-engine" }
+
+# Mandatory: without it this package silently opts out of the workspace lint
+# table, including `unsafe_code = "deny"`, with no error at all.
+[lints]
+workspace = true

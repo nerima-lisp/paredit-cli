@@ -172,7 +172,27 @@ use super::rule::RuleEntry;
 // 20604 corpus loops, so shipping it would have guaranteed a false clean.
 //
 // The three that survive are the ones with no compiler diagnostic at all.
-pub const RULE_COUNT: usize = 324;
+//
+// 324 + 4 = 328: 3 (`lint-generic-dispatch`) and 1 (`lint-binding-analysis`).
+// Both batches proposed far more and dropped most of it against SBCL 2.6.0.
+//
+// CLOS: `defmethod` on `integer`/`list`/`null` is idiomatic, not undefined --
+// even `print-object` on `integer` is accepted silently, and the control
+// confirms the contrast, since `(defun length (x) x)` *does* raise
+// SYMBOL-PACKAGE-LOCKED-ERROR. A `:before` "returning a value" is every
+// `:before` that ends in `setf`. A cross-form congruence rule was built, passed
+// its audit clean over 765 real pairs, and was then dropped **on measurement**:
+// 4.37s at 2000 protocols, slower than the shipped scan it was written to beat.
+//
+// Bindings: the semantic layer turned out far richer than feared -- references
+// resolve to their binding, the function namespace is separate, lambda-list
+// sections are all modelled -- but four of five proposed rules still died.
+// `loop` is not a modelled binder at all; a `dotimes` variable rule measured
+// 35 findings and 35 false positives, because `(dotimes (i w) (write-char c))`
+// is "repeat n times"; and a `let*` read-before-binding rule reached 31
+// findings that were **all** correct, deliberate code -- reading an incoming
+// value and then rebinding the name is what `let*` sequencing is *for*.
+pub const RULE_COUNT: usize = 328;
 
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
@@ -1486,5 +1506,21 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(
         &paredit_feature_lint_loop_facility::accumulation_discarded_by_finally_return::rule::META,
         &paredit_feature_lint_loop_facility::accumulation_discarded_by_finally_return::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_generic_dispatch::defgeneric_method_option_incongruent::rule::META,
+        &paredit_feature_lint_generic_dispatch::defgeneric_method_option_incongruent::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_generic_dispatch::initialization_primary_without_call_next_method::rule::META,
+        &paredit_feature_lint_generic_dispatch::initialization_primary_without_call_next_method::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_generic_dispatch::class_allocated_slot_with_initarg::rule::META,
+        &paredit_feature_lint_generic_dispatch::class_allocated_slot_with_initarg::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_binding_analysis::unused_local_binding::rule::META,
+        &paredit_feature_lint_binding_analysis::unused_local_binding::rule::RULE,
     ),
 ];

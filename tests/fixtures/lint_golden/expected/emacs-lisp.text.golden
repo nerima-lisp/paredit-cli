@@ -307,6 +307,10 @@ rule	carp-deprecated-thread-macro	0
 rule	loop-parallel-binding-reads-sibling	0
 rule	loop-into-accumulator-never-read	0
 rule	loop-accumulation-discarded-by-finally-return	0
+rule	defgeneric-method-option-incongruent	0
+rule	initialization-primary-without-call-next-method	0
+rule	class-allocated-slot-with-initarg	0
+rule	unused-local-binding	0
 finding	elisp-macro-missing-declare	warning	malformed	fixable=false	emacs-lisp.el	344	missing editor declaration: macro `fixture-macro` is defined without one; add a leading (declare (indent ...)) and/or (declare (debug ...)) form so Emacs indents and Edebug instruments calls to this macro correctly	elisp-macro-missing-declare/3f509c1d426873fb/0
 finding	elisp-missing-lexical-binding	warning	suspicious	fixable=false	emacs-lisp.el	0	no `lexical-binding` setting on the first line, so this file is evaluated with dynamic binding; add `-*- lexical-binding: t -*-`	elisp-missing-lexical-binding/48686428ba8a57d0/0
 finding	elisp-unreachable-lexical-binding	error	suspicious	fixable=false	emacs-lisp.el	911	`lexical-binding` is read from the first line only, so this setting has no effect and the file is evaluated with dynamic binding	elisp-unreachable-lexical-binding/7bec796cbb2809fb/0

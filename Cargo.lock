@@ -673,6 +673,7 @@ dependencies = [
  "paredit-feature-function-parameter",
  "paredit-feature-generate",
  "paredit-feature-inline",
+ "paredit-feature-lint-binding-analysis",
  "paredit-feature-lint-build-system",
  "paredit-feature-lint-call-shape",
  "paredit-feature-lint-carp-idiom",
@@ -689,6 +690,7 @@ dependencies = [
  "paredit-feature-lint-elisp-idiom",
  "paredit-feature-lint-fennel-janet-idiom",
  "paredit-feature-lint-form-shape",
+ "paredit-feature-lint-generic-dispatch",
  "paredit-feature-lint-hy-lfe-idiom",
  "paredit-feature-lint-introspection",
  "paredit-feature-lint-iteration-flow",
@@ -982,6 +984,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "paredit-feature-lint-binding-analysis"
+version = "1.4.0"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-semantics",
+ "paredit-core-syntax",
+]
+
+[[package]]
 name = "paredit-feature-lint-build-system"
 version = "1.4.0"
 dependencies = [
@@ -1151,6 +1162,14 @@ dependencies = [
  "proptest",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "paredit-feature-lint-generic-dispatch"
+version = "1.4.0"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
 ]
 
 [[package]]
