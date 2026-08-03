@@ -683,12 +683,14 @@ dependencies = [
  "paredit-feature-lint-convention",
  "paredit-feature-lint-custom",
  "paredit-feature-lint-documentation",
+ "paredit-feature-lint-elisp-idiom",
  "paredit-feature-lint-form-shape",
  "paredit-feature-lint-introspection",
  "paredit-feature-lint-iteration-flow",
  "paredit-feature-lint-numeric",
  "paredit-feature-lint-object-system",
  "paredit-feature-lint-package-hygiene",
+ "paredit-feature-lint-pathname-io",
  "paredit-feature-lint-performance",
  "paredit-feature-lint-portability",
  "paredit-feature-lint-repl-debug",
@@ -1082,6 +1084,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "paredit-feature-lint-elisp-idiom"
+version = "1.4.0"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
+]
+
+[[package]]
 name = "paredit-feature-lint-form-shape"
 version = "1.4.0"
 dependencies = [
@@ -1154,6 +1164,14 @@ dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
  "serde_json",
+]
+
+[[package]]
+name = "paredit-feature-lint-pathname-io"
+version = "1.4.0"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
 ]
 
 [[package]]

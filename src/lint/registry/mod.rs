@@ -30,7 +30,20 @@ use super::rule::RuleEntry;
 // (`lint-package-hygiene`, new) = 286. Four of the five packages already
 // existed; `lint-package-hygiene` is the twenty-fourth package the registry
 // reaches into.
-pub const RULE_COUNT: usize = 286;
+//
+// 286 + this batch's 9, both packages new: 4 (`lint-elisp-idiom`) and 5
+// (`lint-pathname-io`) = 295. This is the first batch aimed squarely at a
+// dialect other than Common Lisp: `dialect_scope()` defaults to
+// `COMMON_LISP_ONLY`, so before it only 13 of 286 rules ran on `.el` at all.
+//
+// It shipped 9 of 10 implemented. `elisp-keymap-binds-non-command` was dropped
+// after an audit over the 1654 `.el` files GNU Emacs 30.2 ships: 70 findings,
+// 0 true positives. 57 bind translation functions into `function-key-map` and
+// friends, which are called with a prompt and *must not* be `commandp`; the
+// rest are private keymaps dispatched by hand through `funcall`, never
+// `command-execute`. A denylist would not save it — the private-map cases are
+// indistinguishable from command maps.
+pub const RULE_COUNT: usize = 295;
 
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
@@ -1192,5 +1205,41 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(
         &paredit_feature_lint_package_hygiene::package_circular_in_package_chain::rule::META,
         &paredit_feature_lint_package_hygiene::package_circular_in_package_chain::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_elisp_idiom::interactive_arity_mismatch::rule::META,
+        &paredit_feature_lint_elisp_idiom::interactive_arity_mismatch::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_elisp_idiom::hook_lambda::rule::META,
+        &paredit_feature_lint_elisp_idiom::hook_lambda::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_elisp_idiom::save_excursion_set_buffer::rule::META,
+        &paredit_feature_lint_elisp_idiom::save_excursion_set_buffer::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_elisp_idiom::require_obsolete_cl::rule::META,
+        &paredit_feature_lint_elisp_idiom::require_obsolete_cl::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_pathname_io::pathname_built_by_concatenation::META,
+        &paredit_feature_lint_pathname_io::pathname_built_by_concatenation::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_pathname_io::output_stream_without_if_exists::META,
+        &paredit_feature_lint_pathname_io::output_stream_without_if_exists::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_pathname_io::pathname_component_compared_case_sensitively::META,
+        &paredit_feature_lint_pathname_io::pathname_component_compared_case_sensitively::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_pathname_io::directory_without_wild_component::META,
+        &paredit_feature_lint_pathname_io::directory_without_wild_component::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_pathname_io::with_open_file_result_captures_stream::META,
+        &paredit_feature_lint_pathname_io::with_open_file_result_captures_stream::RULE,
     ),
 ];

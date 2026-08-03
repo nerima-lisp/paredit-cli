@@ -413,7 +413,12 @@ mod tests {
                 // The declaration half of an arity mismatch: every caller
                 // checked against this annotation is checked against the wrong
                 // number of arguments.
-                "typed-racket-arity-mismatch"
+                "typed-racket-arity-mismatch",
+                // The only caller that matters here is Emacs itself:
+                // `call-interactively` passes exactly what `(interactive)`
+                // produced, which is fewer arguments than the lambda list
+                // requires.
+                "elisp-interactive-arity-mismatch"
             ]
         );
     }
@@ -429,7 +434,8 @@ mod tests {
                 "the-arity",
                 "equality-arity",
                 "accessor-arity",
-                "typed-racket-arity-mismatch"
+                "typed-racket-arity-mismatch",
+                "elisp-interactive-arity-mismatch"
             ]
         );
     }

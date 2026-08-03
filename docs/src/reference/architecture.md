@@ -1,6 +1,6 @@
 # Architecture
 
-`paredit-cli` is a Cargo workspace: a thin composition root plus 58 packages
+`paredit-cli` is a Cargo workspace: a thin composition root plus 60 packages
 under `packages/core/` and `packages/feature/`. Knowing which package owns a
 thing is the fastest way to know where a change belongs.
 
@@ -17,7 +17,7 @@ core/syntax ──▶ core/semantics ──▶ core/edit ──▶ core/cli
      └──▶ core/workspace          core/lint-engine ──┘
                     │
                     ▼
-              feature/*  (49 packages, mostly independent of each other)
+              feature/*  (51 packages, mostly independent of each other)
                     │
                     ▼
               paredit-cli  (command tree, dispatch, REGISTRY)
@@ -65,10 +65,10 @@ src/
 A contract test walks `src/` and refuses anything else.
 
 The lint `REGISTRY` is the canonical example of what *must* live here. It names
-all 286 rules, and every rule depends on the engine; putting the registry in
+all 295 rules, and every rule depends on the engine; putting the registry in
 either would be a cycle. So the engine takes a `RuleCatalog` as an argument and
 never learns which rules exist, the rules never learn the registry does, and
-the registry sits in the root reaching twenty-four feature packages for their
+the registry sits in the root reaching twenty-six feature packages for their
 `META` and `RULE`. That is the criterion: **a module that enumerates or
 aggregates several features** belongs in neither core nor any one feature.
 
@@ -127,7 +127,7 @@ semantic enum (`ReportLimit::{Complete, Limited(NonZeroUsize)}`,
 Derive redundant presentation values (booleans, counts) at the serialization
 boundary instead of storing them.
 
-## Lint rules: one trait, one registry line, twenty-four packages
+## Lint rules: one trait, one registry line, twenty-six packages
 
 The lint suite is the clearest example of the split's shape, and the most
 frequently extended part of the tree.
@@ -141,8 +141,8 @@ frequently extended part of the tree.
 | `policy` | Dialect scope, rule selection and gate decisions: logic that needs no tree. |
 | `engine` | The single pass, which walks the document once and dispatches each node to every rule whose `head_filter` matches. |
 
-281 of the 286 shipped rules live in twenty-three themed packages, split seven
-ways. A twenty-fourth, `feature/lint-custom`, holds no rules at all: it is the
+290 of the 295 shipped rules live in twenty-five themed packages, split seven
+ways. A twenty-sixth, `feature/lint-custom`, holds no rules at all: it is the
 pattern language and the second pass that run the rules a *project* writes for
 itself.
 
@@ -296,7 +296,7 @@ Emacs Lisp's truncating integer `/`. Each needs an arm in `contract.rs`'s
 `lint_rule_dialect_scope` and an entry in `DIALECT_SPECIFIC_REPORTS`, or the
 dialect matrix claims a Common Lisp support the rule declines.
 
-**`REGISTRY` is in neither.** It names all 286 rules, and every rule depends on
+**`REGISTRY` is in neither.** It names all 295 rules, and every rule depends on
 the engine, so putting it in the engine or in a rule package would be a cycle.
 It sits in the root crate, and the engine receives a `RuleCatalog` as an
 argument — which is why the engine can be a package at all.

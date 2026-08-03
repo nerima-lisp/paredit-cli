@@ -1661,6 +1661,54 @@
       "count": 0,
       "description": "a top-level in-package that re-enters a package the file had already left",
       "rule": "package-circular-in-package-chain"
+    },
+    {
+      "category": "arity",
+      "count": 0,
+      "description": "an interactive spec that supplies fewer arguments than the lambda list requires",
+      "rule": "elisp-interactive-arity-mismatch"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "save-excursion wrapping set-buffer, which saves point in the buffer it then leaves",
+      "rule": "elisp-save-excursion-set-buffer"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a require of the obsolete cl package, which prints a deprecation notice when loaded",
+      "rule": "elisp-require-obsolete-cl"
+    },
+    {
+      "category": "portability",
+      "count": 0,
+      "description": "a filesystem call whose designator is a string glued together around a path separator",
+      "rule": "pathname-built-by-concatenation"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a file opened for output with no :if-exists, so an existing file signals file-error",
+      "rule": "output-stream-without-if-exists"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a pathname component compared with string=/equal against a literal, which the host's case defeats",
+      "rule": "pathname-component-compared-case-sensitively"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a (directory \"…/\") whose pathspec has no wildcard, so it matches only the directory itself",
+      "rule": "directory-without-wild-component"
+    },
+    {
+      "category": "resource",
+      "count": 0,
+      "description": "a with-open-file whose result is a closure over, or an aggregate holding, the stream it closed",
+      "rule": "with-open-file-result-captures-stream"
     }
   ],
   "policy": {
