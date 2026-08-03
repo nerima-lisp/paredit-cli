@@ -776,12 +776,18 @@ fn hy_still_refuses_its_real_prefixes_before_a_closing_delimiter() {
 }
 
 /// The comma keeps meaning unquote in every dialect whose reader gives it that
-/// meaning, and keeps meaning whitespace in Clojure.
+/// meaning, and keeps meaning whitespace in Clojure and Carp.
 ///
 /// `classify_hy` is reached only from the `Dialect::Hy` arm of
-/// `classify_reader_macro`, so this cannot drift by construction; the test pins
-/// it anyway, because the arm it was split out of still serves `Unknown` and
-/// `Carp`.
+/// `classify_reader_macro`, so it cannot drift by construction; the test pins
+/// it anyway, because the arm it was split out of still serves `Unknown`.
+///
+/// Carp moved out of the unquote list after the fact. When this test was
+/// written Carp still inherited the legacy reader, where `,` was a prefix --
+/// but `,` is *whitespace* in Carp, and reading it as unquote gave `max` and
+/// `val` in `[min, max, val]` phantom `Unquote` prefixes at 39 corpus sites.
+/// The two changes were green independently and collided only once both were
+/// on `main`: a semantic conflict git cannot see.
 #[test]
 fn hy_comma_arm_does_not_change_other_dialects() {
     for dialect in [
@@ -792,7 +798,6 @@ fn hy_comma_arm_does_not_change_other_dialects() {
         Dialect::Fennel,
         Dialect::Lfe,
         Dialect::Janet,
-        Dialect::Carp,
         Dialect::Unknown,
     ] {
         let input = "(a ,b)";
@@ -815,13 +820,22 @@ fn hy_comma_arm_does_not_change_other_dialects() {
         );
     }
 
-    // Clojure reads a comma as whitespace, so `(a ,b)` is two data there and
-    // `(a ,)` is one -- neither is a prefix, and neither is an error.
-    let tree = SyntaxTree::parse_with_dialect("(a ,b)", Dialect::Clojure).expect("valid");
-    let form = &tree.root_view().children[0];
-    assert_eq!(form.children.len(), 2);
-    assert!(form.children[1].reader_prefixes.is_empty());
-    SyntaxTree::parse_with_dialect("(a ,)", Dialect::Clojure).expect("comma is whitespace");
+    // Clojure and Carp both read a comma as whitespace, so `(a ,b)` is two data
+    // there and `(a ,)` is one -- neither is a prefix, and neither is an error.
+    // Carp's separators are written that way: `[min, max, val]`, `[x Int, y Int]`.
+    for dialect in [Dialect::Clojure, Dialect::Carp] {
+        let tree = SyntaxTree::parse_with_dialect("(a ,b)", dialect)
+            .unwrap_or_else(|error| panic!("{}: {error:?}", dialect.label()));
+        let form = &tree.root_view().children[0];
+        assert_eq!(form.children.len(), 2, "{}", dialect.label());
+        assert!(
+            form.children[1].reader_prefixes.is_empty(),
+            "{}",
+            dialect.label()
+        );
+        SyntaxTree::parse_with_dialect("(a ,)", dialect)
+            .unwrap_or_else(|error| panic!("{}: comma is whitespace, {error:?}", dialect.label()));
+    }
 }
 
 /// A stray closing delimiter with no prefix in front of it still reports the
