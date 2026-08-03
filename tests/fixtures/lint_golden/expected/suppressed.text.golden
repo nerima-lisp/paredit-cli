@@ -251,5 +251,25 @@ rule	typed-racket-arity-mismatch	0
 rule	intern-dynamic-package-target	0
 rule	introspection-probe-unchecked	0
 rule	symbol-function-fset-dynamic-name	0
+rule	destructuring-bind-unused-whole	0
+rule	loop-collect-into-immediately-returned	0
+rule	flet-single-use-inlinable	0
+rule	multiple-value-setq-arity-mismatch	0
+rule	with-open-file-redundant-direction-default	0
+rule	ftype-values-arity-mismatch	0
+rule	with-accessors-empty-binding-list	0
+rule	quoted-form-contains-stray-unquote	0
+rule	hash-table-iteration-order-assumed	0
+rule	set-membership-via-linear-scan	0
+rule	nested-get-chain	0
+rule	redundant-into-empty-collection	0
+rule	mixed-float-precision-arithmetic	0
+rule	division-result-precision-loss	0
+rule	epsilon-less-float-loop-bound	0
+rule	redundant-precision-coercion	0
+rule	format-unknown-directive	0
+rule	format-percent-ampersand-adjacent-redundancy	0
+rule	format-nested-directive-unbalanced	0
+rule	package-circular-in-package-chain	0
 finding	redundant-quote	warning	suspicious	fixable=true	suppressed.lisp	338	quoting number 6 is redundant	redundant-quote/07bb8007b4863bf0/0
 finding	declarative-style-score	warning	suspicious	fixable=false	suppressed.lisp	0	this file's declarative-style score is 0% (5 top-level forms), below the 80% threshold	declarative-style-score/2f534fdd67304360/0

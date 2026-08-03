@@ -9363,6 +9363,278 @@
               "shortDescription": {
                 "text": "a function definition installed under a name built by intern, which no search can connect to its callers"
               }
+            },
+            {
+              "id": "destructuring-bind-unused-whole",
+              "properties": {
+                "category": "dead-code",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a destructuring-bind that binds a &whole variable and never references it"
+              }
+            },
+            {
+              "id": "loop-collect-into-immediately-returned",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a loop whose only collect ... into accumulator is returned unchanged by finally (return acc), which plain collect already does"
+              }
+            },
+            {
+              "id": "flet-single-use-inlinable",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "an flet/labels defining one local function whose only use is a tail call that is the whole body"
+              }
+            },
+            {
+              "id": "multiple-value-setq-arity-mismatch",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a multiple-value-setq whose variable list is a different length from its literal (values ...) right-hand side"
+              }
+            },
+            {
+              "id": "with-open-file-redundant-direction-default",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "an open or with-open-file with an explicit :direction :input, which is already the default ((open p :direction :input) is (open p))"
+              }
+            },
+            {
+              "id": "ftype-values-arity-mismatch",
+              "properties": {
+                "category": "declaration",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a declaimed ftype whose (values ...) return arity is larger than the arity its defun's final literal (values ...) returns"
+              }
+            },
+            {
+              "id": "with-accessors-empty-binding-list",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a with-slots/with-accessors with an empty binding list, which is just progn ((with-slots () o body) is (progn o body))"
+              }
+            },
+            {
+              "id": "quoted-form-contains-stray-unquote",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a quoted form containing a , or ,@ with no enclosing backquote, which Common Lisp refuses to read"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "CLHS 18.1 leaves the order of `maphash` and `loop … being the hash-keys` unspecified. A list built from one and then read by position gives \"some key\", not \"the first key\": the answer can differ between implementations, between versions of one implementation, and between two tables with equal contents but different histories."
+              },
+              "id": "hash-table-iteration-order-assumed",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "CLHS 18.1 leaves the order of `maphash` and `loop … being the hash-keys` unspecified. A list built from one and then read by position gives \"some key\", not \"the first key\": the answer can differ between implementations, between versions of one implementation, and between two tables with equal contents but different histories.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "an element read by position out of a hash table's iteration, whose order is unspecified"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "`member` walks its list, so a membership test against a fixed set of names costs the length of that set on every call. Past a certain size the list has stopped being an argument and become a set, and both a `case` and a hash table answer in constant time."
+              },
+              "id": "set-membership-via-linear-scan",
+              "properties": {
+                "category": "performance",
+                "fixable": false,
+                "rationale": "`member` walks its list, so a membership test against a fixed set of names costs the length of that set on every call. Past a certain size the list has stopped being an argument and become a set, and both a `case` and a hash table answer in constant time.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a member against a long literal list of symbols, which is a set in disguise"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "`get-in`'s two-argument arity is `(reduce get m ks)`, so a chain of two-operand `get`s is exactly a `get-in` over the same path — same lookups, same order, same nil-punning. Spelled as a vector the path reads left to right; spelled as nesting it has to be read inside out."
+              },
+              "id": "nested-get-chain",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "`get-in`'s two-argument arity is `(reduce get m ks)`, so a chain of two-operand `get`s is exactly a `get-in` over the same path — same lookups, same order, same nil-punning. Spelled as a vector the path reads left to right; spelled as nesting it has to be read inside out.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "nested gets reading one path, which is get-in ((get (get m :a) :b) is (get-in m [:a :b]))"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "`(into [] coll)` conjes every element onto an empty vector, which is what `(vec coll)` does and says. The direct conversion is one call rather than two and names the result type instead of building it."
+              },
+              "id": "redundant-into-empty-collection",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "`(into [] coll)` conjes every element onto an empty vector, which is what `(vec coll)` does and says. The direct conversion is one call rather than two and names the result type instead of building it.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "an into onto an empty vector or set, which is a direct conversion ((into [] coll) is (vec coll))"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "CLHS 12.1.4.4 makes the result of a mixed form a float of the largest format present, so a form holding a double-float literal produces a double-float. A single-float literal in the same form is widened first, and widening preserves the single-float rounding error rather than removing it: SBCL evaluates (* 3.14 1.0d0) to 3.140000104904175d0. The result carries a double-float's type and a single-float's accuracy."
+              },
+              "id": "mixed-float-precision-arithmetic",
+              "properties": {
+                "category": "numeric-precision",
+                "fixable": false,
+                "rationale": "CLHS 12.1.4.4 makes the result of a mixed form a float of the largest format present, so a form holding a double-float literal produces a double-float. A single-float literal in the same form is widened first, and widening preserves the single-float rounding error rather than removing it: SBCL evaluates (* 3.14 1.0d0) to 3.140000104904175d0. The result carries a double-float's type and a single-float's accuracy.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a single-float literal beside a double-float literal in one arithmetic form, capping the result at single precision"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "The GNU Emacs Lisp Reference Manual says of `/`: \"If all the arguments are integers, the result is an integer, obtained by rounding the quotient towards zero after each division.\" So (/ 1 3) is 0, not one third. This is the opposite of Common Lisp, where the same form is the exact ratio 1/3 and nothing is lost — which is why this rule is Emacs Lisp only."
+              },
+              "id": "division-result-precision-loss",
+              "properties": {
+                "category": "numeric-precision",
+                "fixable": false,
+                "rationale": "The GNU Emacs Lisp Reference Manual says of `/`: \"If all the arguments are integers, the result is an integer, obtained by rounding the quotient towards zero after each division.\" So (/ 1 3) is 0, not one third. This is the opposite of Common Lisp, where the same form is the exact ratio 1/3 and nothing is lost — which is why this rule is Emacs Lisp only.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "an Emacs Lisp integer division whose quotient truncates to zero, discarding the value"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Repeated addition of a float that binary floating point cannot hold exactly accumulates error, so the running value steps past the bound rather than landing on it. Adding 0.1 ten times gives 1.0000001 in single-float and 0.9999999999999999 in double-float — it overshoots in one format and undershoots in the other — so an = or eql end test may never hold and the loop runs forever. An ordered comparison stops on the first value past the bound and is correct for any step."
+              },
+              "id": "epsilon-less-float-loop-bound",
+              "properties": {
+                "category": "numeric-precision",
+                "fixable": false,
+                "rationale": "Repeated addition of a float that binary floating point cannot hold exactly accumulates error, so the running value steps past the bound rather than landing on it. Adding 0.1 ten times gives 1.0000001 in single-float and 0.9999999999999999 in double-float — it overshoots in one format and undershoots in the other — so an = or eql end test may never hold and the loop runs forever. An ordered comparison stops on the first value past the bound and is correct for any step.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a do loop stepping an inexact float that terminates on = or eql rather than an ordered comparison"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "coerce rounds to the nearest representable float, and truncate is discontinuous at every integer, so the conversion can be amplified into a full unit of error before it is thrown away. SBCL evaluates (truncate 123456789123456789) to itself but (truncate (float 123456789123456789)) to 123456790519087104. A rational just below an integer can also round up across the boundary: (truncate 99999999999999999999/100000000000000000000) is 0, and coercing first makes it 1."
+              },
+              "id": "redundant-precision-coercion",
+              "properties": {
+                "category": "numeric-precision",
+                "fixable": false,
+                "rationale": "coerce rounds to the nearest representable float, and truncate is discontinuous at every integer, so the conversion can be amplified into a full unit of error before it is thrown away. SBCL evaluates (truncate 123456789123456789) to itself but (truncate (float 123456789123456789)) to 123456790519087104. A rational just below an integer can also round up across the boundary: (truncate 99999999999999999999/100000000000000000000) is 0, and coercing first makes it 1.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a float coercion immediately discarded by a truncate/floor/ceiling/round around it"
+              }
+            },
+            {
+              "id": "format-unknown-directive",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a ~ directive in a literal format control string that CLHS 22.3 does not define"
+              }
+            },
+            {
+              "id": "format-percent-ampersand-adjacent-redundancy",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a ~%~& in a literal format control string, where the ~& is already at the start of a line"
+              }
+            },
+            {
+              "id": "format-nested-directive-unbalanced",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "an unbalanced ~[ ~{ ~< ~( bracketing construct in a literal format control string"
+              }
+            },
+            {
+              "id": "package-circular-in-package-chain",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a top-level in-package that re-enters a package the file had already left"
+              }
             }
           ]
         }

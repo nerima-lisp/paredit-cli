@@ -185,7 +185,10 @@ pub const PEDANTIC_RULES: [&str; tagged_count(RuleTag::Pedantic)] = {
 // premises were checked against the primary sources and refuted; both were
 // false-positive generators on correct code. See
 // `packages/feature/lint-contract-annotation/README.md`.
-const _: () = assert!(RULE_COUNT == 266);
+//
+// 266 + the next batch's 20: 8 (`lint-form-shape`), 4 each (`lint-sequence`,
+// `lint-numeric`), 3 (`lint-string-char`) and 1 (`lint-package-hygiene`) = 286.
+const _: () = assert!(RULE_COUNT == 286);
 // Unchanged at 99: every one of this branch's 37 rules is
 // `Fixability::ReportOnly`. Each one reports a judgment the tool cannot make
 // on the author's behalf — whether an annotation or the parameter list under it
@@ -193,6 +196,12 @@ const _: () = assert!(RULE_COUNT == 266);
 // how a temp file should be named are all decisions the author has to make,
 // not spellings of one they already made. The two dropped rules were
 // `ReportOnly` too, which is why this number does not move with them.
+//
+// Still 99 after the next batch's 20: every one of those is `ReportOnly` as
+// well. Several say so in their own words — `redundant-precision-coercion`
+// records that removing the coercion changes the result on exactly the inputs
+// that motivate the rule, and `package-circular-in-package-chain` would have to
+// move forms between two regions of one package to repair anything.
 const _: () = assert!(fixable_count() == 99);
 // 164 (through PR #82) + 31 of this branch's 37 rules. The other 6 are
 // `Severity::Error`: `when-unless-implicit-nil-misused` and the five
@@ -202,7 +211,15 @@ const _: () = assert!(fixable_count() == 99);
 // `sql-query-string-built-via-format` and
 // `world-writable-file-mode-in-open-call`. Both dropped rules were `Warning`,
 // so this fell by 2 where `fixable_count` did not.
-const _: () = assert!(warning_count() == 195);
+//
+// 195 + 17 of the next batch's 20 = 212. The other 3 are `Severity::Error`,
+// each because a real implementation refuses the code rather than merely
+// disliking it: `quoted-form-contains-stray-unquote` (SBCL will not *read* the
+// file — "Comma not inside a backquote"), `format-nested-directive-unbalanced`
+// (`format` signals at run time on an unclosed `~[`/`~{`/`~<`/`~(`), and
+// `ftype-values-arity-mismatch` (a violated `ftype` is undefined behaviour at
+// low safety, and SBCL raises a full WARNING for it).
+const _: () = assert!(warning_count() == 212);
 const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
 // 6 (through PR #82) + 8 of this branch's rules: `lint-call-shape`'s four
 // threshold rules, whose limits are conventions a codebase either adopted or
@@ -210,7 +227,9 @@ const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
 // `missing-package-docstring` and `todo-fixme-no-attribution`; and
 // `repeated-hash-table-lookup-same-key`, which is a real cost only on a hot
 // path the rule cannot identify. Neither dropped rule was tagged `pedantic`,
-// so this does not move either.
+// so this does not move either. Nor does the next batch's 20: none of them
+// carries a tag at all, so `PEDANTIC_RULES` and `EXPERIMENTAL_RULES` are both
+// unchanged by it.
 const _: () = assert!(PEDANTIC_RULES.len() == 14);
 
 fn meta_of(name: &str) -> Option<&'static crate::lint::model::RuleMeta> {

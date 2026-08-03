@@ -919,6 +919,70 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
             command::InspectCommand::SymbolFunctionFsetDynamicName(args) => {
                 symbol_function_fset_dynamic_name_report::workflow::symbol_function_fset_dynamic_name_report(args)?;
             }
+            command::InspectCommand::DestructuringBindUnusedWhole(args) => {
+                destructuring_bind_unused_whole_report::workflow::destructuring_bind_unused_whole_report(args)?;
+            }
+            command::InspectCommand::LoopCollectIntoImmediatelyReturned(args) => {
+                loop_collect_into_immediately_returned_report::workflow::loop_collect_into_immediately_returned_report(args)?;
+            }
+            command::InspectCommand::FletSingleUseInlinable(args) => {
+                flet_single_use_inlinable_report::workflow::flet_single_use_inlinable_report(args)?;
+            }
+            command::InspectCommand::MultipleValueSetqArityMismatch(args) => {
+                multiple_value_setq_arity_mismatch_report::workflow::multiple_value_setq_arity_mismatch_report(args)?;
+            }
+            command::InspectCommand::WithOpenFileRedundantDirectionDefault(args) => {
+                with_open_file_redundant_direction_default_report::workflow::with_open_file_redundant_direction_default_report(args)?;
+            }
+            command::InspectCommand::FtypeValuesArityMismatch(args) => {
+                ftype_values_arity_mismatch_report::workflow::ftype_values_arity_mismatch_report(
+                    args,
+                )?;
+            }
+            command::InspectCommand::WithAccessorsEmptyBindingList(args) => {
+                with_accessors_empty_binding_list_report::workflow::with_accessors_empty_binding_list_report(args)?;
+            }
+            command::InspectCommand::QuotedFormContainsStrayUnquote(args) => {
+                quoted_form_contains_stray_unquote_report::workflow::quoted_form_contains_stray_unquote_report(args)?;
+            }
+            command::InspectCommand::HashTableIterationOrderAssumed(args) => {
+                hash_table_iteration_order_assumed_report::workflow::hash_table_iteration_order_assumed_report(args)?;
+            }
+            command::InspectCommand::SetMembershipViaLinearScan(args) => {
+                set_membership_via_linear_scan_report::workflow::set_membership_via_linear_scan_report(args)?;
+            }
+            command::InspectCommand::NestedGetChain(args) => {
+                nested_get_chain_report::workflow::nested_get_chain_report(args)?;
+            }
+            command::InspectCommand::RedundantIntoEmptyCollection(args) => {
+                redundant_into_empty_collection_report::workflow::redundant_into_empty_collection_report(args)?;
+            }
+            command::InspectCommand::MixedFloatPrecisionArithmetic(args) => {
+                mixed_float_precision_arithmetic_report::workflow::mixed_float_precision_arithmetic_report(args)?;
+            }
+            command::InspectCommand::DivisionResultPrecisionLoss(args) => {
+                division_result_precision_loss_report::workflow::division_result_precision_loss_report(args)?;
+            }
+            command::InspectCommand::EpsilonLessFloatLoopBound(args) => {
+                epsilon_less_float_loop_bound_report::workflow::epsilon_less_float_loop_bound_report(args)?;
+            }
+            command::InspectCommand::RedundantPrecisionCoercion(args) => {
+                redundant_precision_coercion_report::workflow::redundant_precision_coercion_report(
+                    args,
+                )?;
+            }
+            command::InspectCommand::FormatUnknownDirective(args) => {
+                format_unknown_directive_report::workflow::format_unknown_directive_report(args)?;
+            }
+            command::InspectCommand::FormatPercentAmpersandAdjacentRedundancy(args) => {
+                format_percent_ampersand_adjacent_redundancy_report::workflow::format_percent_ampersand_adjacent_redundancy_report(args)?;
+            }
+            command::InspectCommand::FormatNestedDirectiveUnbalanced(args) => {
+                format_nested_directive_unbalanced_report::workflow::format_nested_directive_unbalanced_report(args)?;
+            }
+            command::InspectCommand::PackageCircularInPackageChain(args) => {
+                package_circular_in_package_chain_report::workflow::circular_in_package_chain_report(args)?;
+            }
         },
         Command::Edit { command } => match command {
             command::EditCommand::Format(args) => basic_edit::workflow::format(args)?,

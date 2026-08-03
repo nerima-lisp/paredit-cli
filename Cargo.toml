@@ -137,6 +137,7 @@ paredit-feature-lint-call-shape = { path = "packages/feature/lint-call-shape" }
 paredit-feature-lint-documentation = { path = "packages/feature/lint-documentation" }
 paredit-feature-lint-contract-annotation = { path = "packages/feature/lint-contract-annotation" }
 paredit-feature-lint-introspection = { path = "packages/feature/lint-introspection" }
+paredit-feature-lint-package-hygiene = { path = "packages/feature/lint-package-hygiene" }
 paredit-feature-emacs-lisp = { path = "packages/feature/emacs-lisp" }
 paredit-feature-conditional-conversion = { path = "packages/feature/conditional-conversion" }
 paredit-feature-external-check = { path = "packages/feature/external-check" }

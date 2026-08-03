@@ -1,6 +1,6 @@
 # Architecture
 
-`paredit-cli` is a Cargo workspace: a thin composition root plus 57 packages
+`paredit-cli` is a Cargo workspace: a thin composition root plus 58 packages
 under `packages/core/` and `packages/feature/`. Knowing which package owns a
 thing is the fastest way to know where a change belongs.
 
@@ -17,7 +17,7 @@ core/syntax ──▶ core/semantics ──▶ core/edit ──▶ core/cli
      └──▶ core/workspace          core/lint-engine ──┘
                     │
                     ▼
-              feature/*  (48 packages, mostly independent of each other)
+              feature/*  (49 packages, mostly independent of each other)
                     │
                     ▼
               paredit-cli  (command tree, dispatch, REGISTRY)
@@ -65,10 +65,10 @@ src/
 A contract test walks `src/` and refuses anything else.
 
 The lint `REGISTRY` is the canonical example of what *must* live here. It names
-all 266 rules, and every rule depends on the engine; putting the registry in
+all 286 rules, and every rule depends on the engine; putting the registry in
 either would be a cycle. So the engine takes a `RuleCatalog` as an argument and
 never learns which rules exist, the rules never learn the registry does, and
-the registry sits in the root reaching twenty-three feature packages for their
+the registry sits in the root reaching twenty-four feature packages for their
 `META` and `RULE`. That is the criterion: **a module that enumerates or
 aggregates several features** belongs in neither core nor any one feature.
 
@@ -127,7 +127,7 @@ semantic enum (`ReportLimit::{Complete, Limited(NonZeroUsize)}`,
 Derive redundant presentation values (booleans, counts) at the serialization
 boundary instead of storing them.
 
-## Lint rules: one trait, one registry line, twenty-three packages
+## Lint rules: one trait, one registry line, twenty-four packages
 
 The lint suite is the clearest example of the split's shape, and the most
 frequently extended part of the tree.
@@ -141,8 +141,8 @@ frequently extended part of the tree.
 | `policy` | Dialect scope, rule selection and gate decisions: logic that needs no tree. |
 | `engine` | The single pass, which walks the document once and dispatches each node to every rule whose `head_filter` matches. |
 
-261 of the 266 shipped rules live in twenty-two themed packages, split seven
-ways. A twenty-third, `feature/lint-custom`, holds no rules at all: it is the
+281 of the 286 shipped rules live in twenty-three themed packages, split seven
+ways. A twenty-fourth, `feature/lint-custom`, holds no rules at all: it is the
 pattern language and the second pass that run the rules a *project* writes for
 itself.
 
@@ -272,7 +272,31 @@ and `clojure-pre-referencing-percent` were dropped before merge once their
 premises were checked against CLHS 3.3.1 and `clojure/core.clj` and refuted.
 That package's README records both refutations.
 
-**`REGISTRY` is in neither.** It names all 266 rules, and every rule depends on
+The batch after that added 20 rules and 20 commands — every one of them takes
+the directory *with* `cli/` — and only one new package. Sixteen of the twenty
+went into `feature/lint-{form-shape,sequence,numeric,string-char}`, which
+already existed: they are about the shape of a form, a sequence operation, a
+numeric operation and a `format` control string respectively, which is what
+those packages are for, so a new package would have been a second home for one
+subject. The twentieth's package, `feature/lint-package-hygiene`, is new
+because its subject — how a file *selects* the package its forms are read into
+— had no home at all. Its README is worth reading before adding to it: it
+records five rules that were asked for and deliberately **not** built, each
+with the reason, and the most useful of those is
+`package-nickname-shadows-existing-package`, which would duplicate `inspect
+package-conflicts`. That report is a real gap — it carries no severity, no
+`paredit:ignore` suppression and no place in aggregated `inspect lint` — but
+the fix is a thin `rule.rs` delegating to its existing domain function, not a
+reimplementation.
+
+Three of the twenty are the first rules in these four older packages scoped
+away from Common Lisp: `nested-get-chain` and `redundant-into-empty-collection`
+are Clojure's `get-in` and `into`, and `division-result-precision-loss` is
+Emacs Lisp's truncating integer `/`. Each needs an arm in `contract.rs`'s
+`lint_rule_dialect_scope` and an entry in `DIALECT_SPECIFIC_REPORTS`, or the
+dialect matrix claims a Common Lisp support the rule declines.
+
+**`REGISTRY` is in neither.** It names all 286 rules, and every rule depends on
 the engine, so putting it in the engine or in a rule package would be a cycle.
 It sits in the root crate, and the engine receives a `RuleCatalog` as an
 argument — which is why the engine can be a package at all.

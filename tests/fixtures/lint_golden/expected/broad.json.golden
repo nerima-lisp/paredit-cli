@@ -3348,6 +3348,126 @@
       "count": 0,
       "description": "a function definition installed under a name built by intern, which no search can connect to its callers",
       "rule": "symbol-function-fset-dynamic-name"
+    },
+    {
+      "category": "dead-code",
+      "count": 0,
+      "description": "a destructuring-bind that binds a &whole variable and never references it",
+      "rule": "destructuring-bind-unused-whole"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a loop whose only collect ... into accumulator is returned unchanged by finally (return acc), which plain collect already does",
+      "rule": "loop-collect-into-immediately-returned"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an flet/labels defining one local function whose only use is a tail call that is the whole body",
+      "rule": "flet-single-use-inlinable"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a multiple-value-setq whose variable list is a different length from its literal (values ...) right-hand side",
+      "rule": "multiple-value-setq-arity-mismatch"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an open or with-open-file with an explicit :direction :input, which is already the default ((open p :direction :input) is (open p))",
+      "rule": "with-open-file-redundant-direction-default"
+    },
+    {
+      "category": "declaration",
+      "count": 0,
+      "description": "a declaimed ftype whose (values ...) return arity is larger than the arity its defun's final literal (values ...) returns",
+      "rule": "ftype-values-arity-mismatch"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a with-slots/with-accessors with an empty binding list, which is just progn ((with-slots () o body) is (progn o body))",
+      "rule": "with-accessors-empty-binding-list"
+    },
+    {
+      "category": "malformed",
+      "count": 0,
+      "description": "a quoted form containing a , or ,@ with no enclosing backquote, which Common Lisp refuses to read",
+      "rule": "quoted-form-contains-stray-unquote"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an element read by position out of a hash table's iteration, whose order is unspecified",
+      "rule": "hash-table-iteration-order-assumed"
+    },
+    {
+      "category": "performance",
+      "count": 0,
+      "description": "a member against a long literal list of symbols, which is a set in disguise",
+      "rule": "set-membership-via-linear-scan"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "nested gets reading one path, which is get-in ((get (get m :a) :b) is (get-in m [:a :b]))",
+      "rule": "nested-get-chain"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an into onto an empty vector or set, which is a direct conversion ((into [] coll) is (vec coll))",
+      "rule": "redundant-into-empty-collection"
+    },
+    {
+      "category": "numeric-precision",
+      "count": 0,
+      "description": "a single-float literal beside a double-float literal in one arithmetic form, capping the result at single precision",
+      "rule": "mixed-float-precision-arithmetic"
+    },
+    {
+      "category": "numeric-precision",
+      "count": 0,
+      "description": "an Emacs Lisp integer division whose quotient truncates to zero, discarding the value",
+      "rule": "division-result-precision-loss"
+    },
+    {
+      "category": "numeric-precision",
+      "count": 0,
+      "description": "a do loop stepping an inexact float that terminates on = or eql rather than an ordered comparison",
+      "rule": "epsilon-less-float-loop-bound"
+    },
+    {
+      "category": "numeric-precision",
+      "count": 0,
+      "description": "a float coercion immediately discarded by a truncate/floor/ceiling/round around it",
+      "rule": "redundant-precision-coercion"
+    },
+    {
+      "category": "malformed",
+      "count": 0,
+      "description": "a ~ directive in a literal format control string that CLHS 22.3 does not define",
+      "rule": "format-unknown-directive"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a ~%~& in a literal format control string, where the ~& is already at the start of a line",
+      "rule": "format-percent-ampersand-adjacent-redundancy"
+    },
+    {
+      "category": "malformed",
+      "count": 0,
+      "description": "an unbalanced ~[ ~{ ~< ~( bracketing construct in a literal format control string",
+      "rule": "format-nested-directive-unbalanced"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a top-level in-package that re-enters a package the file had already left",
+      "rule": "package-circular-in-package-chain"
     }
   ],
   "policy": {
