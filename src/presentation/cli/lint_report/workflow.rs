@@ -2454,6 +2454,17 @@ mod tests {
         // file — the rule withholds its fix when it is, which would make this
         // test fail for a reason that has nothing to do with the fix engine.
         let carp_source = "(=> cdtm (f) (g))\n"; // carp-deprecated-thread-macro
+        // The Racket half, added for the third time this test has caught the
+        // same class. `lint-racket-depth`'s two fixable rules declare
+        // `[Dialect::Racket]` *alone*, where `lint-scheme-idiom`'s declare
+        // `[Scheme, Racket]` — so the Scheme fixture above parses as
+        // `Dialect::Scheme` and reaches neither of them. Without this fixture
+        // both are `Fixability::Fixable` rules the fix engine never exercises,
+        // which is a `--fix` that silently does nothing.
+        let racket_source = concat!(
+            "(begin0 (rb0-body))\n",                 // racket-begin0-single-form
+            "(case-lambda [(rcl-x) (* rcl-x 2)])\n", // racket-case-lambda-single-clause
+        );
 
         let active: Vec<&str> = RULES.to_vec();
         let mut produced: BTreeSet<&str> = BTreeSet::new();
@@ -2462,6 +2473,7 @@ mod tests {
             (elisp_source, Dialect::EmacsLisp, "fixture.el"),
             (scheme_source, Dialect::Scheme, "fixture.scm"),
             (carp_source, Dialect::Carp, "fixture.carp"),
+            (racket_source, Dialect::Racket, "fixture.rkt"),
         ] {
             let tree = paredit_core_syntax::sexpr::SyntaxTree::parse_with_dialect(text, dialect)
                 .expect("parse fixture");

@@ -30,7 +30,7 @@ paredit mcp --read-only   # …that refuses every command which would write
 The server offers a handful of tools — `paredit_check`, `paredit_outline`,
 `paredit_lint`, `paredit_format`, `paredit_diff`, `paredit_capabilities` — plus
 `paredit_run`, which takes any command's argument vector. **It deliberately does
-not expose one tool per command.** There are 463 of them; that many descriptions
+not expose one tool per command.** There are 467 of them; that many descriptions
 costs thousands of tokens of context before the agent has read a line of code,
 and it makes selection harder rather than easier. The catalog is available as
 the `paredit://capabilities` resource, and `paredit_run` reaches everything in
@@ -113,16 +113,20 @@ Each cell carries one of four statuses:
 
 `silent` is the one worth reading carefully. Almost every `inspect` command
 exits `0` for every dialect, so a `finding_count` of `0` looks identical
-whether the code is clean or the tool has nothing to say about it. 284 of the
-463 commands are `silent` for at least one dialect outside Common Lisp, and
-fourteen of those are `silent` for Common Lisp *itself*, because their subject
+whether the code is clean or the tool has nothing to say about it. 288 of the
+467 commands are `silent` for at least one dialect outside Common Lisp, and
+eighteen of those are `silent` for Common Lisp *itself*, because their subject
 is another dialect entirely: `inspect elisp-file` and
 `inspect division-result-precision-loss` (Emacs Lisp);
 `inspect atom-swap-with-side-effect`, `inspect future-promise-never-realized`,
 `inspect nested-get-chain`, `inspect redundant-into-empty-collection`,
 `inspect with-open-returns-lazy-seq`, `inspect def-inside-function-body`,
-`inspect single-key-nested-path` and `inspect apply-with-literal-collection`
-(Clojure); and `inspect scheme-begin-single-form`,
+`inspect single-key-nested-path`, `inspect apply-with-literal-collection`,
+`inspect go-block-blocking-channel-op`,
+`inspect parking-op-outside-go-machinery`,
+`inspect contains-on-non-associative` and
+`inspect reference-type-operator-mismatch` (Clojure); and
+`inspect scheme-begin-single-form`,
 `inspect scheme-let-star-independent-bindings`,
 `inspect scheme-memq-assq-literal-key` and
 `inspect scheme-named-let-never-recurs` (Scheme, and Racket for all but the

@@ -245,7 +245,7 @@ fn leaf_commands_by_path(
     out
 }
 
-/// FR-011: every command the dialect contract counts (the 463 commands
+/// FR-011: every command the dialect contract counts (the 467 commands
 /// across `inspect`/`edit`/`refactor`/`query`/`fix`/`migrate`) carries a
 /// `writes` flag and a non-empty `possible_error_codes` set. A missing or
 /// empty set would mean a command nobody classified — the exact drift this
@@ -263,7 +263,7 @@ fn every_dialect_contract_command_has_a_writes_flag_and_a_non_empty_error_code_s
         .collect();
     assert_eq!(
         dialect_paths.len(),
-        463,
+        467,
         "the dialect contract's own command inventory changed size; update this test's \
          expectation alongside it"
     );

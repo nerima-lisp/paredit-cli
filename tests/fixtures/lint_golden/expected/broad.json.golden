@@ -3770,6 +3770,72 @@
       "count": 0,
       "description": "a vector-push on a vector made with no :fill-pointer",
       "rule": "vector-push-without-fill-pointer"
+    },
+    {
+      "category": "dead-code",
+      "count": 0,
+      "description": "a match clause an earlier catch-all pattern makes unreachable",
+      "rule": "racket-match-unreachable-clause"
+    },
+    {
+      "category": "allocation",
+      "count": 0,
+      "description": "a for/list-family comprehension whose container is built and then dropped",
+      "rule": "racket-for-comprehension-value-discarded"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a begin0 wrapping a single expression, which is just that expression",
+      "rule": "racket-begin0-single-form"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a case-lambda with one clause, which is a lambda written the long way",
+      "rule": "racket-case-lambda-single-clause"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a parameterize whose binding list is empty, so it rebinds nothing",
+      "rule": "racket-parameterize-empty-bindings"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a process filter parsing its string argument as a complete message",
+      "rule": "elisp-process-filter-assumes-whole-output"
+    },
+    {
+      "category": "resource",
+      "count": 0,
+      "description": "a repeating timer whose returned handle is discarded, leaving nothing to cancel it with",
+      "rule": "elisp-repeating-timer-handle-discarded"
+    },
+    {
+      "category": "concurrency",
+      "count": 0,
+      "description": "a core.async blocking op (<!!, >!!, alts!!, alt!!) reached from a go body, which can deplete the fixed go-block thread pool",
+      "rule": "go-block-blocking-channel-op"
+    },
+    {
+      "category": "concurrency",
+      "count": 0,
+      "description": "a core.async parking op (<!, >!, alts!, alt!) inside a go body but behind a function or thread boundary the go transform does not rewrite",
+      "rule": "parking-op-outside-go-machinery"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a contains? whose collection is a sequence, or a literal vector asked about a non-index key, so the call can never answer true",
+      "rule": "contains-on-non-associative"
+    },
+    {
+      "category": "concurrency",
+      "count": 0,
+      "description": "an atom/ref/volatile operator applied to a local bound to a different reference constructor, which throws ClassCastException",
+      "rule": "reference-type-operator-mismatch"
     }
   ],
   "policy": {

@@ -317,5 +317,16 @@ rule	hash-table-literal-string-key-under-eql	0
 rule	make-array-conflicting-initializers	0
 rule	maphash-mutates-other-entry	0
 rule	vector-push-without-fill-pointer	0
+rule	racket-match-unreachable-clause	0
+rule	racket-for-comprehension-value-discarded	0
+rule	racket-begin0-single-form	0
+rule	racket-case-lambda-single-clause	0
+rule	racket-parameterize-empty-bindings	0
+rule	elisp-process-filter-assumes-whole-output	0
+rule	elisp-repeating-timer-handle-discarded	0
+rule	go-block-blocking-channel-op	0
+rule	parking-op-outside-go-machinery	0
+rule	contains-on-non-associative	0
+rule	reference-type-operator-mismatch	0
 finding	redundant-quote	warning	suspicious	fixable=true	suppressed.lisp	338	quoting number 6 is redundant	redundant-quote/07bb8007b4863bf0/0
 finding	declarative-style-score	warning	suspicious	fixable=false	suppressed.lisp	0	this file's declarative-style score is 0% (5 top-level forms), below the 80% threshold	declarative-style-score/2f534fdd67304360/0

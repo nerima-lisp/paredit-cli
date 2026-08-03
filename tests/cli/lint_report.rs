@@ -305,8 +305,14 @@ fn cli_lint_list_rules_prints_the_catalog_without_files() {
         // four batches, because `lfe-catch-swallows-exit` ships tagged
         // `pedantic`. So this rises by 3 where the suite rises by 4, and the
         // two numbers are not the same arithmetic. + this branch's 1 = 305,
-        // and the divisor holds at 16, so it is a plain +1 again.
-        .stdout(predicate::str::contains("\"rule_count\": 318"))
+        // and the divisor holds at 16, so it is a plain +1 again. + 3, + 4 and
+        // + 6 over the loop-facility, dispatch/binding and data-structure
+        // batches = 318, the divisor still 16 throughout. + all 11 of this
+        // branch's = 329, the whole suite's 345 less the same 16: none of the
+        // 11 carries a tag, so the rise here is once more the full count, and
+        // it is the full count across three *dialects* — 5 Racket, 2 Emacs
+        // Lisp, 4 Clojure — none of which the divisor distinguishes.
+        .stdout(predicate::str::contains("\"rule_count\": 329"))
         .stdout(predicate::str::contains("\"self-assignment\""))
         .stdout(predicate::str::contains(
             "a setq/setf/psetq/psetf that assigns a place to itself",
@@ -998,7 +1004,19 @@ fn cli_lint_list_rules_marks_severity() {
     // `lfe-catch-swallows-exit` is also tagged `pedantic`, so the default
     // preset holds it back and only 2 of the 3 are visible here: 235 less the
     // now-16 `pedantic` rules, all still warnings, = 219.
-    assert_eq!(warnings, 225);
+    //
+    // + 1, + 2 and + 2 over the loop-facility, dispatch/binding and
+    // data-structure batches = 225, the divisor holding at 16 throughout.
+    //
+    // + 6 of this branch's 11 = 231. The 6 are both `lint-elisp-depth` rules
+    // and 4 of the 5 `lint-racket-depth` ones; the other 5 are
+    // `Severity::Error` — `racket-match-unreachable-clause` and all four
+    // `lint-clojure-depth` rules, each of which throws or deadlocks at run
+    // time. None of the 11 is tagged `pedantic`, so the two subtractions stay
+    // together this time: the suite's warning total rises by the same 6, to
+    // 247, and 247 less the still-16 `pedantic` rules, all of them warnings,
+    // = 231.
+    assert_eq!(warnings, 231);
 }
 
 #[test]
@@ -1037,8 +1055,21 @@ fn cli_lint_list_rules_marks_fixability() {
     // and the preset-filtered one. It is the rare mechanical repair -- `=>`
     // and `->` are byte-identical macro bodies in Carp's own stdlib, so the
     // fix is a rename.
+    //
+    // And this branch moves it again, by 2, to 106:
+    // `racket-begin0-single-form` and `racket-case-lambda-single-clause` are
+    // both `Fixability::Fixable` and both untagged, so they land in the suite
+    // total and in this preset-filtered one alike. Both repairs copy an inner
+    // span verbatim — the sole `begin0` body form with its reader prefix, the
+    // sole `case-lambda` clause's formals and body into a `lambda` — so
+    // neither invents a decision. The other 9 rules of the branch are
+    // `ReportOnly`.
+    //
+    // These two are also why `fixable_rules_match_the_fix_engine` grew a
+    // *Racket* fixture: they declare `[Dialect::Racket]` alone, which the
+    // Scheme fixture added for the same failure in PR #88 does not reach.
     assert_eq!(
-        fixable_count, 104,
+        fixable_count, 106,
         "the fixable rules the default preset admits"
     );
 

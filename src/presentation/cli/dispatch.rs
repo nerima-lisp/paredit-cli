@@ -1020,6 +1020,26 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
             command::InspectCommand::DefconstantNonEqlValue(args) => {
                 defconstant_non_eql_value_report::workflow::defconstant_non_eql_value_report(args)?;
             }
+            command::InspectCommand::GoBlockBlockingChannelOp(args) => {
+                go_block_blocking_channel_op_report::workflow::go_block_blocking_channel_op_report(
+                    args,
+                )?;
+            }
+            command::InspectCommand::ParkingOpOutsideGoMachinery(args) => {
+                parking_op_outside_go_machinery_report::workflow::parking_op_outside_go_machinery_report(
+                    args,
+                )?;
+            }
+            command::InspectCommand::ContainsOnNonAssociative(args) => {
+                contains_on_non_associative_report::workflow::contains_on_non_associative_report(
+                    args,
+                )?;
+            }
+            command::InspectCommand::ReferenceTypeOperatorMismatch(args) => {
+                reference_type_operator_mismatch_report::workflow::reference_type_operator_mismatch_report(
+                    args,
+                )?;
+            }
         },
         Command::Edit { command } => match command {
             command::EditCommand::Format(args) => basic_edit::workflow::format(args)?,
