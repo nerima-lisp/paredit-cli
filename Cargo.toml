@@ -150,6 +150,7 @@ paredit-feature-lint-carp-idiom = { path = "packages/feature/lint-carp-idiom" }
 paredit-feature-lint-loop-facility = { path = "packages/feature/lint-loop-facility" }
 paredit-feature-lint-generic-dispatch = { path = "packages/feature/lint-generic-dispatch" }
 paredit-feature-lint-binding-analysis = { path = "packages/feature/lint-binding-analysis" }
+paredit-feature-lint-data-structure = { path = "packages/feature/lint-data-structure" }
 paredit-feature-emacs-lisp = { path = "packages/feature/emacs-lisp" }
 paredit-feature-conditional-conversion = { path = "packages/feature/conditional-conversion" }
 paredit-feature-external-check = { path = "packages/feature/external-check" }

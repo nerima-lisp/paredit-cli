@@ -192,7 +192,15 @@ use super::rule::RuleEntry;
 // is "repeat n times"; and a `let*` read-before-binding rule reached 31
 // findings that were **all** correct, deliberate code -- reading an incoming
 // value and then rebinding the name is what `let*` sequencing is *for*.
-pub const RULE_COUNT: usize = 328;
+//
+// 328 + 6 (`lint-data-structure`) = 334, covering CL's remaining aggregate
+// types: defstruct, hash tables and arrays. Three of eight premises were
+// refuted by running them, and each refutation would have been a rule firing
+// on correct code -- a BOA constructor omitting a slot *does* run its
+// `:initform`; `:type list` with `:include` is fine and only *disagreeing*
+// types are constrained; and `vector-push-extend` needs a fill pointer, not
+// `:adjustable`, so requiring the latter would have flagged working code.
+pub const RULE_COUNT: usize = 334;
 
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
@@ -1522,5 +1530,29 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(
         &paredit_feature_lint_binding_analysis::unused_local_binding::rule::META,
         &paredit_feature_lint_binding_analysis::unused_local_binding::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_data_structure::defstruct_boa_aux_uninitialized_slot::rule::META,
+        &paredit_feature_lint_data_structure::defstruct_boa_aux_uninitialized_slot::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_data_structure::defstruct_include_type_mismatch::rule::META,
+        &paredit_feature_lint_data_structure::defstruct_include_type_mismatch::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_data_structure::hash_table_literal_string_key_under_eql::rule::META,
+        &paredit_feature_lint_data_structure::hash_table_literal_string_key_under_eql::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_data_structure::make_array_conflicting_initializers::rule::META,
+        &paredit_feature_lint_data_structure::make_array_conflicting_initializers::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_data_structure::maphash_mutates_other_entry::rule::META,
+        &paredit_feature_lint_data_structure::maphash_mutates_other_entry::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_data_structure::vector_push_without_fill_pointer::rule::META,
+        &paredit_feature_lint_data_structure::vector_push_without_fill_pointer::rule::RULE,
     ),
 ];

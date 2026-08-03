@@ -311,6 +311,12 @@ rule	defgeneric-method-option-incongruent	0
 rule	initialization-primary-without-call-next-method	0
 rule	class-allocated-slot-with-initarg	0
 rule	unused-local-binding	0
+rule	defstruct-boa-aux-uninitialized-slot	0
+rule	defstruct-include-type-mismatch	0
+rule	hash-table-literal-string-key-under-eql	0
+rule	make-array-conflicting-initializers	0
+rule	maphash-mutates-other-entry	0
+rule	vector-push-without-fill-pointer	0
 finding	redundant-quote	warning	suspicious	fixable=true	nested.lisp	840	quoting number 5 is redundant	redundant-quote/07bb8307b4864109/0
 finding	redundant-progn	warning	suspicious	fixable=true	nested.lisp	268	redundant progn: progn wraps a single form; it is equivalent to that form	redundant-progn/9715182cb9f63314/0
 finding	redundant-progn	warning	suspicious	fixable=true	nested.lisp	833	redundant progn: progn wraps a single form; it is equivalent to that form	redundant-progn/8d949e5fcf0552a8/0

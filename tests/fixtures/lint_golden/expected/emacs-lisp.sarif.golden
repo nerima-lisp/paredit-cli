@@ -4661,6 +4661,78 @@
               "shortDescription": {
                 "text": "a let/let*/flet/labels binding that nothing in its body reads"
               }
+            },
+            {
+              "id": "defstruct-boa-aux-uninitialized-slot",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a BOA constructor binding a slot as a bare &aux variable, leaving it uninitialized"
+              }
+            },
+            {
+              "id": "defstruct-include-type-mismatch",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a defstruct whose :include names a structure declared with a different :type"
+              }
+            },
+            {
+              "id": "hash-table-literal-string-key-under-eql",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a literal string key on a hash table whose eq/eql test compares by identity"
+              }
+            },
+            {
+              "id": "make-array-conflicting-initializers",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a make-array supplying both :initial-element and :initial-contents"
+              }
+            },
+            {
+              "id": "maphash-mutates-other-entry",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a maphash body that adds or removes an entry other than the one being processed"
+              }
+            },
+            {
+              "id": "vector-push-without-fill-pointer",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a vector-push on a vector made with no :fill-pointer"
+              }
             }
           ]
         }

@@ -311,6 +311,12 @@ rule	defgeneric-method-option-incongruent	0
 rule	initialization-primary-without-call-next-method	0
 rule	class-allocated-slot-with-initarg	0
 rule	unused-local-binding	2
+rule	defstruct-boa-aux-uninitialized-slot	0
+rule	defstruct-include-type-mismatch	0
+rule	hash-table-literal-string-key-under-eql	0
+rule	make-array-conflicting-initializers	0
+rule	maphash-mutates-other-entry	0
+rule	vector-push-without-fill-pointer	0
 finding	self-assignment	error	suspicious	fixable=false	broad.lisp	6875	setq assigns place x to itself	self-assignment/5f1a5b802aa99b47/0
 finding	duplicate-setf-places	error	duplicate	fixable=false	broad.lisp	6961	setf assigns variable total more than once; the earlier assignment is dead	duplicate-setf-places/8104810ed815b9fd/0
 finding	setf-arity	error	arity	fixable=false	broad.lisp	7021	setf has 3 arguments; place/value pairs require an even count	setf-arity/b0a5b422aad6d4d2/0
