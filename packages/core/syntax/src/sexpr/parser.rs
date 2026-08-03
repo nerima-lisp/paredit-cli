@@ -2,7 +2,9 @@ use thiserror::Error;
 
 use crate::dialect::Dialect;
 
-use super::reader_policy::{BarQuoting, DialectReaderPolicy, LongStringExtent, ReaderMacro};
+use super::reader_policy::{
+    BarQuoting, DialectReaderPolicy, HyStringExtent, LongStringExtent, ReaderMacro,
+};
 use super::tree::{Comment, Node, NodeKind, ReaderPrefix, ReaderPrefixes, SyntaxTree};
 use super::types::{ByteOffset, ByteSpan, Delimiter, NodeId};
 
@@ -437,6 +439,74 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn atom_hy_string_with_prefixes(
+        &mut self,
+        prefixes: Vec<PrefixToken>,
+    ) -> std::result::Result<(), ParseError> {
+        let start = self.pos;
+        let width = self.hy_string_width(start.get())?;
+        self.advance_by(width);
+        self.push_atom(prefixes, start, self.pos);
+        Ok(())
+    }
+
+    /// Byte width of the Hy string literal at `start`, prefix and both
+    /// delimiters included.
+    ///
+    /// Unterminated is refused rather than read to EOF, for the same reason
+    /// the Janet long string is: an atom that swallows the rest of the file is
+    /// silent corruption, and Hy refuses it too — `chars()` raises
+    /// `PrematureEndOfInput` when the stream ends inside a string body.
+    ///
+    /// The two `Refused` bytes are the ones Hy names explicitly: a `]` inside
+    /// a bracket string's delimiter ("Ran into a ']' where it wasn't
+    /// expected") and an undoubled `}` in f-string literal text ("single '}'
+    /// is not allowed"). Both map onto the delimiter error this reader already
+    /// has, rather than a new variant, because that is exactly what they are.
+    fn hy_string_width(&self, start: usize) -> std::result::Result<usize, ParseError> {
+        match self.policy.hy_string_extent(self.bytes, start) {
+            Some(HyStringExtent::Closed { width }) => Ok(width),
+            Some(HyStringExtent::Refused { position, byte }) => Err(ParseError::UnexpectedClose {
+                delimiter: char::from(byte),
+                position,
+            }),
+            Some(HyStringExtent::Unterminated) | None => Err(ParseError::UnterminatedString(start)),
+        }
+    }
+
+    /// Whether a Hy string literal that needs the dedicated scanner starts here.
+    ///
+    /// A bare `"` in Hy is left to [`Self::atom_string_with_prefixes`]: it has
+    /// no prefix and cannot interpolate, and that path already applies the
+    /// same escape rule. Only a prefixed string (which may be an f-string) and
+    /// a `#[` bracket string need the sub-reader.
+    /// Whether a Hy string literal starts at the cursor.
+    ///
+    /// The dialect test is hoisted to the top and the whole function is
+    /// `#[inline]`, so for the other nine dialects this collapses to a single
+    /// comparison against a loop-invariant field rather than two guarded calls
+    /// and two byte reads. That matters because this is called once per *form*
+    /// from `parse_form`'s match and again from the discarded-form scanner: on
+    /// an 8 MiB Common Lisp document the difference is millions of calls that
+    /// can only ever answer `false`.
+    #[inline]
+    fn at_hy_string(&self) -> bool {
+        if !self.policy.has_prefixed_strings() && !self.policy.has_bracket_strings() {
+            return false;
+        }
+        let pos = self.pos.get();
+        if self
+            .policy
+            .hy_string_prefix_width(self.bytes, pos)
+            .is_some()
+        {
+            return true;
+        }
+        self.policy.has_bracket_strings()
+            && self.bytes.get(pos) == Some(&b'#')
+            && self.bytes.get(pos + 1) == Some(&b'[')
+    }
+
     fn atom_with_prefixes(
         &mut self,
         prefixes: Vec<PrefixToken>,
@@ -699,6 +769,7 @@ impl<'a> Parser<'a> {
             b'`' if self.policy.has_long_strings() => {
                 self.atom_long_string_with_prefixes(prefixes)?;
             }
+            _ if self.at_hy_string() => self.atom_hy_string_with_prefixes(prefixes)?,
             _ => self.atom_with_prefixes(prefixes)?,
         }
         Ok(())
@@ -887,6 +958,16 @@ impl<'a> Parser<'a> {
                         // `long_string_extent`, which is what makes them agree.
                         b'`' if self.policy.has_long_strings() => {
                             let width = self.long_string_width(self.pos.get())?;
+                            self.advance_by(width);
+                        }
+                        // `#_` is Hy's datum comment, so unlike the Janet arm
+                        // above this one is reached constantly: `#_ f"{x}"`
+                        // and `#_ #[[...]]` both land here. Both paths call
+                        // the same `hy_string_extent`, which is what keeps the
+                        // recording and scanning readers from disagreeing
+                        // about where the literal ends.
+                        _ if self.at_hy_string() => {
+                            let width = self.hy_string_width(self.pos.get())?;
                             self.advance_by(width);
                         }
                         _ => self.skip_atom()?,

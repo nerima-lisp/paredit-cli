@@ -42,6 +42,51 @@ pub(super) enum LongStringExtent {
     Unterminated,
 }
 
+/// How far a Hy string literal reaches from its opening delimiter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum HyStringExtent {
+    /// Total byte width of the literal, prefix and both delimiters included.
+    Closed { width: usize },
+    /// An opening delimiter with no matching close before EOF.
+    Unterminated,
+    /// A byte Hy's own reader refuses outright: a `]` inside a bracket
+    /// string's delimiter, or an undoubled `}` in an f-string's literal text.
+    Refused { position: usize, byte: u8 },
+}
+
+/// The bytes a Hy string prefix may be built from (`hy_reader.prefixed_string`).
+const HY_STRING_PREFIX_BYTES: &[u8] = b"bfrt";
+
+/// How deeply a Hy f-string may nest string literals inside its `{...}`
+/// interpolations before the reader refuses it.
+///
+/// `f"{f"{x}"}"` is legal and reads recursively, so the scanner recurses too,
+/// and a bound keeps adversarial input from exhausting the stack. Real code
+/// does not go past two or three; 32 is far above anything the 2825-file
+/// corpus contains and far below a stack limit.
+const MAX_HY_STRING_NESTING: usize = 32;
+
+/// What ends a Hy string body.
+#[derive(Debug, Clone, Copy)]
+enum HyCloser<'a> {
+    /// An unescaped `"`.
+    Quote,
+    /// `]`, the bracket string's delimiter, then `]`.
+    Bracket(&'a [u8]),
+}
+
+/// The outcome of scanning one Hy string body.
+#[derive(Debug, Clone, Copy)]
+enum HyScan {
+    /// Offset just past the closing delimiter.
+    End(usize),
+    Unterminated,
+    Refused {
+        position: usize,
+        byte: u8,
+    },
+}
+
 /// Dialect-specific lexical decisions shared by normal parsing and discarded
 /// form scanning. Keeping these decisions in one place prevents the two paths
 /// from disagreeing about the extent of a reader form.
@@ -102,6 +147,25 @@ impl DialectReaderPolicy {
             // offset 0 keeps a stray `#!` anywhere else the reader error it
             // has always been.
             Dialect::EmacsLisp if pos == 0 && bytes.starts_with(b"#!") => Some(2),
+            // Hy strips a shebang the same way, and under exactly the same
+            // restriction. `HyReader.parse` peeks the first two characters of
+            // the *stream* and, when `skip_shebang` is set, consumes to the
+            // first newline; `hy.importer` and `hy2py` both set it, so this is
+            // what reading a `.hy` file means. Offset 0 only: Hy's own peek
+            // happens before any character is consumed, and `\n#!/usr/bin/env
+            // hy` is rejected with "reader macro '#!/usr/bin/env' is not
+            // defined", so a `#!` anywhere else stays the error it has always
+            // been.
+            //
+            // Reading it as a line comment rather than stripping the line
+            // keeps every later byte offset unchanged, which matters because
+            // every rewrite in this workspace is a span replacement over the
+            // original string.
+            //
+            // Without this, 393 of 2825 real `.hy` files parsed at exit 0 with
+            // the shebang split into two junk atoms -- `#!/usr/bin/env` and
+            // `hy` -- sitting at top level as if they were code.
+            Dialect::Hy if pos == 0 && bytes.starts_with(b"#!") => Some(2),
             _ => None,
         }
     }
@@ -242,6 +306,69 @@ impl DialectReaderPolicy {
         Some(LongStringExtent::Unterminated)
     }
 
+    /// Whether an identifier written immediately before `"` is a Python-style
+    /// string prefix rather than a symbol.
+    ///
+    /// Hy only. `HyReader.read_default` (`hy/reader/hy_reader.py`) reads an
+    /// identifier and then, if the very next character is `"`, hands that
+    /// identifier to `prefixed_string` *as a prefix* instead of returning it
+    /// as a symbol. So `r"a)b"` is one string literal, not the symbol `r`
+    /// followed by anything.
+    ///
+    /// Missing this rule was the single largest reader defect for Hy: the atom
+    /// scanner ran past the opening quote, stopped at the `)` *inside* the
+    /// literal, and reported a stray closing delimiter. 417 of 469 parse
+    /// failures over a 2825-file corpus were this one rule.
+    pub(super) const fn has_prefixed_strings(self) -> bool {
+        matches!(self.dialect, Dialect::Hy)
+    }
+
+    /// Whether `#[` opens a bracket string.
+    ///
+    /// Hy only, and unconditionally: `tag_dispatch` finds no identifier after
+    /// the `#` (because `[` ends one), takes `[` as the tag, and dispatches to
+    /// `bracketed_string`. There is no other reading of `#[` in Hy.
+    ///
+    /// This is why the arm matters so much more than its frequency suggests:
+    /// `#[[...]]` was being read as a `HashLiteral` prefix on a nested bracket
+    /// *list*, so `#[[(defn evil [] 1)]]` produced a real `defn` node — inside
+    /// what is actually a raw string. Any of the 320 lint rules could fire on
+    /// text that is not code.
+    pub(super) const fn has_bracket_strings(self) -> bool {
+        matches!(self.dialect, Dialect::Hy)
+    }
+
+    /// The width of a valid non-empty Hy string prefix at `pos`, when one is
+    /// immediately followed by `"`.
+    ///
+    /// `prefixed_string` accepts a prefix whose characters are distinct, are a
+    /// proper subset of `bfrt`, and include at most one of `b`/`f`/`t`. That
+    /// admits `r`, `b`, `f`, `t` and the two-character pairs that add `r`, and
+    /// rejects `bf`, `ff` and `bfrt`. A longer identifier such as `foo"` is a
+    /// Hy error rather than a string; this returns `None` for it so the atom
+    /// scanner keeps its existing behaviour instead of the reader inventing a
+    /// literal where Hy has none.
+    pub(super) fn hy_string_prefix_width(self, bytes: &[u8], pos: usize) -> Option<usize> {
+        if !self.has_prefixed_strings() {
+            return None;
+        }
+        hy_string_prefix_width_at(bytes, pos)
+    }
+
+    /// How far the Hy string literal starting at `pos` reaches, if one starts
+    /// there.
+    ///
+    /// Covers both spellings: a quoted string with an optional prefix, and a
+    /// `#[delim[...]delim]` bracket string. The whole literal, interpolations
+    /// included, is one opaque atom -- see [`hy_string_extent_at`] for why the
+    /// interpolated forms are deliberately not exposed as children.
+    pub(super) fn hy_string_extent(self, bytes: &[u8], pos: usize) -> Option<HyStringExtent> {
+        if !self.has_prefixed_strings() {
+            return None;
+        }
+        hy_string_extent_at(bytes, pos, MAX_HY_STRING_NESTING)
+    }
+
     /// How many bytes introduce a character literal at `pos`, if one starts
     /// there.
     ///
@@ -302,10 +429,9 @@ impl DialectReaderPolicy {
         let third = bytes.get(pos + 2).copied();
 
         match self.dialect {
-            Dialect::Unknown | Dialect::Hy | Dialect::Carp => {
-                self.classify_legacy(byte, next, third)
-            }
+            Dialect::Unknown | Dialect::Carp => self.classify_legacy(byte, next, third),
             Dialect::Lfe => self.classify_lfe(bytes, pos),
+            Dialect::Hy => self.classify_hy(byte, next, third),
             Dialect::CommonLisp => self.classify_common_lisp(bytes, pos),
             Dialect::EmacsLisp => self.classify_emacs_lisp(bytes, pos),
             Dialect::Scheme | Dialect::Racket => self.classify_scheme(bytes, pos),
@@ -434,6 +560,61 @@ impl DialectReaderPolicy {
         }
 
         self.classify_legacy(byte, next, third)
+    }
+
+    /// Hy's reader macros.
+    ///
+    /// Split out of [`Self::classify_legacy`] so `#[` can stop being a
+    /// `HashLiteral` prefix. In Hy it opens a bracket string, so the shared arm
+    /// turned a raw string's contents into real nodes;
+    /// [`Self::has_bracket_strings`] describes what that cost. `#(` and `#{`
+    /// keep the shared reading: they are Hy's tuple and set literals, which
+    /// really do contain forms.
+    ///
+    /// ### Why `~` is *not* a prefix here yet
+    ///
+    /// `~` is Hy's unquote and `~@` its unquote-splice (`@reader_for("~")`
+    /// returns `(unquote ...)`, or `(unquote-splice ...)` when an `@`
+    /// follows), so a Hy `~foo` coming out as the bare atom `~foo` is wrong:
+    /// `QuoteState`'s quasiquote counter never comes back down, and every form
+    /// inside a Hy `` ` `` is treated as data. It suppresses findings rather
+    /// than inventing them.
+    ///
+    /// Adding the two arms is a three-line change and it *was* implemented and
+    /// measured. It is left out because it is not safe to ship on its own:
+    /// several formatter paths open a child list by pushing `delimiter.open()`
+    /// directly, without first writing that child's reader prefixes, so a
+    /// prefixed list reaching one of them is emitted with its prefix deleted.
+    /// `format_body_clause` and `format_sequence_list` are two; there are more.
+    ///
+    /// That bug is already live — `#(...)` in a Hy `cond` loses its `#` today,
+    /// turning a tuple into a call — but it is rare, because `#(` in clause
+    /// position is rare. Making `~` a prefix would aim it straight at the
+    /// single most common construct in Hy macro code. Measured over the 2825
+    /// file corpus with Hy's reader as the oracle, `edit format` newly changed
+    /// the *meaning* of 14 files that it had previously formatted correctly,
+    /// every one of them a dropped `~`/`~@`.
+    ///
+    /// So this waits on a formatter fix. It is a bug family across five files
+    /// in `sexpr::formatter`, it affects every dialect, and it needs its own
+    /// golden review — not a rider on a reader change.
+    ///
+    /// Two smaller divergences are also knowingly left alone:
+    ///
+    /// * `,` still reads as `Unquote`. In Hy it is an ordinary identifier
+    ///   character — `(foo a, b)` reads the symbol `a,` — so a leading `,` is
+    ///   mis-shaped. It occurs at a token start essentially never.
+    /// * `#;`, `#+` and `#-` are not Hy reader macros at all.
+    const fn classify_hy(
+        self,
+        byte: u8,
+        next: Option<u8>,
+        third: Option<u8>,
+    ) -> Option<ReaderMacro> {
+        match (byte, next) {
+            (b'#', Some(b'[')) => None,
+            _ => self.classify_legacy(byte, next, third),
+        }
     }
 
     fn classify_common_lisp(self, bytes: &[u8], pos: usize) -> Option<ReaderMacro> {
@@ -765,6 +946,290 @@ impl DialectReaderPolicy {
             _ => None,
         }
     }
+}
+
+/// Whether `byte` ends a Hy identifier (`HyReader.NON_IDENT`).
+///
+/// Note what is *absent*: `#`, `,`, `:`, `!` and `@` are all ordinary
+/// identifier constituents in Hy, which is why `a,` is the single symbol `a,`
+/// and why `f"{x:>10}"` interpolates the symbol `x:>10` rather than applying a
+/// format spec.
+const fn is_hy_non_ident(byte: u8) -> bool {
+    byte.is_ascii_whitespace()
+        || matches!(
+            byte,
+            b'(' | b')' | b'[' | b']' | b'{' | b'}' | b';' | b'"' | b'\'' | b'`' | b'~'
+        )
+}
+
+/// The width of a valid non-empty Hy string prefix at `pos` followed by `"`.
+fn hy_string_prefix_width_at(bytes: &[u8], pos: usize) -> Option<usize> {
+    // A valid prefix is one or two bytes: `prefixed_string` requires distinct
+    // characters, a *proper* subset of `bfrt`, and at most one of `b`/`f`/`t`.
+    for width in 1..=2usize {
+        let candidate = bytes.get(pos..pos + width)?;
+        if bytes.get(pos + width) != Some(&b'"') {
+            continue;
+        }
+        if !candidate
+            .iter()
+            .all(|byte| HY_STRING_PREFIX_BYTES.contains(byte))
+        {
+            continue;
+        }
+        if candidate[0] == *candidate.last().expect("candidate is non-empty") && width == 2 {
+            // Duplicate characters: `prefix_chars` would be shorter than
+            // `prefix`, which `prefixed_string` rejects (`ff"..."`).
+            continue;
+        }
+        if candidate.iter().filter(|byte| **byte != b'r').count() > 1 {
+            // Two of `b`/`f`/`t` together, such as `bf"..."`.
+            continue;
+        }
+        return Some(width);
+    }
+    None
+}
+
+/// Whether the prefix bytes at `pos` select f-string (interpolating) mode.
+fn hy_prefix_is_fstring(prefix: &[u8]) -> bool {
+    prefix.iter().any(|byte| matches!(byte, b'f' | b't'))
+}
+
+/// How far the complete Hy string literal starting at `pos` reaches.
+///
+/// ### Why the whole literal is one opaque atom
+///
+/// A Hy f-string genuinely contains code: `read_fcomponent` calls
+/// `parse_one_form`, so `f"{(get d \"k\")}"` holds a real function call, and
+/// this scanner has to understand that sub-language just to find the closing
+/// quote. It would therefore be possible to expose the interpolated forms as
+/// children. That is deliberately not done, for three reasons.
+///
+/// * Hy models it as a literal. The reader returns `FString`, a value-
+///   producing model, not program structure.
+/// * There is no node kind for it. `ExpressionKind` is `Root`, `List` or
+///   `Atom`; interleaved literal text and forms fits none of them, and adding
+///   a kind changes a crate shared by the formatter, the edit engine and 320
+///   lint rules.
+/// * Children are *editable*, and that is the danger. The formatter reindents
+///   children; reindenting inside an f-string rewrites the literal segments
+///   between the interpolations and silently changes what the program prints.
+///   That is the same failure this fix removes for `#[[...]]` — code visible
+///   where there is none — and re-introducing it deliberately would trade one
+///   silent-corruption class for another.
+///
+/// Blind beats wrong, and the alternative today is worse than blind: the file
+/// does not parse at all, so no rule sees any of it.
+fn hy_string_extent_at(bytes: &[u8], pos: usize, budget: usize) -> Option<HyStringExtent> {
+    let scan = hy_string_scan_at(bytes, pos, budget)?;
+    Some(match scan {
+        HyScan::End(end) => HyStringExtent::Closed { width: end - pos },
+        HyScan::Unterminated => HyStringExtent::Unterminated,
+        HyScan::Refused { position, byte } => HyStringExtent::Refused { position, byte },
+    })
+}
+
+/// Scans a complete Hy string literal at `pos`, in either spelling.
+fn hy_string_scan_at(bytes: &[u8], pos: usize, budget: usize) -> Option<HyScan> {
+    if budget == 0 {
+        return Some(HyScan::Unterminated);
+    }
+    if bytes.get(pos) == Some(&b'#') && bytes.get(pos + 1) == Some(&b'[') {
+        return Some(hy_bracket_string_scan(bytes, pos, budget));
+    }
+    let prefix_width = hy_string_prefix_width_at(bytes, pos).unwrap_or(0);
+    if bytes.get(pos + prefix_width) != Some(&b'"') {
+        return None;
+    }
+    let prefix = &bytes[pos..pos + prefix_width];
+    Some(hy_string_body_scan(
+        bytes,
+        pos + prefix_width + 1,
+        hy_prefix_is_fstring(prefix),
+        HyCloser::Quote,
+        budget,
+    ))
+}
+
+/// Scans a `#[delim[...]delim]` bracket string whose `#[` is at `pos`.
+///
+/// The delimiter is every byte up to the second `[`; a `]` there is the error
+/// Hy raises as "Ran into a ']' where it wasn't expected". A delimiter of `f`
+/// or one starting `f-` makes the body an f-string. `t` does not, because
+/// `bracketed_templates` is off in the default reader.
+fn hy_bracket_string_scan(bytes: &[u8], pos: usize, budget: usize) -> HyScan {
+    let delim_start = pos + 2;
+    let mut cursor = delim_start;
+    loop {
+        let Some(&byte) = bytes.get(cursor) else {
+            return HyScan::Unterminated;
+        };
+        if byte == b'[' {
+            break;
+        }
+        if byte == b']' {
+            return HyScan::Refused {
+                position: cursor,
+                byte,
+            };
+        }
+        cursor += 1;
+    }
+    let delim = &bytes[delim_start..cursor];
+    let fstring = delim == b"f" || delim.starts_with(b"f-");
+    // A single newline straight after the opening `[` is dropped from the
+    // value. It is still inside the literal's span, so the extent is unchanged
+    // and the scanner simply steps over it.
+    let mut body = cursor + 1;
+    if bytes.get(body) == Some(&b'\r') {
+        body += 1;
+    }
+    if bytes.get(body) == Some(&b'\n') {
+        body += 1;
+    }
+    hy_string_body_scan(bytes, body, fstring, HyCloser::Bracket(delim), budget)
+}
+
+/// Whether the string's closing delimiter sits at `pos`, and how wide it is.
+fn hy_closer_width(bytes: &[u8], pos: usize, closer: HyCloser<'_>) -> Option<usize> {
+    match closer {
+        HyCloser::Quote => (bytes.get(pos) == Some(&b'"')).then_some(1),
+        HyCloser::Bracket(delim) => {
+            if bytes.get(pos) != Some(&b']') {
+                return None;
+            }
+            let after = pos + 1;
+            let end = after + delim.len();
+            if bytes.get(after..end) != Some(delim) {
+                return None;
+            }
+            (bytes.get(end) == Some(&b']')).then_some(delim.len() + 2)
+        }
+    }
+}
+
+/// Scans a Hy string body from its first content byte to just past its close.
+///
+/// Two regions alternate. In the literal region the closing delimiter ends the
+/// string, a backslash escapes the next byte (for quoted strings — a bracket
+/// string's `delim_closing` has no escape case at all, which is what makes it
+/// raw), and in f-string mode `{{`/`}}` are doubled literals while a lone `{`
+/// opens an interpolation.
+///
+/// Inside an interpolation the bytes are Hy code, so the scanner has to skip
+/// what the reader would skip: nested string literals of either spelling,
+/// `;` line comments, and nested braces from dict literals. Getting this wrong
+/// would move the closing quote, which is why it is a real sub-reader rather
+/// than a search for the next `"`.
+fn hy_string_body_scan(
+    bytes: &[u8],
+    pos: usize,
+    fstring: bool,
+    closer: HyCloser<'_>,
+    budget: usize,
+) -> HyScan {
+    let mut cursor = pos;
+    let mut escaped = false;
+    let mut depth = 0usize;
+
+    while cursor < bytes.len() {
+        let byte = bytes[cursor];
+
+        if depth == 0 {
+            // Hy checks `closing(c)` before it looks at braces, so the closing
+            // delimiter wins over everything except a pending escape.
+            if !escaped {
+                if let Some(width) = hy_closer_width(bytes, cursor, closer) {
+                    return HyScan::End(cursor + width);
+                }
+            }
+            if escaped {
+                escaped = false;
+                cursor += 1;
+                continue;
+            }
+            if byte == b'\\' && matches!(closer, HyCloser::Quote) {
+                escaped = true;
+                cursor += 1;
+                continue;
+            }
+            if !fstring {
+                cursor += 1;
+                continue;
+            }
+            match byte {
+                b'{' if bytes.get(cursor + 1) == Some(&b'{') => cursor += 2,
+                b'{' => {
+                    depth = 1;
+                    cursor += 1;
+                }
+                b'}' if bytes.get(cursor + 1) == Some(&b'}') => cursor += 2,
+                // `read_chars_until` raises "single '}' is not allowed" here.
+                b'}' => {
+                    return HyScan::Refused {
+                        position: cursor,
+                        byte,
+                    };
+                }
+                _ => cursor += 1,
+            }
+            continue;
+        }
+
+        // Interpolation: this is Hy code.
+        match byte {
+            b';' => {
+                cursor += 1;
+                while cursor < bytes.len() && bytes[cursor] != b'\n' {
+                    cursor += 1;
+                }
+            }
+            b'{' => {
+                depth += 1;
+                cursor += 1;
+            }
+            b'}' => {
+                depth -= 1;
+                cursor += 1;
+            }
+            _ => {
+                // A nested literal keeps its own rules, including its own
+                // escapes and its own braces, so it is scanned rather than
+                // skipped byte by byte. `f"{(str \"}\")}"` depends on this:
+                // the `}` inside the nested string must not close the field.
+                let nested = if is_nested_hy_string_start(bytes, cursor) {
+                    hy_string_scan_at(bytes, cursor, budget - 1)
+                } else {
+                    None
+                };
+                match nested {
+                    Some(HyScan::End(end)) => cursor = end,
+                    Some(other) => return other,
+                    None => cursor += 1,
+                }
+            }
+        }
+    }
+
+    HyScan::Unterminated
+}
+
+/// Whether a nested string literal starts at `pos` inside an interpolation.
+///
+/// A prefix only counts at the start of an identifier, so the `f` of `xf"..."`
+/// is not one.
+fn is_nested_hy_string_start(bytes: &[u8], pos: usize) -> bool {
+    if bytes.get(pos) == Some(&b'#') {
+        return bytes.get(pos + 1) == Some(&b'[');
+    }
+    if bytes.get(pos) == Some(&b'"') {
+        return true;
+    }
+    if hy_string_prefix_width_at(bytes, pos).is_none() {
+        return false;
+    }
+    pos == 0 || bytes.get(pos - 1).copied().is_some_and(is_hy_non_ident)
 }
 
 /// How many consecutive backticks start at `pos`.
