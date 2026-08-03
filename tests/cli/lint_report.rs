@@ -312,7 +312,7 @@ fn cli_lint_list_rules_prints_the_catalog_without_files() {
         // 11 carries a tag, so the rise here is once more the full count, and
         // it is the full count across three *dialects* — 5 Racket, 2 Emacs
         // Lisp, 4 Clojure — none of which the divisor distinguishes.
-        .stdout(predicate::str::contains("\"rule_count\": 329"))
+        .stdout(predicate::str::contains("\"rule_count\": 331"))
         .stdout(predicate::str::contains("\"self-assignment\""))
         .stdout(predicate::str::contains(
             "a setq/setf/psetq/psetf that assigns a place to itself",

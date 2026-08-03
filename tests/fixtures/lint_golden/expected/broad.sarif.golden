@@ -10498,6 +10498,38 @@
               "shortDescription": {
                 "text": "an atom/ref/volatile operator applied to a local bound to a different reference constructor, which throws ClassCastException"
               }
+            },
+            {
+              "fullDescription": {
+                "text": "A macro's parameters are bound to the caller's own source structure: `&body` is a tail of the list the reader built for the call site. A destructive operator applied to one edits the program in place, so the next expansion of that call site sees the edited version and produces different code."
+              },
+              "id": "macro-body-destroys-argument-form",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "A macro's parameters are bound to the caller's own source structure: `&body` is a tail of the list the reader built for the call site. A destructive operator applied to one edits the program in place, so the next expansion of that call site sees the edited version and produces different code.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a macro expander applying a destructive operator to its own parameter"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A macrolet expander runs at macroexpansion time, before any enclosing binding exists. CLHS states that the consequences are undefined if a local macro definition references a local variable binding visible in its lexical environment. A name written plainly in the template is fine — it is part of the expansion — but a name the expander evaluates is read out of an environment that is not there yet."
+              },
+              "id": "macrolet-expander-captures-lexical-variable",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "A macrolet expander runs at macroexpansion time, before any enclosing binding exists. CLHS states that the consequences are undefined if a local macro definition references a local variable binding visible in its lexical environment. A name written plainly in the template is fine — it is part of the expansion — but a name the expander evaluates is read out of an environment that is not there yet.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a macrolet expander evaluating a name bound by an enclosing lexical binding"
+              }
             }
           ]
         }

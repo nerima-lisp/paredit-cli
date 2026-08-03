@@ -698,6 +698,7 @@ dependencies = [
  "paredit-feature-lint-introspection",
  "paredit-feature-lint-iteration-flow",
  "paredit-feature-lint-loop-facility",
+ "paredit-feature-lint-macro-authoring",
  "paredit-feature-lint-numeric",
  "paredit-feature-lint-object-system",
  "paredit-feature-lint-package-hygiene",
@@ -1242,6 +1243,16 @@ version = "1.4.0"
 dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
+]
+
+[[package]]
+name = "paredit-feature-lint-macro-authoring"
+version = "1.4.0"
+dependencies = [
+ "paredit-core-cli",
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
+ "serde_json",
 ]
 
 [[package]]
