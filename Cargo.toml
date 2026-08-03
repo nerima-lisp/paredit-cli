@@ -142,6 +142,8 @@ paredit-feature-lint-elisp-idiom = { path = "packages/feature/lint-elisp-idiom" 
 paredit-feature-lint-pathname-io = { path = "packages/feature/lint-pathname-io" }
 paredit-feature-lint-clojure-idiom = { path = "packages/feature/lint-clojure-idiom" }
 paredit-feature-lint-scheme-idiom = { path = "packages/feature/lint-scheme-idiom" }
+paredit-feature-lint-fennel-janet-idiom = { path = "packages/feature/lint-fennel-janet-idiom" }
+paredit-feature-lint-type-declaration = { path = "packages/feature/lint-type-declaration" }
 paredit-feature-emacs-lisp = { path = "packages/feature/emacs-lisp" }
 paredit-feature-conditional-conversion = { path = "packages/feature/conditional-conversion" }
 paredit-feature-external-check = { path = "packages/feature/external-check" }

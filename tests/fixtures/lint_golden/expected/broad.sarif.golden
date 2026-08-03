@@ -9878,6 +9878,148 @@
               "shortDescription": {
                 "text": "a named let whose loop name is never mentioned in its body, so it can never iterate"
               }
+            },
+            {
+              "fullDescription": {
+                "text": "Fennel's `local`/`var` and Janet's `def`/`var` split immutable from mutable bindings. The mutable spelling exists only so a later assignment is legal, so a `var` with no assignment anywhere in the file states a mutability the code never uses and makes a reader look for a reassignment that is not there. Fennel's own linter plugin reports it as `\"<name> declared as var but never set\"`."
+              },
+              "id": "var-never-set",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "Fennel's `local`/`var` and Janet's `def`/`var` split immutable from mutable bindings. The mutable spelling exists only so a later assignment is legal, so a `var` with no assignment anywhere in the file states a mutability the code never uses and makes a reader look for a reassignment that is not there. Fennel's own linter plugin reports it as `\"<name> declared as var but never set\"`.",
+                "severity": "warning",
+                "tags": [
+                  "style"
+                ]
+              },
+              "shortDescription": {
+                "text": "a Fennel or Janet `var` binding that nothing ever assigns to"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Fennel's reference has a \"Deprecated Forms\" section naming three specials and, for each, what replaced it. They still compile, which is exactly why they survive in code long after the replacement landed."
+              },
+              "id": "fennel-deprecated-form",
+              "properties": {
+                "category": "portability",
+                "fixable": false,
+                "rationale": "Fennel's reference has a \"Deprecated Forms\" section naming three specials and, for each, what replaced it. They still compile, which is exactly why they survive in code long after the replacement landed.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a Fennel special the language reference lists under \"Deprecated Forms\""
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "`each` compiles to Lua's generic `for … in <iterator> do`, which *calls* the iterator on every round. A table, sequence, string or number literal is not callable, so the loop raises \"attempt to call a table value\" the first time it runs. The collection belongs inside `pairs` or `ipairs`."
+              },
+              "id": "fennel-each-over-non-iterator",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "`each` compiles to Lua's generic `for … in <iterator> do`, which *calls* the iterator on every round. A table, sequence, string or number literal is not callable, so the loop raises \"attempt to call a table value\" the first time it runs. The collection belongs inside `pairs` or `ipairs`.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a Fennel `each` whose iterator position holds a literal that cannot be called"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Janet's own `loop`, `seq` and `catseq` macros call `check-empty-body`, which emits `\"empty loop body\"` through `maclintf`. That warning only appears when the macro is expanded, so it never reaches a reader of the source. The usual cause is a body that was deleted, or one that ended up outside the closing parenthesis."
+              },
+              "id": "janet-empty-loop-body",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "Janet's own `loop`, `seq` and `catseq` macros call `check-empty-body`, which emits `\"empty loop body\"` through `maclintf`. That warning only appears when the macro is expanded, so it never reaches a reader of the source. The usual cause is a body that was deleted, or one that ended up outside the closing parenthesis.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a Janet `loop`, `seq`, or `catseq` whose body is empty"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Janet's mutable containers differ from their immutable twins by one character: `@[…]` is an array and `[…]` a tuple, `@{…}` a table and `{…}` a struct, `@\"…\"` a buffer and `\"…\"` a string. `put`, the `array/*` family and the `buffer/*` family all panic when handed the immutable twin, so a dropped `@` is code that reads correctly and dies on its first call."
+              },
+              "id": "janet-mutating-immutable-literal",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "Janet's mutable containers differ from their immutable twins by one character: `@[…]` is an array and `[…]` a tuple, `@{…}` a table and `{…}` a struct, `@\"…\"` a buffer and `\"…\"` a string. `put`, the `array/*` family and the `buffer/*` family all panic when handed the immutable twin, so a dropped `@` is code that reads correctly and dies on its first call.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a Janet mutating call whose target is a tuple, struct, or string literal"
+              }
+            },
+            {
+              "id": "declare-not-at-head-of-body",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a (declare ...) after the first body form, where it is a call to an undefined function"
+              }
+            },
+            {
+              "id": "declaim-inside-body",
+              "properties": {
+                "category": "declaration",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a (declaim ...) among a body's leading declarations, where (declare ...) was meant"
+              }
+            },
+            {
+              "id": "type-declaration-contradicts-initform",
+              "properties": {
+                "category": "declaration",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a let binding whose declared type cannot contain the literal it is initialised to"
+              }
+            },
+            {
+              "id": "the-form-with-impossible-type",
+              "properties": {
+                "category": "declaration",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a (the TYPE EXPR) whose declared type cannot contain the value the expression plainly is"
+              }
+            },
+            {
+              "id": "type-declaration-on-rest-parameter",
+              "properties": {
+                "category": "declaration",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a &rest parameter declared to be its element type, though it is always bound to a list"
+              }
             }
           ]
         }

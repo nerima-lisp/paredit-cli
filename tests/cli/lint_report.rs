@@ -295,9 +295,11 @@ fn cli_lint_list_rules_prints_the_catalog_without_files() {
         // + 8 of the 9-rule batch = 280 — the ninth, `elisp-hook-lambda`, is
         // `pedantic`. + all 8 of this branch's = 288, the whole suite's 303
         // less the 15 `pedantic` rules the default `recommended` preset holds
-        // back. This branch tags none of its rules, so the rise here is the
-        // full count.
-        .stdout(predicate::str::contains("\"rule_count\": 288"))
+        // back. + all 10 of this branch's = 298, the whole suite's 313 less
+        // the same 15. Nine of the 10 are untagged and the tenth carries
+        // `RuleTag::Style`, which no preset filters on, so the rise here is
+        // again the full count.
+        .stdout(predicate::str::contains("\"rule_count\": 298"))
         .stdout(predicate::str::contains("\"self-assignment\""))
         .stdout(predicate::str::contains(
             "a setq/setf/psetq/psetf that assigns a place to itself",
@@ -973,9 +975,12 @@ fn cli_lint_list_rules_marks_severity() {
     // `pedantic`, so the default preset holds it back — = 204. + 6 of this
     // branch's 8, the other 2 being `with-open-returns-lazy-seq` and
     // `def-inside-function-body`, both `Severity::Error`, and none of the 8
-    // `pedantic` — = 210, which is the suite's 225 warnings less the 15
+    // `pedantic` — = 210. + 7 of this branch's 10, the other 3 being
+    // `fennel-each-over-non-iterator`, `janet-mutating-immutable-literal` and
+    // `declare-not-at-head-of-body`, all `Severity::Error`, and none of the 10
+    // `pedantic` — = 217, which is the suite's 232 warnings less the 15
     // `pedantic` rules, all of them warnings.
-    assert_eq!(warnings, 210);
+    assert_eq!(warnings, 217);
 }
 
 #[test]
@@ -998,7 +1003,8 @@ fn cli_lint_list_rules_marks_fixability() {
     // batches — the `lint-scheme-idiom` four are the first fixable rules added
     // since — and it is also the only place the *preset-filtered* fixable
     // count is pinned, so a fixable rule that arrived tagged `pedantic` would
-    // show up here and nowhere else.
+    // show up here and nowhere else. Unmoved by this branch's 10: every one of
+    // them is `ReportOnly`.
     assert_eq!(
         fixable_count, 103,
         "the fixable rules the default preset admits"
