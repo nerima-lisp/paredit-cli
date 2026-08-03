@@ -243,7 +243,17 @@ use super::rule::RuleEntry;
 // the wrong constructor throws `ClassCastException` on the first call.
 // `PEDANTIC_RULES.len()` is unchanged at 16: none of the 11 carries a tag at
 // all, so `EXPERIMENTAL_RULES` is still empty too.
-pub const RULE_COUNT: usize = 345;
+//
+// 345 + 2 (`lint-macro-authoring`) = 347. Seven were proposed and five died,
+// four of them because SBCL already rejects the shape at `defmacro` processing
+// time -- every `&whole`/`&environment`/`&body` misplacement is a
+// SIMPLE-PROGRAM-ERROR, so a lambda-list-marker rule would have duplicated the
+// compiler. CLHS 3.4.4 also refutes two of the premises outright:
+// `&environment` "can appear anywhere in that list", and `&body` "is identical
+// in function to `&rest`" with no must-be-last rule.
+//
+// The two that ship are the two SBCL says nothing about at all.
+pub const RULE_COUNT: usize = 347;
 
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
@@ -1641,5 +1651,13 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(
         &paredit_feature_lint_clojure_depth::reference_type_operator_mismatch::rule::META,
         &paredit_feature_lint_clojure_depth::reference_type_operator_mismatch::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_macro_authoring::macro_body_destroys_argument_form::rule::META,
+        &paredit_feature_lint_macro_authoring::macro_body_destroys_argument_form::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_macro_authoring::macrolet_expander_captures_lexical_variable::rule::META,
+        &paredit_feature_lint_macro_authoring::macrolet_expander_captures_lexical_variable::rule::RULE,
     ),
 ];

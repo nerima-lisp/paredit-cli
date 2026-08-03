@@ -239,7 +239,9 @@ pub const PEDANTIC_RULES: [&str; tagged_count(RuleTag::Pedantic)] = {
 // `lint-clojure-depth` ships a `cli/` directory, so its four add a standalone
 // command each (`INTROSPECTION_COMMANDS` 340 -> 344) and the other seven move
 // no command-oriented list.
-const _: () = assert!(RULE_COUNT == 345);
+// 345 + 2 (`lint-macro-authoring`). Five of seven proposals died, four because
+// SBCL already rejects the shape at `defmacro` processing time.
+const _: () = assert!(RULE_COUNT == 347);
 // Unchanged at 99: every one of this branch's 37 rules is
 // `Fixability::ReportOnly`. Each one reports a judgment the tool cannot make
 // on the author's behalf — whether an annotation or the parameter list under it

@@ -2224,6 +2224,18 @@
       "count": 0,
       "description": "an atom/ref/volatile operator applied to a local bound to a different reference constructor, which throws ClassCastException",
       "rule": "reference-type-operator-mismatch"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a macro expander applying a destructive operator to its own parameter",
+      "rule": "macro-body-destroys-argument-form"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a macrolet expander evaluating a name bound by an enclosing lexical binding",
+      "rule": "macrolet-expander-captures-lexical-variable"
     }
   ],
   "policy": {
