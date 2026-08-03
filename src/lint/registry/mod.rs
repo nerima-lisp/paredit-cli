@@ -104,7 +104,48 @@ use super::rule::RuleEntry;
 // The second rule was renamed from `eval-when-situation-ignored` during
 // implementation for exactly this reason — two same-head rules one character
 // class apart is a maintenance trap even when they never overlap.
-pub const RULE_COUNT: usize = 316;
+//
+// 316 + this batch's 4, one new package: 4 (`lint-hy-lfe-idiom`) = 320. Back to
+// registry-only — the package ships no `cli/` directory, so no standalone
+// `inspect <rule>` command comes with it and the command-oriented lists
+// (`DIALECT_SPECIFIC_REPORTS`, `INTROSPECTION_COMMANDS`, the command and cell
+// counts) all stay where the batch above left them.
+//
+// Three rules are Hy (`hy-mutable-default-argument`,
+// `hy-identity-comparison-with-literal`, `hy-bare-except`) and one is LFE
+// (`lfe-catch-swallows-exit`); none runs on Common Lisp, and each names its
+// dialect through the same `DIALECTS` constant its domain analysis reads, so
+// the scope and the analysis cannot drift apart. `dialect_scope()`'s default is
+// `COMMON_LISP_ONLY`, which for `hy-mutable-default-argument` would have meant
+// running on the one dialect where the shape is *correct* — Common Lisp
+// evaluates an `&optional` default on every call, and the identical rule was
+// refuted for Common Lisp in an earlier batch. Hy is the contrast case: it
+// compiles `defn` to a Python `FunctionDef`, whose default is evaluated once at
+// definition time.
+//
+// Of the four pinned counts in [`catalog`], three move. `RULE_COUNT` 316 -> 320
+// and `warning_count()` 232 -> 235 — three of the four are `Severity::Warning`
+// and `hy-mutable-default-argument` is an `Error`, because a shared mutable
+// default is a wrong answer rather than a risky spelling. `PEDANTIC_RULES.len()`
+// 15 -> 16, the first batch since `elisp-hook-lambda` to move it:
+// `lfe-catch-swallows-exit` is tagged `RuleTag::Pedantic`. `fixable_count()`
+// stays at 103 — all four are `Fixability::ReportOnly`.
+//
+// Carried forward, not fixed here, and recorded in the package's README: this
+// workspace's reader mis-handles enough of both languages that the rules were
+// written defensively around it. Hy's interpolated f-strings are unimplemented
+// (390 of 2825 corpus files fail to parse outright), `#!` shebangs are not
+// stripped (393 files parse at exit 0 with two junk atoms), Hy bracket strings
+// `#[[…]]` are parsed as *code* in 33 files — which is the one that can make a
+// rule fire on text that is not code, so the package refuses `#`-prefixed lists
+// throughout and pins it with a test — and Hy's `~` is not a `ReaderPrefix`, so
+// the quasiquote counter never counts down for Hy and everything inside a Hy
+// template reads as data (suppressing findings rather than inventing them). On
+// the LFE side `#B(…)`/`#M(…)` are orphaned from their list in 243 files,
+// inflating arity at exit 0. Same class as the Janet backtick defect fixed in
+// PR #91, and the same disposition: a reader repair belongs in `core/syntax`,
+// not in a rule package.
+pub const RULE_COUNT: usize = 320;
 
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
@@ -1386,5 +1427,21 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(
         &paredit_feature_lint_compile_time::defconstant_non_eql_value::rule::META,
         &paredit_feature_lint_compile_time::defconstant_non_eql_value::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_hy_lfe_idiom::mutable_default_argument::rule::META,
+        &paredit_feature_lint_hy_lfe_idiom::mutable_default_argument::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_hy_lfe_idiom::identity_comparison_with_literal::rule::META,
+        &paredit_feature_lint_hy_lfe_idiom::identity_comparison_with_literal::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_hy_lfe_idiom::bare_except::rule::META,
+        &paredit_feature_lint_hy_lfe_idiom::bare_except::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_hy_lfe_idiom::catch_swallows_exit::rule::META,
+        &paredit_feature_lint_hy_lfe_idiom::catch_swallows_exit::rule::RULE,
     ),
 ];

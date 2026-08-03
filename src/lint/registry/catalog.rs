@@ -212,7 +212,12 @@ pub const PEDANTIC_RULES: [&str; tagged_count(RuleTag::Pedantic)] = {
 // only. It ships a `cli/` directory per rule, so all three add a standalone
 // command and `INTROSPECTION_COMMANDS` moves with this number (337 -> 340), as
 // it did two batches ago and did not one batch ago.
-const _: () = assert!(RULE_COUNT == 316);
+//
+// 316 + this batch's 4: 4 (`lint-hy-lfe-idiom`), one new package, and back to
+// registry-only — no `cli/` directory, so no standalone command and
+// `INTROSPECTION_COMMANDS` stays at 340 where the batch above left it. Three of
+// the four are Hy and the fourth is LFE; none of them runs on Common Lisp.
+const _: () = assert!(RULE_COUNT == 320);
 // Unchanged at 99: every one of this branch's 37 rules is
 // `Fixability::ReportOnly`. Each one reports a judgment the tool cannot make
 // on the author's behalf — whether an annotation or the parameter list under it
@@ -264,6 +269,15 @@ const _: () = assert!(RULE_COUNT == 316);
 // or may want deleting outright; and a `defconstant` whose initform allocates
 // may want `defparameter`, `alexandria:define-constant` with a `:test`, or a
 // genuinely `eql`-able value. Rewriting any of them is guessing.
+//
+// Still 103 after this batch's 4, every one `Fixability::ReportOnly`. The Hy
+// three each have a repair with more than one shape: a shared mutable default
+// can become `None` plus a body guard or can be hoisted deliberately, `is`
+// against a literal may have wanted `=` or may have wanted a different operand,
+// and a bare `(except [] …)` has to name the exceptions the author actually
+// meant to handle, which the tool cannot know. `lfe-catch-swallows-exit` is the
+// clearest of the four: rewriting `(catch Expr)` to `try … catch` requires
+// inventing the failure continuation the `catch` form never had.
 const _: () = assert!(fixable_count() == 103);
 // 164 (through PR #82) + 31 of this branch's 37 rules. The other 6 are
 // `Severity::Error`: `when-unless-implicit-nil-misused` and the five
@@ -322,7 +336,20 @@ const _: () = assert!(fixable_count() == 103);
 // phase and SBCL says nothing at all; and `(defconstant +x+ #("a" "b"))`
 // signals `DEFCONSTANT-UNEQL` on the compile-then-load path. None of the three
 // is a preference.
-const _: () = assert!(warning_count() == 232);
+//
+// 232 + 3 of this batch's 4 = 235. The fourth,
+// `hy-mutable-default-argument`, is `Severity::Error`: measured against Hy
+// 1.3.1 on CPython 3.14.6, `(defn f [[acc []]] (.append acc 1) acc)` returns
+// `[1, 1, 1]` from its *third* call, so the function gives a wrong answer
+// rather than reading badly. The three warnings are risky spellings whose
+// behaviour is at least defensible — `is` against a literal answers correctly
+// while the value stays inside CPython's interning range, `(except [] …)` does
+// catch the exceptions it was written for as well as the two it should not, and
+// `(catch Expr)` returns a term the caller *could* discriminate if it took the
+// trouble. Note `lfe-catch-swallows-exit` is one of the 3: it is a warning that
+// also carries `RuleTag::Pedantic`, so it counts here and is subtracted again
+// in the preset-filtered count `tests/cli/lint_report.rs` pins.
+const _: () = assert!(warning_count() == 235);
 const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
 // 6 (through PR #82) + 8 of this branch's rules: `lint-call-shape`'s four
 // threshold rules, whose limits are conventions a codebase either adopted or
@@ -347,7 +374,22 @@ const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
 // `EXPERIMENTAL_RULES` are both unchanged.
 // This batch's 3 leave it at 15 as well: none of them carries a tag at all, so
 // `PEDANTIC_RULES` and `EXPERIMENTAL_RULES` are both unchanged by it.
-const _: () = assert!(PEDANTIC_RULES.len() == 15);
+// This batch's 4 moves it by one, to 16 — the first movement since
+// `elisp-hook-lambda`, and for the same reason. `lfe-catch-swallows-exit` is
+// tagged `pedantic` because the mechanism is real and measured (an exit and an
+// honest `(tuple 'EXIT 'boom)` produce the identical term under LFE 2.2.0, so
+// the caller cannot tell failure from success) and the rule is still noisy on a
+// codebase that uses `catch` as its house style: 146 findings over 2604
+// third-party `.lfe` files, of which 28 sit under an enclosing `case` that is
+// explicitly discriminating `#(EXIT …)` and 28 more are in statement position
+// with the value discarded — best-effort telemetry and optional startup. What
+// kept it out of the bin rather than out of `recommended` alone is the
+// *spread*: the findings fall in 9 of the corpus's ~143 repositories, so 94% of
+// repositories are clean and two of the three heaviest are LFE's own
+// implementation. Correct, and noise on a codebase that has not adopted the
+// convention — which is the tag's definition. The other 3 carry no tag, and
+// `EXPERIMENTAL_RULES` is still empty.
+const _: () = assert!(PEDANTIC_RULES.len() == 16);
 
 fn meta_of(name: &str) -> Option<&'static crate::lint::model::RuleMeta> {
     REGISTRY

@@ -1835,6 +1835,24 @@
       "count": 0,
       "description": "a defconstant whose initform allocates, so the compile-time and load-time values are not eql",
       "rule": "defconstant-non-eql-value"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a Hy parameter default that every call shares, because Python evaluates it once",
+      "rule": "hy-mutable-default-argument"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "`is` compared against a value literal, which tests object identity, not equality",
+      "rule": "hy-identity-comparison-with-literal"
+    },
+    {
+      "category": "conditions",
+      "count": 0,
+      "description": "`(except [] …)` catches every BaseException, Ctrl-C and SystemExit included",
+      "rule": "hy-bare-except"
     }
   ],
   "policy": {

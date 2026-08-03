@@ -688,6 +688,7 @@ dependencies = [
  "paredit-feature-lint-elisp-idiom",
  "paredit-feature-lint-fennel-janet-idiom",
  "paredit-feature-lint-form-shape",
+ "paredit-feature-lint-hy-lfe-idiom",
  "paredit-feature-lint-introspection",
  "paredit-feature-lint-iteration-flow",
  "paredit-feature-lint-numeric",
@@ -1140,6 +1141,14 @@ dependencies = [
  "proptest",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "paredit-feature-lint-hy-lfe-idiom"
+version = "1.4.0"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
 ]
 
 [[package]]

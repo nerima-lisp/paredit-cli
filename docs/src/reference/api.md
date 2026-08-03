@@ -424,7 +424,7 @@ adds each finding's full field set as indented lines under its row.
 
 ### Choosing and tuning lint rules
 
-With 316 rules, `inspect lint` needs more than an on/off switch per rule. The
+With 320 rules, `inspect lint` needs more than an on/off switch per rule. The
 flags below are about the rule *set* rather than about any one rule, and all of
 them work with `--list-rules` as well as with a scan — so a run can be
 inspected before it is made.
@@ -449,7 +449,7 @@ key for baselines and suppression tooling.
 
 ### Rules a project writes for itself
 
-The 316 shipped rules are the ones everybody gets. A rule like "in *this*
+The 320 shipped rules are the ones everybody gets. A rule like "in *this*
 codebase, `defentity` must always be given a `:table`" is the majority of what
 a mature project wants and none of what a linter can ship, so a project writes
 those itself, in Lisp, in `.paredit/rules/*.lisp`:
