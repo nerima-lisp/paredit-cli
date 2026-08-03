@@ -297,6 +297,9 @@ rule	declaim-inside-body	0
 rule	type-declaration-contradicts-initform	0
 rule	the-form-with-impossible-type	0
 rule	type-declaration-on-rest-parameter	0
+rule	eval-when-execute-only	0
+rule	eval-when-body-never-runs	0
+rule	defconstant-non-eql-value	0
 finding	elisp-macro-missing-declare	warning	malformed	fixable=false	emacs-lisp.el	344	missing editor declaration: macro `fixture-macro` is defined without one; add a leading (declare (indent ...)) and/or (declare (debug ...)) form so Emacs indents and Edebug instruments calls to this macro correctly	elisp-macro-missing-declare/3f509c1d426873fb/0
 finding	elisp-missing-lexical-binding	warning	suspicious	fixable=false	emacs-lisp.el	0	no `lexical-binding` setting on the first line, so this file is evaluated with dynamic binding; add `-*- lexical-binding: t -*-`	elisp-missing-lexical-binding/48686428ba8a57d0/0
 finding	elisp-unreachable-lexical-binding	error	suspicious	fixable=false	emacs-lisp.el	911	`lexical-binding` is read from the first line only, so this setting has no effect and the file is evaluated with dynamic binding	elisp-unreachable-lexical-binding/7bec796cbb2809fb/0

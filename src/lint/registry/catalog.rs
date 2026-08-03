@@ -207,7 +207,12 @@ pub const PEDANTIC_RULES: [&str; tagged_count(RuleTag::Pedantic)] = {
 // `INTROSPECTION_COMMANDS` stays where it was. `lint-type-declaration`
 // proposed six and ships five: `ignore-declared-variable-then-used` was dropped
 // as a true duplicate of `lint-convention`'s `ignore-declaration-conflict`.
-const _: () = assert!(RULE_COUNT == 313);
+//
+// 313 + this batch's 3: 3 (`lint-compile-time`), one new package, Common Lisp
+// only. It ships a `cli/` directory per rule, so all three add a standalone
+// command and `INTROSPECTION_COMMANDS` moves with this number (337 -> 340), as
+// it did two batches ago and did not one batch ago.
+const _: () = assert!(RULE_COUNT == 316);
 // Unchanged at 99: every one of this branch's 37 rules is
 // `Fixability::ReportOnly`. Each one reports a judgment the tool cannot make
 // on the author's behalf — whether an annotation or the parameter list under it
@@ -250,6 +255,15 @@ const _: () = assert!(RULE_COUNT == 313);
 // the initform is wrong, or whether a late `declare` wanted hoisting or wanted
 // to be a `the`, is the author's call and neither repair is right more often
 // than the other.
+//
+// Still 103 after this batch's 3, all three `Fixability::ReportOnly` and all
+// three for the same reason: the offending form says nothing about what was
+// meant. A `(eval-when (:execute) …)` at top level may have wanted
+// `:load-toplevel`, or may have wanted to be hoisted out of a macro that put it
+// there; a nested `eval-when` the standard ignores may have wanted `:execute`
+// or may want deleting outright; and a `defconstant` whose initform allocates
+// may want `defparameter`, `alexandria:define-constant` with a `:test`, or a
+// genuinely `eql`-able value. Rewriting any of them is guessing.
 const _: () = assert!(fixable_count() == 103);
 // 164 (through PR #82) + 31 of this branch's 37 rules. The other 6 are
 // `Severity::Error`: `when-unless-implicit-nil-misused` and the five
@@ -298,6 +312,16 @@ const _: () = assert!(fixable_count() == 103);
 // 2.6.0 reports as a full `caught ERROR`). `var-never-set` carries
 // `RuleTag::Style`, which is not `Pedantic` and so does not hold it back from
 // any preset; it counts as a warning here like the other 6.
+//
+// This batch's 3 leave it at 232: all three are `Severity::Error`, and each was
+// run through SBCL 2.6.0 under both `load` of the source and `compile-file`
+// plus `load` of the fasl before being given that severity. The two phases
+// disagree, or the form is dead in both: `(eval-when (:execute) (defmacro m …))`
+// loads fine from source and gives an *undefined function* at run time from a
+// fasl; a non-top-level `eval-when` without `:execute` never runs in either
+// phase and SBCL says nothing at all; and `(defconstant +x+ #("a" "b"))`
+// signals `DEFCONSTANT-UNEQL` on the compile-then-load path. None of the three
+// is a preference.
 const _: () = assert!(warning_count() == 232);
 const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
 // 6 (through PR #82) + 8 of this branch's rules: `lint-call-shape`'s four
@@ -321,6 +345,8 @@ const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
 // layout or naming rather than behaviour, and which no preset filters on. Only
 // `Pedantic` and `Experimental` gate admission, so `PEDANTIC_RULES` and
 // `EXPERIMENTAL_RULES` are both unchanged.
+// This batch's 3 leave it at 15 as well: none of them carries a tag at all, so
+// `PEDANTIC_RULES` and `EXPERIMENTAL_RULES` are both unchanged by it.
 const _: () = assert!(PEDANTIC_RULES.len() == 15);
 
 fn meta_of(name: &str) -> Option<&'static crate::lint::model::RuleMeta> {

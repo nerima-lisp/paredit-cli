@@ -144,6 +144,7 @@ paredit-feature-lint-clojure-idiom = { path = "packages/feature/lint-clojure-idi
 paredit-feature-lint-scheme-idiom = { path = "packages/feature/lint-scheme-idiom" }
 paredit-feature-lint-fennel-janet-idiom = { path = "packages/feature/lint-fennel-janet-idiom" }
 paredit-feature-lint-type-declaration = { path = "packages/feature/lint-type-declaration" }
+paredit-feature-lint-compile-time = { path = "packages/feature/lint-compile-time" }
 paredit-feature-emacs-lisp = { path = "packages/feature/emacs-lisp" }
 paredit-feature-conditional-conversion = { path = "packages/feature/conditional-conversion" }
 paredit-feature-external-check = { path = "packages/feature/external-check" }

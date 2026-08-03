@@ -1011,6 +1011,15 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
                     args,
                 )?;
             }
+            command::InspectCommand::EvalWhenExecuteOnly(args) => {
+                eval_when_execute_only_report::workflow::eval_when_execute_only_report(args)?;
+            }
+            command::InspectCommand::EvalWhenBodyNeverRuns(args) => {
+                eval_when_body_never_runs_report::workflow::eval_when_body_never_runs_report(args)?;
+            }
+            command::InspectCommand::DefconstantNonEqlValue(args) => {
+                defconstant_non_eql_value_report::workflow::defconstant_non_eql_value_report(args)?;
+            }
         },
         Command::Edit { command } => match command {
             command::EditCommand::Format(args) => basic_edit::workflow::format(args)?,

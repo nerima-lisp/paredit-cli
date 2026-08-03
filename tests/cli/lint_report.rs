@@ -298,8 +298,10 @@ fn cli_lint_list_rules_prints_the_catalog_without_files() {
         // back. + all 10 of this branch's = 298, the whole suite's 313 less
         // the same 15. Nine of the 10 are untagged and the tenth carries
         // `RuleTag::Style`, which no preset filters on, so the rise here is
-        // again the full count.
-        .stdout(predicate::str::contains("\"rule_count\": 298"))
+        // again the full count. + all 3 of this branch's = 301, the whole
+        // suite's 316 less the same 15: all three are untagged, so once more
+        // the rise is the full count.
+        .stdout(predicate::str::contains("\"rule_count\": 301"))
         .stdout(predicate::str::contains("\"self-assignment\""))
         .stdout(predicate::str::contains(
             "a setq/setf/psetq/psetf that assigns a place to itself",
@@ -979,7 +981,9 @@ fn cli_lint_list_rules_marks_severity() {
     // `fennel-each-over-non-iterator`, `janet-mutating-immutable-literal` and
     // `declare-not-at-head-of-body`, all `Severity::Error`, and none of the 10
     // `pedantic` — = 217, which is the suite's 232 warnings less the 15
-    // `pedantic` rules, all of them warnings.
+    // `pedantic` rules, all of them warnings. + 0 of this branch's 3: all
+    // three `lint-compile-time` rules are `Severity::Error`, so this stays at
+    // 217 and the suite total stays at 232.
     assert_eq!(warnings, 217);
 }
 
@@ -1004,7 +1008,9 @@ fn cli_lint_list_rules_marks_fixability() {
     // since — and it is also the only place the *preset-filtered* fixable
     // count is pinned, so a fixable rule that arrived tagged `pedantic` would
     // show up here and nowhere else. Unmoved by this branch's 10: every one of
-    // them is `ReportOnly`.
+    // them is `ReportOnly`. Unmoved by this branch's 3 for the same reason —
+    // all three `lint-compile-time` rules are `ReportOnly`, so the suite total
+    // and the preset-filtered total both stay at 103.
     assert_eq!(
         fixable_count, 103,
         "the fixable rules the default preset admits"

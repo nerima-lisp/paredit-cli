@@ -297,5 +297,8 @@ rule	declaim-inside-body	0
 rule	type-declaration-contradicts-initform	0
 rule	the-form-with-impossible-type	0
 rule	type-declaration-on-rest-parameter	0
+rule	eval-when-execute-only	0
+rule	eval-when-body-never-runs	0
+rule	defconstant-non-eql-value	0
 finding	redundant-quote	warning	suspicious	fixable=true	suppressed.lisp	338	quoting number 6 is redundant	redundant-quote/07bb8007b4863bf0/0
 finding	declarative-style-score	warning	suspicious	fixable=false	suppressed.lisp	0	this file's declarative-style score is 0% (5 top-level forms), below the 80% threshold	declarative-style-score/2f534fdd67304360/0
