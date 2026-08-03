@@ -267,7 +267,7 @@ impl SupportStatus {
 /// here, the stack floor is the first thing to check — and note that an
 /// inherited `RUST_MIN_STACK` from the environment silently overrides
 /// `.cargo/config.toml`, because cargo's `[env]` is unforced.
-const INTROSPECTION_COMMANDS: [&str; 337] = [
+const INTROSPECTION_COMMANDS: [&str; 340] = [
     "inspect diff",
     "inspect check",
     "inspect dialect",
@@ -622,6 +622,9 @@ const INTROSPECTION_COMMANDS: [&str; 337] = [
     "inspect scheme-let-star-independent-bindings",
     "inspect scheme-memq-assq-literal-key",
     "inspect scheme-named-let-never-recurs",
+    "inspect eval-when-execute-only",
+    "inspect eval-when-body-never-runs",
+    "inspect defconstant-non-eql-value",
 ];
 
 const FORMAT_COMMANDS: [&str; 3] = [

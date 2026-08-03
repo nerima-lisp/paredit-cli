@@ -1934,6 +1934,24 @@
       "count": 0,
       "description": "a &rest parameter declared to be its element type, though it is always bound to a list",
       "rule": "type-declaration-on-rest-parameter"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a top-level eval-when naming :execute but neither top-level situation, wrapping a definition",
+      "rule": "eval-when-execute-only"
+    },
+    {
+      "category": "dead-code",
+      "count": 0,
+      "description": "a non-top-level eval-when naming only situations the standard ignores there, so its body never runs",
+      "rule": "eval-when-body-never-runs"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a defconstant whose initform allocates, so the compile-time and load-time values are not eql",
+      "rule": "defconstant-non-eql-value"
     }
   ],
   "policy": {

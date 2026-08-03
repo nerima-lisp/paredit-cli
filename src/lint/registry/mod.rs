@@ -76,7 +76,35 @@ use super::rule::RuleEntry;
 // positives, with the fixed guards sitting in this package's `support.rs`
 // ready to lift across. That is a pre-existing defect and deliberately not
 // repaired here.
-pub const RULE_COUNT: usize = 313;
+//
+// 313 + this batch's 3, one new package: 3 (`lint-compile-time`) = 316. Unlike
+// the two registry-only packages above it ships a `cli/` directory per rule, so
+// all three come with a standalone `inspect <rule>` command and
+// `INTROSPECTION_COMMANDS` moves 337 -> 340. All three are Common Lisp only on
+// `dialect_scope()`'s default, all three are `Severity::Error`, and all three
+// are `Fixability::ReportOnly` — so of the four pinned counts in [`catalog`]
+// only `RULE_COUNT` moves; `fixable_count()`, `warning_count()` and
+// `PEDANTIC_RULES.len()` are unchanged at 103, 232 and 15.
+//
+// The subject is the compile-file/load gap — the "works in the REPL, breaks
+// from a fasl" class. `eval-when-execute-only` catches a *top-level*
+// `eval-when` naming `:execute` but neither top-level situation, whose body
+// `compile-file` discards outright; `eval-when-body-never-runs` catches the
+// mirror image, a *non*-top-level `eval-when` without `:execute`, whose body
+// runs in no phase at all; `defconstant-non-eql-value` catches a `defconstant`
+// whose initform allocates, so the compile-time and load-time values are not
+// `eql` and a fresh image signals `DEFCONSTANT-UNEQL`.
+//
+// The two `eval-when` rules share the head `eval-when` with `lint-control-flow`'s
+// already-registered `eval-when-situation`, which is the first time three rules
+// in this registry key on one head. They are disjoint by construction and it
+// was checked through the engine, not just by reading: `eval-when-situation`
+// fires only on a *misspelled* situation (`:executee`, category `Malformed`),
+// while these two fire only on situation lists that are entirely well spelled.
+// The second rule was renamed from `eval-when-situation-ignored` during
+// implementation for exactly this reason — two same-head rules one character
+// class apart is a maintenance trap even when they never overlap.
+pub const RULE_COUNT: usize = 316;
 
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
@@ -1346,5 +1374,17 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(
         &paredit_feature_lint_type_declaration::type_declaration_on_rest_parameter::rule::META,
         &paredit_feature_lint_type_declaration::type_declaration_on_rest_parameter::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_compile_time::eval_when_execute_only::rule::META,
+        &paredit_feature_lint_compile_time::eval_when_execute_only::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_compile_time::eval_when_body_never_runs::rule::META,
+        &paredit_feature_lint_compile_time::eval_when_body_never_runs::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_compile_time::defconstant_non_eql_value::rule::META,
+        &paredit_feature_lint_compile_time::defconstant_non_eql_value::rule::RULE,
     ),
 ];

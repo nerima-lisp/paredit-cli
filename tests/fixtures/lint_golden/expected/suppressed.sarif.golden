@@ -4213,6 +4213,42 @@
               "shortDescription": {
                 "text": "a &rest parameter declared to be its element type, though it is always bound to a list"
               }
+            },
+            {
+              "id": "eval-when-execute-only",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a top-level eval-when naming :execute but neither top-level situation, wrapping a definition"
+              }
+            },
+            {
+              "id": "eval-when-body-never-runs",
+              "properties": {
+                "category": "dead-code",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a non-top-level eval-when naming only situations the standard ignores there, so its body never runs"
+              }
+            },
+            {
+              "id": "defconstant-non-eql-value",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a defconstant whose initform allocates, so the compile-time and load-time values are not eql"
+              }
             }
           ]
         }

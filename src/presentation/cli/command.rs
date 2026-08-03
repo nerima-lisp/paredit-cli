@@ -26,7 +26,7 @@ use super::{
     de_morgan_report, dead_boolean_operand_report, debt_score_report,
     deeply_nested_anonymous_lambda_report, def_inside_function_body_report,
     defclass_required_slot_no_initform_or_initarg_report, defclass_slot_shadowing_report,
-    define_condition_empty_superclass_list_report,
+    defconstant_non_eql_value_report, define_condition_empty_superclass_list_report,
     define_condition_missing_report_for_error_type_report, definition_movement, definition_removal,
     definition_report, defpackage_quoted_report, defpackage_without_in_package_report,
     dependency_report, destructive_literal_report, destructuring_bind_unused_whole_report,
@@ -41,11 +41,12 @@ use super::{
     eliminate_empty_binding_form, emacs_lisp_file_report, empty_body_report, empty_let_report,
     empty_test_body_report, epsilon_less_float_loop_bound_report, eq_char_comparison_report,
     eq_number_comparison_report, eql_list_comparison_report, eql_search_literal_report,
-    eql_string_comparison_report, equality_arity_report, eval_when_situation_report,
-    exhaustive_case_otherwise_report, explicit_nil_return_report, explicit_step_delta_report,
-    external_diagnostics_report, external_system_report, extract_constant, extract_function,
-    extract_local_function, flatten_progn, flet_single_use_inlinable_report, fold_constants,
-    form_report, format_directive_report, format_missing_destination_report,
+    eql_string_comparison_report, equality_arity_report, eval_when_body_never_runs_report,
+    eval_when_execute_only_report, eval_when_situation_report, exhaustive_case_otherwise_report,
+    explicit_nil_return_report, explicit_step_delta_report, external_diagnostics_report,
+    external_system_report, extract_constant, extract_function, extract_local_function,
+    flatten_progn, flet_single_use_inlinable_report, fold_constants, form_report,
+    format_directive_report, format_missing_destination_report,
     format_nested_directive_unbalanced_report, format_newline_report,
     format_percent_ampersand_adjacent_redundancy_report, format_to_string_report,
     format_unknown_directive_report, ftype_values_arity_mismatch_report, funcall_lambda_report,
@@ -825,6 +826,12 @@ pub(super) enum InspectCommand {
     SchemeMemqAssqLiteralKey(scheme_memq_assq_literal_key_report::args::MemqAssqLiteralKeyReportArgs),
     /// Report a Scheme named let whose loop name is never mentioned in its body, so it can never iterate.
     SchemeNamedLetNeverRecurs(scheme_named_let_never_recurs_report::args::NamedLetNeverRecursReportArgs),
+    /// Report a top-level eval-when naming :execute but neither top-level situation, whose body compile-file discards.
+    EvalWhenExecuteOnly(eval_when_execute_only_report::args::EvalWhenExecuteOnlyReportArgs),
+    /// Report a non-top-level eval-when naming only situations the standard ignores there, so its body never runs.
+    EvalWhenBodyNeverRuns(eval_when_body_never_runs_report::args::EvalWhenBodyNeverRunsReportArgs),
+    /// Report a defconstant whose initform allocates, so the compile-time and load-time values are not eql.
+    DefconstantNonEqlValue(defconstant_non_eql_value_report::args::DefconstantNonEqlValueReportArgs),
 }
 
 /// Single-document structural editing commands. These print rewritten source
