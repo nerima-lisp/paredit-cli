@@ -292,10 +292,12 @@ fn cli_lint_list_rules_prints_the_catalog_without_files() {
         .assert()
         .success()
         // 252 (through the 37-rule batch) + all 20 of the 20-rule batch = 272,
-        // + 8 of this branch's 9 = 280 — the whole suite's 295 less the 15
-        // `pedantic` rules the default `recommended` preset holds back. The
-        // ninth, `elisp-hook-lambda`, is the fifteenth of those.
-        .stdout(predicate::str::contains("\"rule_count\": 280"))
+        // + 8 of the 9-rule batch = 280 — the ninth, `elisp-hook-lambda`, is
+        // `pedantic`. + all 8 of this branch's = 288, the whole suite's 303
+        // less the 15 `pedantic` rules the default `recommended` preset holds
+        // back. This branch tags none of its rules, so the rise here is the
+        // full count.
+        .stdout(predicate::str::contains("\"rule_count\": 288"))
         .stdout(predicate::str::contains("\"self-assignment\""))
         .stdout(predicate::str::contains(
             "a setq/setf/psetq/psetf that assigns a place to itself",
@@ -967,10 +969,13 @@ fn cli_lint_list_rules_marks_severity() {
     // The default preset is `recommended`, which holds back the fourteen
     // `pedantic` rules; `--preset all` is what lists the whole suite.
     // 181 (through the 37-rule batch) + 17 of the 20-rule batch = 198, + 6 of
-    // this branch's 9 — 2 are `Severity::Error` and `elisp-hook-lambda` is
-    // `pedantic`, so the default preset holds it back — = 204, which is the
-    // suite's 219 warnings less the 15 `pedantic` rules, all of them warnings.
-    assert_eq!(warnings, 204);
+    // the 9-rule batch — 2 are `Severity::Error` and `elisp-hook-lambda` is
+    // `pedantic`, so the default preset holds it back — = 204. + 6 of this
+    // branch's 8, the other 2 being `with-open-returns-lazy-seq` and
+    // `def-inside-function-body`, both `Severity::Error`, and none of the 8
+    // `pedantic` — = 210, which is the suite's 225 warnings less the 15
+    // `pedantic` rules, all of them warnings.
+    assert_eq!(warnings, 210);
 }
 
 #[test]
@@ -988,8 +993,14 @@ fn cli_lint_list_rules_marks_fixability() {
     let rules = catalog["rules"].as_array().expect("rules array");
 
     let fixable_count = rules.iter().filter(|r| r["fixable"] == true).count();
+    // The suite's 103, unreduced: none of the 15 `pedantic` rules the default
+    // `recommended` preset holds back is fixable. This sat at 99 for four
+    // batches — the `lint-scheme-idiom` four are the first fixable rules added
+    // since — and it is also the only place the *preset-filtered* fixable
+    // count is pinned, so a fixable rule that arrived tagged `pedantic` would
+    // show up here and nowhere else.
     assert_eq!(
-        fixable_count, 99,
+        fixable_count, 103,
         "the fixable rules the default preset admits"
     );
 

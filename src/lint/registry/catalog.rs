@@ -195,7 +195,12 @@ pub const PEDANTIC_RULES: [&str; tagged_count(RuleTag::Pedantic)] = {
 // against a running Emacs, and `elisp-keymap-binds-non-command` was dropped
 // after implementation when a false-positive audit over GNU Emacs's own
 // sources returned 70 findings and 0 true positives.
-const _: () = assert!(RULE_COUNT == 295);
+//
+// 295 + this batch's 8: 4 (`lint-clojure-idiom`) and 4 (`lint-scheme-idiom`),
+// both new packages, neither of which runs on Common Lisp. All 8 ship with a
+// standalone `inspect <rule>` command as well, so `INTROSPECTION_COMMANDS`
+// moves with this number where the batch above left it alone.
+const _: () = assert!(RULE_COUNT == 303);
 // Unchanged at 99: every one of this branch's 37 rules is
 // `Fixability::ReportOnly`. Each one reports a judgment the tool cannot make
 // on the author's behalf — whether an annotation or the parameter list under it
@@ -215,7 +220,19 @@ const _: () = assert!(RULE_COUNT == 295);
 // mechanical but is not, because the unprefixed names `cl.el` provides do not
 // exist in `cl-lib`. Offering that fix would make a working file stop working,
 // so the rule says so in its own header and stays `ReportOnly`.
-const _: () = assert!(fixable_count() == 99);
+//
+// 99 + 4 of this batch's 8 = 103, and this is the first batch in a long while
+// to move the number at all. The four `lint-scheme-idiom` rules are all
+// `Fixability::Fixable` because each repair is a spelling of a decision the
+// author already made rather than a new one: unwrapping a one-form `begin`,
+// `let*` to `let` when no initializer can see a sibling binding, `memq`/`assq`
+// to the `eqv?`-based `memv`/`assv` R7RS 6.4 specifies, and deleting a loop
+// name the body never mentions. Every fix rewrites a head symbol or copies an
+// inner span verbatim, so comments and spacing survive it. The four
+// `lint-clojure-idiom` rules are `ReportOnly`: each of them has a repair with
+// more than one shape (`doall` versus `into` versus `reduce`; `let` versus a
+// top-level `defonce`), and picking one would be picking for the author.
+const _: () = assert!(fixable_count() == 103);
 // 164 (through PR #82) + 31 of this branch's 37 rules. The other 6 are
 // `Severity::Error`: `when-unless-implicit-nil-misused` and the five
 // `lint-safety` rules that report an exploitable defect rather than a risk —
@@ -241,7 +258,15 @@ const _: () = assert!(fixable_count() == 99);
 // value that carries it is ever used). Dropping
 // `elisp-keymap-binds-non-command` did not move this number: it was an
 // `Error` too.
-const _: () = assert!(warning_count() == 219);
+//
+// 219 + 6 of this batch's 8 = 225. The other 2 are `Severity::Error`, both
+// from `lint-clojure-idiom` and both because the code throws rather than reads
+// badly: `with-open-returns-lazy-seq` (the sequence is realized after the
+// resource closes, so `IOException: Stream closed`) and
+// `def-inside-function-body` (the Var does not exist until the function runs,
+// and concurrent callers race on it — which is also clj-kondo's judgement,
+// where `:inline-def` is on by default).
+const _: () = assert!(warning_count() == 225);
 const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
 // 6 (through PR #82) + 8 of this branch's rules: `lint-call-shape`'s four
 // threshold rules, whose limits are conventions a codebase either adopted or
@@ -256,7 +281,9 @@ const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
 // 1654 `.el` files GNU Emacs 30.2 ships, 31 of them on buffer-local hooks
 // where the lambda's buffer is about to be discarded and the re-evaluation
 // problem it warns about cannot arise. The other 8 report a defect with a
-// demonstrated failure and stay untagged.
+// demonstrated failure and stay untagged. This batch's 8 leave it at 15 as
+// well: none of them carries a tag, so `PEDANTIC_RULES` and
+// `EXPERIMENTAL_RULES` are both unchanged by it.
 const _: () = assert!(PEDANTIC_RULES.len() == 15);
 
 fn meta_of(name: &str) -> Option<&'static crate::lint::model::RuleMeta> {

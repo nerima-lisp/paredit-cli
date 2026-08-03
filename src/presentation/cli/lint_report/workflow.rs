@@ -2436,12 +2436,25 @@ mod tests {
         // The Emacs Lisp half. Its rules declare `Dialect::EmacsLisp` only, so
         // they never see the fixture above.
         let elisp_source = ";;; -*- lexical-binding: t -*-\n(mapcar '(lambda (x) x) xs)\n";
+        // The Scheme half, for the same reason: `lint-scheme-idiom`'s four
+        // rules declare `[Scheme, Racket]` (or Scheme alone), so neither
+        // fixture above reaches them. They are also the only fixable rules
+        // outside Common Lisp and Emacs Lisp, which is what made this test the
+        // one that noticed them — a `Fixability::Fixable` the fix engine never
+        // exercises is a `--fix` that silently does nothing.
+        let scheme_source = concat!(
+            "(begin (sbs-body))\n",                       // scheme-begin-single-form
+            "(let* ((slsa 1) (slsb 2)) (+ slsa slsb))\n", // scheme-let-star-independent-bindings
+            "(memq 101 smk)\n",                           // scheme-memq-assq-literal-key
+            "(let sln ((slni 0)) (* slni 2))\n",          // scheme-named-let-never-recurs
+        );
 
         let active: Vec<&str> = RULES.to_vec();
         let mut produced: BTreeSet<&str> = BTreeSet::new();
         for (text, dialect, name) in [
             (source, Dialect::CommonLisp, "fixture.lisp"),
             (elisp_source, Dialect::EmacsLisp, "fixture.el"),
+            (scheme_source, Dialect::Scheme, "fixture.scm"),
         ] {
             let tree = paredit_core_syntax::sexpr::SyntaxTree::parse_with_dialect(text, dialect)
                 .expect("parse fixture");

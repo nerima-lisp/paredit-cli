@@ -30,7 +30,7 @@ paredit mcp --read-only   # …that refuses every command which would write
 The server offers a handful of tools — `paredit_check`, `paredit_outline`,
 `paredit_lint`, `paredit_format`, `paredit_diff`, `paredit_capabilities` — plus
 `paredit_run`, which takes any command's argument vector. **It deliberately does
-not expose one tool per command.** There are 452 of them; that many descriptions
+not expose one tool per command.** There are 460 of them; that many descriptions
 costs thousands of tokens of context before the agent has read a line of code,
 and it makes selection harder rather than easier. The catalog is available as
 the `paredit://capabilities` resource, and `paredit_run` reaches everything in
@@ -113,14 +113,21 @@ Each cell carries one of four statuses:
 
 `silent` is the one worth reading carefully. Almost every `inspect` command
 exits `0` for every dialect, so a `finding_count` of `0` looks identical
-whether the code is clean or the tool has nothing to say about it. 273 of the
-452 commands are `silent` for at least one dialect outside Common Lisp, and
-six of those — `inspect elisp-file`, `inspect atom-swap-with-side-effect`,
-`inspect future-promise-never-realized`, `inspect nested-get-chain`,
-`inspect redundant-into-empty-collection` and
-`inspect division-result-precision-loss` — are `silent` for Common Lisp
-itself, because their subject is another dialect entirely. Treat a `silent`
-report as absent rather than negative, whatever the dialect.
+whether the code is clean or the tool has nothing to say about it. 281 of the
+460 commands are `silent` for at least one dialect outside Common Lisp, and
+fourteen of those are `silent` for Common Lisp *itself*, because their subject
+is another dialect entirely: `inspect elisp-file` and
+`inspect division-result-precision-loss` (Emacs Lisp);
+`inspect atom-swap-with-side-effect`, `inspect future-promise-never-realized`,
+`inspect nested-get-chain`, `inspect redundant-into-empty-collection`,
+`inspect with-open-returns-lazy-seq`, `inspect def-inside-function-body`,
+`inspect single-key-nested-path` and `inspect apply-with-literal-collection`
+(Clojure); and `inspect scheme-begin-single-form`,
+`inspect scheme-let-star-independent-bindings`,
+`inspect scheme-memq-assq-literal-key` and
+`inspect scheme-named-let-never-recurs` (Scheme, and Racket for all but the
+`memq`/`assq` one). Treat a `silent` report as absent rather than negative,
+whatever the dialect.
 
 Each command also reports the `tier` it needs from a dialect — `syntax`
 (balanced parens only), `scope` (lexical binder and definition shapes),

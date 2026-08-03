@@ -637,6 +637,10 @@ use paredit_feature_lint_call_shape::nested_function_parameter_shadows_enclosing
 use paredit_feature_lint_call_shape::overly_long_parameter_list::cli as overly_long_parameter_list_report;
 use paredit_feature_lint_call_shape::positional_argument_count_exceeds_readability::cli as positional_argument_count_exceeds_readability_report;
 use paredit_feature_lint_call_shape::stringly_typed_dispatch::cli as stringly_typed_dispatch_report;
+use paredit_feature_lint_clojure_idiom::apply_with_literal_collection::cli as apply_with_literal_collection_report;
+use paredit_feature_lint_clojure_idiom::def_inside_function_body::cli as def_inside_function_body_report;
+use paredit_feature_lint_clojure_idiom::single_key_nested_path::cli as single_key_nested_path_report;
+use paredit_feature_lint_clojure_idiom::with_open_returns_lazy_seq::cli as with_open_returns_lazy_seq_report;
 use paredit_feature_lint_concurrency::atom_swap_with_side_effect::cli as atom_swap_with_side_effect_report;
 use paredit_feature_lint_concurrency::dynamic_var_bound_across_thread_boundary::cli as dynamic_var_bound_across_thread_boundary_report;
 use paredit_feature_lint_concurrency::future_promise_never_realized::cli as future_promise_never_realized_report;
@@ -806,6 +810,10 @@ use paredit_feature_lint_repl_debug::leftover_print_debug::cli as leftover_print
 use paredit_feature_lint_repl_debug::leftover_step_call::cli as leftover_step_call_report;
 use paredit_feature_lint_repl_debug::leftover_time_benchmark_call::cli as leftover_time_benchmark_call_report;
 use paredit_feature_lint_repl_debug::leftover_trace_call::cli as leftover_trace_call_report;
+use paredit_feature_lint_scheme_idiom::begin_single_form::cli as scheme_begin_single_form_report;
+use paredit_feature_lint_scheme_idiom::let_star_independent_bindings::cli as scheme_let_star_independent_bindings_report;
+use paredit_feature_lint_scheme_idiom::memq_assq_literal_key::cli as scheme_memq_assq_literal_key_report;
+use paredit_feature_lint_scheme_idiom::named_let_never_recurs::cli as scheme_named_let_never_recurs_report;
 use paredit_feature_lint_sequence::accessor_arity::cli as accessor_arity_report;
 use paredit_feature_lint_sequence::append_list_to_cons::cli as append_list_to_cons_report;
 use paredit_feature_lint_sequence::append_nil::cli as append_nil_report;

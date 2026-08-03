@@ -983,6 +983,34 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
             command::InspectCommand::PackageCircularInPackageChain(args) => {
                 package_circular_in_package_chain_report::workflow::circular_in_package_chain_report(args)?;
             }
+            command::InspectCommand::WithOpenReturnsLazySeq(args) => {
+                with_open_returns_lazy_seq_report::workflow::with_open_returns_lazy_seq_report(
+                    args,
+                )?;
+            }
+            command::InspectCommand::DefInsideFunctionBody(args) => {
+                def_inside_function_body_report::workflow::def_inside_function_body_report(args)?;
+            }
+            command::InspectCommand::SingleKeyNestedPath(args) => {
+                single_key_nested_path_report::workflow::single_key_nested_path_report(args)?;
+            }
+            command::InspectCommand::ApplyWithLiteralCollection(args) => {
+                apply_with_literal_collection_report::workflow::apply_with_literal_collection_report(args)?;
+            }
+            command::InspectCommand::SchemeBeginSingleForm(args) => {
+                scheme_begin_single_form_report::workflow::begin_single_form_report(args)?;
+            }
+            command::InspectCommand::SchemeLetStarIndependentBindings(args) => {
+                scheme_let_star_independent_bindings_report::workflow::let_star_independent_bindings_report(args)?;
+            }
+            command::InspectCommand::SchemeMemqAssqLiteralKey(args) => {
+                scheme_memq_assq_literal_key_report::workflow::memq_assq_literal_key_report(args)?;
+            }
+            command::InspectCommand::SchemeNamedLetNeverRecurs(args) => {
+                scheme_named_let_never_recurs_report::workflow::named_let_never_recurs_report(
+                    args,
+                )?;
+            }
         },
         Command::Edit { command } => match command {
             command::EditCommand::Format(args) => basic_edit::workflow::format(args)?,
