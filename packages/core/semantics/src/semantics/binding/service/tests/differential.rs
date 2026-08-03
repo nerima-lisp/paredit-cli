@@ -29,6 +29,7 @@ use paredit_core_syntax::sexpr::{
 };
 
 use super::build;
+use crate::semantics::binding::model::BindingKind;
 
 /// Common Lisp fixtures taken verbatim from `lexical_scope::tests`
 /// (shadowing, boundaries, capture), plus one input per binder head so no
@@ -97,6 +98,10 @@ pub(super) const FIXTURES: &[&str] = &[
     "(let ((x 1)) (setq x 2) (incf x) (push x acc))",
     "(let ((x 1)) (setf (car x) 3))",
     "(let ((x 1)) (my-unknown-macro (rebinds x)))",
+    // --- function designators, which the two layers read differently
+    "(flet ((g () 1)) (mapcar #'g list))",
+    "(flet ((g () 1)) (mapcar (function g) list))",
+    "(let ((g 1)) (mapcar #'g list))",
     "(let ((x 1)) (let ((x 2)) (let ((x 3)) x)))",
 ];
 
@@ -239,6 +244,87 @@ fn a_local_function_never_shadows_a_variable_reference() {
             "the bare `m` at {offset} is a variable reference, not the local \
              function"
         );
+    }
+}
+
+/// The second known divergence: a function designator.
+///
+/// `#'g` and `(function g)` are excluded from the oracle's live set because
+/// the *query* skips them — it has no namespaces, so for renaming a variable
+/// `g` a `#'g` is never a hit. The table does have namespaces, so it reads the
+/// same occurrence as a reference in the function namespace. That asymmetry is
+/// deliberate on both sides, and it puts these spans outside the partition.
+///
+/// What is still assertable, and is the invariant the fix rests on: a
+/// designator never resolves to a *variable*, and whatever it resolves to
+/// spells the same name. `#'` on a variable designates nothing in Common Lisp,
+/// so a designator reaching one would mean the namespace override was dropped
+/// rather than applied.
+#[test]
+fn a_function_designator_never_resolves_to_a_variable() {
+    for input in FIXTURES {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp)
+            .unwrap_or_else(|error| panic!("{input:?} must parse: {error}"));
+        let table = build(input);
+
+        let mut designators = Vec::new();
+        collect_function_designators(&tree.root_view(), &mut designators);
+
+        for (name, span) in designators {
+            let Some(id) = table.resolve(NodeKey::atom(span)) else {
+                continue;
+            };
+            let binding = table.binding(id);
+            assert!(
+                matches!(binding.kind(), BindingKind::Function | BindingKind::Macro),
+                "{input:?}: the designator at {span:?} resolved to a \
+                 {:?} binding, but `#'` names a function",
+                binding.kind()
+            );
+            assert!(
+                common_lisp_symbol_reference_eq(binding.name().as_str(), &name),
+                "{input:?}: the designator {name:?} at {span:?} resolved to \
+                 {:?}",
+                binding.name()
+            );
+        }
+    }
+}
+
+/// Every `#'NAME` and `(function NAME)` in the tree, as `(name, symbol span)`.
+///
+/// Derived from the reader rules alone, like [`collect_live`]: it knows the
+/// two spellings of a function designator and nothing about binding forms.
+fn collect_function_designators(view: &ExpressionView, output: &mut Vec<(String, ByteSpan)>) {
+    if view.kind == ExpressionKind::Atom {
+        if view.reader_prefixes.contains(&ReaderPrefix::Function) {
+            if let (Some(name), Some(span)) = (atom_symbol_text(view), atom_symbol_span(view)) {
+                output.push((name.to_owned(), span));
+            }
+        }
+        return;
+    }
+
+    if view.children.len() == 2 && view.children[1].kind == ExpressionKind::Atom {
+        if let Some(head) = view
+            .children
+            .first()
+            .filter(|child| child.reader_prefixes.is_empty())
+            .and_then(|child| child.text.as_deref())
+        {
+            if common_lisp_operator_head_eq(normalize_common_lisp_operator_head(head), "function") {
+                let designated = &view.children[1];
+                if let (Some(name), Some(span)) =
+                    (atom_symbol_text(designated), atom_symbol_span(designated))
+                {
+                    output.push((name.to_owned(), span));
+                }
+            }
+        }
+    }
+
+    for child in &view.children {
+        collect_function_designators(child, output);
     }
 }
 
@@ -463,6 +549,11 @@ fn collect_live(view: &ExpressionView, quasiquote_depth: usize, output: &mut Vec
     };
 
     if view.kind == ExpressionKind::Atom {
+        // A function designator is live code, but it is not a *value*
+        // occurrence, and the query this partition is against has no
+        // namespaces. So `#'g` is left out of the partition on both sides and
+        // asserted separately, by
+        // `a_function_designator_never_resolves_to_a_variable`.
         if view.reader_prefixes.contains(&ReaderPrefix::Function) || quasiquote_depth > 0 {
             return;
         }
