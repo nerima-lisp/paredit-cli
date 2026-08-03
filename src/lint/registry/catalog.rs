@@ -225,7 +225,9 @@ pub const PEDANTIC_RULES: [&str; tagged_count(RuleTag::Pedantic)] = {
 // diagnostic earn a rule.
 // 324 + 4: 3 (`lint-generic-dispatch`), 1 (`lint-binding-analysis`). Both
 // batches dropped most of what they proposed against a running SBCL.
-const _: () = assert!(RULE_COUNT == 328);
+// 328 + 6 (`lint-data-structure`). Three of eight premises were refuted by
+// running them, and each would have fired on correct code.
+const _: () = assert!(RULE_COUNT == 334);
 // Unchanged at 99: every one of this branch's 37 rules is
 // `Fixability::ReportOnly`. Each one reports a judgment the tool cannot make
 // on the author's behalf — whether an annotation or the parameter list under it
@@ -377,7 +379,12 @@ const _: () = assert!(fixable_count() == 104);
 // load at all; and a primary `initialize-instance` reaching neither
 // `call-next-method` nor `shared-initialize` hands back an instance with
 // **every slot unbound**, silently.
-const _: () = assert!(warning_count() == 239);
+// 239 + 2 = 241. The other 4 are `Severity::Error`: two are hard errors SBCL
+// refuses outright (`:initial-element` with `:initial-contents`, and `:include`
+// across disagreeing `:type`s, which stops the file loading), and two fail at
+// run time on every call (`vector-push` with no fill pointer, and a literal
+// string key on an eql table, which misses silently forever).
+const _: () = assert!(warning_count() == 241);
 const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
 // 6 (through PR #82) + 8 of this branch's rules: `lint-call-shape`'s four
 // threshold rules, whose limits are conventions a codebase either adopted or

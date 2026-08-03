@@ -2018,6 +2018,42 @@
       "count": 0,
       "description": "a let/let*/flet/labels binding that nothing in its body reads",
       "rule": "unused-local-binding"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a BOA constructor binding a slot as a bare &aux variable, leaving it uninitialized",
+      "rule": "defstruct-boa-aux-uninitialized-slot"
+    },
+    {
+      "category": "malformed",
+      "count": 0,
+      "description": "a defstruct whose :include names a structure declared with a different :type",
+      "rule": "defstruct-include-type-mismatch"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a literal string key on a hash table whose eq/eql test compares by identity",
+      "rule": "hash-table-literal-string-key-under-eql"
+    },
+    {
+      "category": "malformed",
+      "count": 0,
+      "description": "a make-array supplying both :initial-element and :initial-contents",
+      "rule": "make-array-conflicting-initializers"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a maphash body that adds or removes an entry other than the one being processed",
+      "rule": "maphash-mutates-other-entry"
+    },
+    {
+      "category": "malformed",
+      "count": 0,
+      "description": "a vector-push on a vector made with no :fill-pointer",
+      "rule": "vector-push-without-fill-pointer"
     }
   ],
   "policy": {

@@ -686,6 +686,7 @@ dependencies = [
  "paredit-feature-lint-control-flow",
  "paredit-feature-lint-convention",
  "paredit-feature-lint-custom",
+ "paredit-feature-lint-data-structure",
  "paredit-feature-lint-documentation",
  "paredit-feature-lint-elisp-idiom",
  "paredit-feature-lint-fennel-janet-idiom",
@@ -1122,6 +1123,17 @@ dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
  "thiserror",
+]
+
+[[package]]
+name = "paredit-feature-lint-data-structure"
+version = "1.4.0"
+dependencies = [
+ "paredit-core-cli",
+ "paredit-core-lint-engine",
+ "paredit-core-semantics",
+ "paredit-core-syntax",
+ "serde_json",
 ]
 
 [[package]]
