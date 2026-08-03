@@ -234,6 +234,22 @@ pub enum ReaderPrefix {
     ReaderConditional,
     /// Clojure splicing reader conditional (`#?@(:clj [a] :cljs [b])`).
     ReaderConditionalSplicing,
+    /// Carp's `&x`, which its reader expands to `(ref x)`.
+    ///
+    /// Carp gets its own variants rather than borrowing [`Self::Function`] --
+    /// the "catch-all single-prefix slot" `quote_edit` describes, which already
+    /// carries Clojure's `@x` and Janet's `|x`. That slot spells itself `#'`
+    /// through [`Self::as_source`], and `as_source` is not decorative: three
+    /// re-emission paths write it straight back into source text. Carp is the
+    /// dialect where three distinct sigils would have collided in that one
+    /// slot, so each keeps its own spelling.
+    Ref,
+    /// Carp's `@x`, which its reader expands to `(copy x)`.
+    Copy,
+    /// Carp's `~x`, which its reader expands to a `Deref` node.
+    Deref,
+    /// Carp's `$[1 2 3]` static array literal, whose `$` glues to the `[`.
+    StaticArray,
 }
 
 impl ReaderPrefix {
@@ -261,6 +277,10 @@ impl ReaderPrefix {
             Self::Metadata => "^",
             Self::ReaderConditional => "#?",
             Self::ReaderConditionalSplicing => "#?@",
+            Self::Ref => "&",
+            Self::Copy => "@",
+            Self::Deref => "~",
+            Self::StaticArray => "$",
         }
     }
 

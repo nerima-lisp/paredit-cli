@@ -1551,10 +1551,20 @@ mod tests {
                 Dialect::Hy,
                 "(defmacro m [var form] `(let [,var ,form] ,var))",
             ),
-            (
-                Dialect::Carp,
-                "(defmacro m [var form] `(let [,var ,form] ,var))",
-            ),
+            // Carp has no row here. It used to, spelling its unquote `,`, and
+            // it passed only because Carp then shared the permissive legacy
+            // reader, which read `,` as unquote in every dialect it served.
+            // Carp's unquote is `%` and its unquote-splicing is `%@`
+            // (`docs/Quasiquotation.md`; `src/Parsing.hs` dispatches `'%' ->
+            // try unquoteSplicing <|> unquote`), and `,` is plain whitespace
+            // there -- `emptyCharacters` lists it beside space and tab. So the
+            // row asserted a property of a dialect that does not exist.
+            //
+            // `%` is not yet a reader prefix here, so there is currently no
+            // spelling of "an unquoted binding name" in Carp for this test to
+            // use: a `%var` written today reads as the single atom `%var`,
+            // which would satisfy the assertion without exercising it. The row
+            // returns when `%`/`%@` are modelled.
             (
                 Dialect::Fennel,
                 "(macro m [var form] `(let [,var ,form] ,var))",

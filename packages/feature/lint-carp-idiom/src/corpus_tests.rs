@@ -14,13 +14,14 @@
 //! take an owned copy, `Array.reduce` with a `&(fn …)`, `let-do` for
 //! sequencing, and `-> `/`-->` for threading.
 //!
-//! The correct corpus deliberately includes `@(…)` and `&(…)` forms, which
-//! this workspace's reader mis-lexes into an extra sibling atom (see
-//! `crate::support`). They belong here precisely because the rule must be
-//! immune to that: it keys on the head symbol and never on arity.
+//! The correct corpus deliberately includes `@(…)` and `&(…)` forms. The
+//! reader used to mis-lex them into an extra sibling atom; it now reads them as
+//! reader prefixes (see `crate::support`). They stay here either way, because
+//! the rule must be immune to how they lex: it keys on the head symbol and
+//! never on arity.
 
 use paredit_core_syntax::dialect::Dialect;
-use paredit_core_syntax::sexpr::SyntaxTree;
+use paredit_core_syntax::sexpr::{ExpressionKind, ExpressionView, ReaderPrefix, SyntaxTree};
 
 use crate::deprecated_thread_macro;
 use crate::engine_pass_tests::fired;
@@ -143,24 +144,55 @@ fn the_dangerous_twin_fires_each_rule_exactly_once() {
     );
 }
 
-/// The correct corpus exercises the reader's `@(…)` / `&(…)` arity inflation.
-/// Pinned so a later edit that "simplifies" the corpus does not quietly remove
-/// the only coverage of the shape the rule had to be built around.
+/// The correct corpus exercises Carp's `@(…)` / `&(…)` reader prefixes.
+///
+/// This pin used to run the other way. It asserted that the reader split
+/// `@(…)` into a bare `@` atom plus a sibling list, inflating the enclosing
+/// call's arity by one, because that is what the reader then did: Carp shared
+/// the permissive legacy reader, which implements neither sigil. `core/syntax`
+/// now implements Carp's own `sexpr` dispatch, so each sigil is a
+/// [`ReaderPrefix`] on the form it prefixes and no bare sigil atom survives.
+///
+/// Both halves stay pinned, and they fail in opposite directions:
+///
+/// * The zero-bare-sigil half fails if the reader regresses to the old split,
+///   which is the shape every rule in this package must stay immune to.
+/// * The prefixed-form count fails if a later edit "simplifies" the corpus and
+///   quietly removes the only coverage of that shape. The expected 8 is read
+///   off `CARP_CORPUS` itself, not off the parser: seven `&(`/`@(` paren forms
+///   (the `sig` argument type, three `&(fn …)` arguments, `@(Point.x p)`, and
+///   the two `println*` arguments) plus the one `&[1.0 2.0 3.0]` array.
 #[test]
-fn the_correct_corpus_exercises_the_readers_arity_inflation() {
+fn the_correct_corpus_exercises_carps_sigil_reader_prefixes() {
     let tree = SyntaxTree::parse_with_dialect(CARP_CORPUS, Dialect::Carp).expect("parse");
-    fn count_bare(view: &paredit_core_syntax::sexpr::ExpressionView, n: &mut usize) {
+
+    fn walk(view: &ExpressionView, bare: &mut usize, prefixed_lists: &mut usize) {
         for child in &view.children {
             if matches!(child.text.as_deref(), Some("@") | Some("&")) {
-                *n += 1;
+                *bare += 1;
             }
-            count_bare(child, n);
+            if child.kind == ExpressionKind::List
+                && child
+                    .reader_prefixes
+                    .iter()
+                    .any(|prefix| matches!(prefix, ReaderPrefix::Copy | ReaderPrefix::Ref))
+            {
+                *prefixed_lists += 1;
+            }
+            walk(child, bare, prefixed_lists);
         }
     }
+
     let mut bare = 0;
-    count_bare(&tree.root_view(), &mut bare);
-    assert!(
-        bare > 0,
-        "the corpus should contain `@(…)`/`&(…)`, which the reader splits into a bare sigil atom"
+    let mut prefixed_lists = 0;
+    walk(&tree.root_view(), &mut bare, &mut prefixed_lists);
+
+    assert_eq!(
+        bare, 0,
+        "no bare `@`/`&` sigil atom may survive the Carp reader"
+    );
+    assert_eq!(
+        prefixed_lists, 8,
+        "the corpus must keep its `@(…)`/`&(…)` coverage"
     );
 }

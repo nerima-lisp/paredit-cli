@@ -488,12 +488,16 @@ fn a_feature_conditional_is_never_broken_apart_by_formatting() {
     // datum, so the `(declare ...)` after it genuinely is a separate top-level
     // form and separating them is correct. Asserting otherwise would pin a
     // Common Lisp reading onto a dialect that does not share it.
-    const FEATURE_CONDITIONAL_DIALECTS: [Dialect; 5] = [
+    // Carp is *not* here, and was only ever here because it shared the
+    // permissive legacy reader. `src/Parsing.hs` gives `#` exactly one meaning
+    // -- the `#"…"` `Pattern` literal -- and leaves `#` out of
+    // `validCharacters`, so `#+sbcl` is neither a feature conditional nor a
+    // symbol in Carp: it is a read error, which the Carp reader now reports.
+    const FEATURE_CONDITIONAL_DIALECTS: [Dialect; 4] = [
         Dialect::Unknown,
         Dialect::CommonLisp,
         Dialect::Lfe,
         Dialect::Hy,
-        Dialect::Carp,
     ];
 
     for dialect in FEATURE_CONDITIONAL_DIALECTS {

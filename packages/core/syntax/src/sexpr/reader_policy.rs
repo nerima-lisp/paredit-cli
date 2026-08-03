@@ -111,8 +111,16 @@ impl DialectReaderPolicy {
         }
     }
 
+    /// Whether `byte` separates tokens rather than belonging to one.
+    ///
+    /// Carp joins Clojure in treating a comma as whitespace: upstream's
+    /// `emptyCharacters` is `[space, tab, comma, linebreak, eof, comment]`
+    /// (`src/Parsing.hs`), so a comma is a separator there exactly as it is in
+    /// Clojure. Without this it fell through to the shared quote-prefix table
+    /// and read as an unquote, which is a reader macro Carp does not have.
     pub(super) const fn is_whitespace(self, byte: u8) -> bool {
-        byte.is_ascii_whitespace() || matches!(self.dialect, Dialect::Clojure) && byte == b','
+        byte.is_ascii_whitespace()
+            || matches!(self.dialect, Dialect::Clojure | Dialect::Carp) && byte == b','
     }
 
     pub(super) fn line_comment_width(self, bytes: &[u8], pos: usize) -> Option<usize> {
@@ -392,6 +400,19 @@ impl DialectReaderPolicy {
                 2
             }
             Dialect::Clojure if byte == b'\\' => 1,
+            // Carp spells a character literal `\a`, like Clojure. Upstream's
+            // `aChar` is `Parsec.char '\\'` followed by one of the named
+            // characters (`space`, `newline`, `tab`, `backspace`, `return`,
+            // `formfeed`), `\"`, `\uXXXX`, or `Parsec.anyChar` -- so the
+            // payload is always at least one character and never a delimiter
+            // boundary. Without this arm `\{`, `\}`, `\(`, `\)`, `\[`, `\]`
+            // and `\"` had their payload read as a *real* delimiter, which is
+            // what made `core/Format.carp` and `examples/json_parser.carp`
+            // fail to parse outright. The named spellings need no arm of their
+            // own: consuming `\` plus one character leaves `pace` of `\space`
+            // to the atom scanner, which stops at the same boundary and yields
+            // the one atom `\space`.
+            Dialect::Carp if byte == b'\\' => 1,
             Dialect::EmacsLisp if byte == b'?' && next == Some(b'\\') => 2,
             Dialect::EmacsLisp if byte == b'?' => 1,
             _ => return None,
@@ -429,9 +450,10 @@ impl DialectReaderPolicy {
         let third = bytes.get(pos + 2).copied();
 
         match self.dialect {
-            Dialect::Unknown | Dialect::Carp => self.classify_legacy(byte, next, third),
+            Dialect::Unknown => self.classify_legacy(byte, next, third),
             Dialect::Lfe => self.classify_lfe(bytes, pos),
             Dialect::Hy => self.classify_hy(byte, next, third),
+            Dialect::Carp => Self::classify_carp(byte, next),
             Dialect::CommonLisp => self.classify_common_lisp(bytes, pos),
             Dialect::EmacsLisp => self.classify_emacs_lisp(bytes, pos),
             Dialect::Scheme | Dialect::Racket => self.classify_scheme(bytes, pos),
@@ -614,6 +636,96 @@ impl DialectReaderPolicy {
         match (byte, next) {
             (b'#', Some(b'[')) => None,
             _ => self.classify_legacy(byte, next, third),
+        }
+    }
+
+    /// Carp's reader macros, from the `sexpr` dispatch in `src/Parsing.hs`.
+    ///
+    /// Carp used to share [`Self::classify_legacy`] with LFE, Hy and the
+    /// permissive reader, and the two grammars have almost nothing in common.
+    /// Upstream dispatches on a single lookahead character:
+    ///
+    /// ```text
+    /// sexpr = do
+    ///   c <- Parsec.lookAhead Parsec.anyChar
+    ///   x <- case c of
+    ///     '&' -> ref
+    ///     '~' -> deref
+    ///     '@' -> copy
+    ///     '\'' -> quote
+    ///     '`' -> quasiquote
+    ///     '%' -> Parsec.try unquoteSplicing <|> unquote
+    ///     '(' -> list
+    ///     '[' -> array
+    ///     '$' -> staticArray
+    ///     '{' -> dictionary
+    ///     _ -> atom
+    /// ```
+    ///
+    /// where `readerMacro` consumes the sigil and then recurses into `sexpr`,
+    /// so a sigil prefixes *any* following form -- symbol, list, string
+    /// literal, or another prefixed form (`@@x`, `&@x`). None of `& ~ @ % $ #`
+    /// is in upstream's `validCharacters`, so none can occur inside a symbol
+    /// and each is unambiguously a prefix wherever it appears.
+    ///
+    /// Missing these cost more than tidiness. `&` and `@` alone accounted for
+    /// 1493 bare sigil atoms across 116 of the 248 files in `carp-lang/Carp`,
+    /// each one an extra sibling that inflated its enclosing call's arity, so
+    /// no argument-counting analysis was sound for Carp.
+    ///
+    /// Two upstream forms are deliberately still not implemented here:
+    ///
+    /// * `%` / `%@` (unquote, unquote-splicing). Recognizing them would make
+    ///   the interior of every `` ` `` template read as code rather than data,
+    ///   which *adds* lint findings on macro bodies. That direction needs a
+    ///   per-dialect false-positive audit of its own, and leaving it reads
+    ///   templates as inert data -- the suppressing, safe direction.
+    /// * `{...}` dictionaries desugar to `(Map.from-array [(Pair.init k v)…])`
+    ///   in upstream's reader. Structurally they are already a brace list here,
+    ///   which is the right shape for a structural tool; the desugaring is a
+    ///   semantic concern.
+    const fn classify_carp(byte: u8, next: Option<u8>) -> Option<ReaderMacro> {
+        match byte {
+            // A trailing `\` is a truncated character literal, not a symbol.
+            // Same contract `classify_clojure`, `classify_scheme` and
+            // `classify_emacs_lisp` already state for their own spellings: the
+            // formatter appends a trailing newline, a `\` left as an atom
+            // claims that newline as its character on the next parse, and
+            // `format(format(x))` stops converging. The recorded fuzz input
+            // `fuzz/corpus/format_idempotence/truncated-clojure-char` is
+            // exactly this byte and found it here too.
+            b'\\' if next.is_none() => Some(ReaderMacro::UnsupportedDispatch { width: 1 }),
+            b'&' => prefix(ReaderPrefix::Ref, 1),
+            b'@' => prefix(ReaderPrefix::Copy, 1),
+            b'~' => prefix(ReaderPrefix::Deref, 1),
+            b'\'' => prefix(ReaderPrefix::Quote, 1),
+            b'`' => prefix(ReaderPrefix::Quasiquote, 1),
+            // `staticArray` matches the two-byte string `$[`; a `$` anywhere
+            // else is a parse error upstream, and reading it as an atom here
+            // is the more permissive of the two options.
+            b'$' if matches!(next, Some(b'[')) => prefix(ReaderPrefix::StaticArray, 1),
+            // `#"…"` is a `Pattern` literal and the only `#` form Carp has.
+            // One dispatch byte plus exactly one datum, which is how
+            // `classify_clojure` reads its `#"…"` regex literal too, so both
+            // go through the same string scanner. Upstream's
+            // `parseInternalPattern` accepts a `"` only as `\"` and every
+            // other escape as backslash-plus-one, so a backslash-aware scan
+            // ends the literal on exactly the byte upstream ends it on.
+            b'#' if matches!(next, Some(b'"')) => Some(ReaderMacro::MultiDatum {
+                width: 1,
+                payload_forms: 1,
+            }),
+            // `#"` is the *only* `#` form Carp has. `#` is absent from
+            // upstream's `validCharacters`, so it cannot occur inside a symbol
+            // either, and `atom` has no branch that accepts it: `#` anywhere
+            // else is a parse error upstream. Refusing it here keeps that,
+            // and keeps the robustness suite's out-of-band oracle -- "no
+            // complete document contains a bare `#+`/`#-` standing alone as
+            // its own datum" -- true for Carp rather than exempting it.
+            // Carp inherited `#;`, `#_`, `#+`, `#-`, `#.`, `#'`, `#?`, `#(`,
+            // `#[` and `#{` from the legacy reader; it has none of them.
+            b'#' => Some(ReaderMacro::UnsupportedDispatch { width: 1 }),
+            _ => None,
         }
     }
 
