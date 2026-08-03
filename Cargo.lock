@@ -692,6 +692,7 @@ dependencies = [
  "paredit-feature-lint-hy-lfe-idiom",
  "paredit-feature-lint-introspection",
  "paredit-feature-lint-iteration-flow",
+ "paredit-feature-lint-loop-facility",
  "paredit-feature-lint-numeric",
  "paredit-feature-lint-object-system",
  "paredit-feature-lint-package-hygiene",
@@ -1180,6 +1181,14 @@ dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
  "serde_json",
+]
+
+[[package]]
+name = "paredit-feature-lint-loop-facility"
+version = "1.4.0"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
 ]
 
 [[package]]

@@ -304,6 +304,9 @@ rule	hy-mutable-default-argument	0
 rule	hy-identity-comparison-with-literal	0
 rule	hy-bare-except	0
 rule	carp-deprecated-thread-macro	0
+rule	loop-parallel-binding-reads-sibling	0
+rule	loop-into-accumulator-never-read	0
+rule	loop-accumulation-discarded-by-finally-return	0
 finding	self-assignment	error	suspicious	fixable=false	broad.lisp	6875	setq assigns place x to itself	self-assignment/5f1a5b802aa99b47/0
 finding	duplicate-setf-places	error	duplicate	fixable=false	broad.lisp	6961	setf assigns variable total more than once; the earlier assignment is dead	duplicate-setf-places/8104810ed815b9fd/0
 finding	setf-arity	error	arity	fixable=false	broad.lisp	7021	setf has 3 arguments; place/value pairs require an even count	setf-arity/b0a5b422aad6d4d2/0

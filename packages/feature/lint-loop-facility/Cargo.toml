@@ -1,0 +1,42 @@
+[package]
+name = "paredit-feature-lint-loop-facility"
+description = "Lint rules for the Common Lisp `loop` macro's own clause grammar, where the defect is in how the clauses relate rather than in any one form"
+readme = "README.md"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+paredit-core-syntax = { path = "../../core/syntax" }
+paredit-core-lint-engine = { path = "../../core/lint-engine" }
+
+# No feature-package dependency, dev or otherwise.
+#
+# This crate carries its own `loop` clause reader in `src/loop_grammar.rs`
+# rather than reusing the one in the lint-iteration-flow package's
+# `loop_syntax.rs`. That is duplication and it is deliberate twice over:
+#
+# 1. A feature-to-feature dependency needs an entry in
+#    `tests/cli/feature_dependency_contract.rs`, which this batch is not
+#    permitted to edit.
+# 2. The existing reader could not answer this crate's question anyway. It
+#    documents `and` as "tokenized but never interpreted" and lists `and` as a
+#    NAME_INTRODUCER, which deliberately over-collects in order to *lose*
+#    findings — and `and` grouping is precisely what `loop-parallel-binding-
+#    reads-sibling` is about.
+#
+# The overlap and the case for merging the two readers are written up in
+# README.md under "Relationship to lint-iteration-flow".
+#
+# The two packages are named by directory rather than by crate name on purpose:
+# `tests/cli/feature_dependency_contract.rs` scans this file as whole text
+# rather than parsing it, so a crate-name prefix appearing anywhere in it — a
+# comment included — reads as a declared edge and fails the contract.
+
+# Mandatory: without it this package silently opts out of the workspace lint
+# table, including `unsafe_code = "deny"`, with no error at all.
+[lints]
+workspace = true

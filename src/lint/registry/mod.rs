@@ -162,7 +162,17 @@ use super::rule::RuleEntry;
 // a bare sigil atom plus a sibling, inflating the enclosing call's arity in 116
 // of 248 files, and `@"..."` silently splits string literals. Same class as the
 // Hy, LFE and Janet gaps above; a repair belongs in `core/syntax`.
-pub const RULE_COUNT: usize = 321;
+//
+// 321 + 3 (`lint-loop-facility`) = 324. Seven were proposed; four died against
+// SBCL 2.6.0. `loop`'s clause grammar turns out to be mostly *checked*: mixing
+// accumulation kinds (`collect x sum x`) is a macroexpansion-time ERROR, and a
+// `with` clause after `for` compiles clean with no warning, so neither earns a
+// lint. `for x on list by #'cddr` is the plist idiom, not a defect. A
+// destructuring-arity rule is real but had **zero** decidable occurrences in
+// 20604 corpus loops, so shipping it would have guaranteed a false clean.
+//
+// The three that survive are the ones with no compiler diagnostic at all.
+pub const RULE_COUNT: usize = 324;
 
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
@@ -1464,5 +1474,17 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(
         &paredit_feature_lint_carp_idiom::deprecated_thread_macro::rule::META,
         &paredit_feature_lint_carp_idiom::deprecated_thread_macro::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_loop_facility::parallel_binding_reads_sibling::rule::META,
+        &paredit_feature_lint_loop_facility::parallel_binding_reads_sibling::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_loop_facility::into_accumulator_never_read::rule::META,
+        &paredit_feature_lint_loop_facility::into_accumulator_never_read::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_loop_facility::accumulation_discarded_by_finally_return::rule::META,
+        &paredit_feature_lint_loop_facility::accumulation_discarded_by_finally_return::rule::RULE,
     ),
 ];

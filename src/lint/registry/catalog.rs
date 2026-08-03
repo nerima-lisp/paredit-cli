@@ -220,7 +220,10 @@ pub const PEDANTIC_RULES: [&str; tagged_count(RuleTag::Pedantic)] = {
 // 320 + 1 (`lint-carp-idiom`) = 321. One rule, not more: the Carp compiler
 // already rejects the ownership defects that looked most promising, so the only
 // one worth a lint is the one that builds silently.
-const _: () = assert!(RULE_COUNT == 321);
+// 321 + 3 (`lint-loop-facility`). Four of seven proposals died against SBCL:
+// `loop` checks more than expected, so only the clauses with *no* compiler
+// diagnostic earn a rule.
+const _: () = assert!(RULE_COUNT == 324);
 // Unchanged at 99: every one of this branch's 37 rules is
 // `Fixability::ReportOnly`. Each one reports a judgment the tool cannot make
 // on the author's behalf — whether an annotation or the parameter list under it
@@ -284,6 +287,9 @@ const _: () = assert!(RULE_COUNT == 321);
 // 103 + 1: `carp-deprecated-thread-macro` is the rare mechanical fix -- `=>`
 // and `->` are byte-identical macro bodies in Carp's own stdlib, so the repair
 // is a rename. It is still withheld when the file defines its own `->`.
+// Unmoved by `lint-loop-facility`: all three are `ReportOnly`. Repairing a
+// parallel-binding read means choosing between `and` and a second `for`, which
+// changes the loop's values -- the author's call, not the tool's.
 const _: () = assert!(fixable_count() == 104);
 // 164 (through PR #82) + 31 of this branch's 37 rules. The other 6 are
 // `Severity::Error`: `when-unless-implicit-nil-misused` and the five
@@ -357,7 +363,13 @@ const _: () = assert!(fixable_count() == 104);
 // in the preset-filtered count `tests/cli/lint_report.rs` pins.
 // 235 + 1: the Carp rule is a `Warning`. Deprecated-but-working code is not an
 // error, and Carp's own stdlib still uses the spelling.
-const _: () = assert!(warning_count() == 236);
+// 236 + 1: two of the three `loop` rules are `Severity::Error` because the
+// code runs and produces wrong values with no diagnostic -- a parallel `and`
+// binding reads `nil` from its sibling, and an `into` accumulator nothing reads
+// makes the loop return `nil`. The third is a `Warning`: discarding an
+// accumulation via `finally (return ...)` wastes the consing but the returned
+// value is whatever the author asked for.
+const _: () = assert!(warning_count() == 237);
 const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
 // 6 (through PR #82) + 8 of this branch's rules: `lint-call-shape`'s four
 // threshold rules, whose limits are conventions a codebase either adopted or
