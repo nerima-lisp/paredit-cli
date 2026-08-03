@@ -1884,22 +1884,10 @@
       "rule": "package-circular-in-package-chain"
     },
     {
-      "category": "suspicious",
-      "count": 0,
-      "description": "a key bound to a same-file defun that has no (interactive), so the binding cannot run",
-      "rule": "elisp-keymap-binds-non-command"
-    },
-    {
       "category": "arity",
       "count": 0,
       "description": "an interactive spec that supplies fewer arguments than the lambda list requires",
       "rule": "elisp-interactive-arity-mismatch"
-    },
-    {
-      "category": "suspicious",
-      "count": 0,
-      "description": "a lambda on a hook, which re-evaluating the file adds a second copy of",
-      "rule": "elisp-hook-lambda"
     },
     {
       "category": "suspicious",

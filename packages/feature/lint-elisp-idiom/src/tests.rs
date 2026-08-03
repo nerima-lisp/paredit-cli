@@ -23,11 +23,7 @@ use std::path::Path;
 /// the real engine rather than calling `check` directly. Calling `check`
 /// directly would bypass the head index, which is where a wrong `HeadFilter`
 /// shows up.
-const CATALOG: [RuleEntry; 5] = [
-    RuleEntry::new(
-        &crate::keymap_binds_non_command::rule::META,
-        &crate::keymap_binds_non_command::rule::RULE,
-    ),
+const CATALOG: [RuleEntry; 4] = [
     RuleEntry::new(
         &crate::interactive_arity_mismatch::rule::META,
         &crate::interactive_arity_mismatch::rule::RULE,
@@ -80,118 +76,26 @@ fn rules_for(body: &str) -> Vec<&'static str> {
 const NONE: [&str; 0] = [];
 
 // ---------------------------------------------------------------------------
-// elisp-keymap-binds-non-command
+// Shared: the two-counter quote model
 // ---------------------------------------------------------------------------
+//
+// These three lived under `elisp-keymap-binds-non-command` until that rule was
+// dropped. They test `support`'s quote handling rather than any one rule, so
+// they are re-pointed at `add-hook` and kept: dropping them with the rule would
+// have silently removed the only coverage of the `hard`/`quasi` split.
 
 #[test]
-fn a_key_bound_to_a_same_file_defun_without_interactive_is_reported() {
-    assert_eq!(
-        rules_for("(defun my-go () (message \"hi\"))\n(define-key m (kbd \"C-c a\") #'my-go)\n"),
-        ["elisp-keymap-binds-non-command"]
-    );
+fn a_quoted_call_is_data_and_is_left_alone() {
+    assert_eq!(rules_for("'(add-hook 'h (lambda () 1))\n"), NONE);
 }
 
 #[test]
-fn the_same_binding_to_a_command_is_left_alone() {
-    assert_eq!(
-        rules_for(
-            "(defun my-go () (interactive) (message \"hi\"))\n\
-             (define-key m (kbd \"C-c a\") #'my-go)\n"
-        ),
-        NONE
-    );
-}
-
-#[test]
-fn a_command_whose_interactive_follows_a_docstring_and_a_declare_is_left_alone() {
-    // The header runs past both, and reading only the first body form would
-    // call this definition non-interactive.
-    assert_eq!(
-        rules_for(
-            "(defun my-go () \"Doc.\" (declare (indent 1)) (interactive) (message \"hi\"))\n\
-             (define-key m (kbd \"C-c a\") #'my-go)\n"
-        ),
-        NONE
-    );
-}
-
-#[test]
-fn every_binder_head_is_read_at_its_own_definition_index() {
-    // `global-set-key` has no keymap argument, so its DEF sits one earlier
-    // than `define-key`'s. A single constant index would read the `kbd` call
-    // here and report nothing at all.
-    for form in [
-        "(define-key m (kbd \"C-c a\") #'my-go)",
-        "(define-key-after m (kbd \"C-c a\") #'my-go)",
-        "(keymap-set m \"C-c a\" #'my-go)",
-        "(keymap-global-set \"C-c a\" #'my-go)",
-        "(keymap-local-set \"C-c a\" #'my-go)",
-        "(global-set-key (kbd \"C-c a\") #'my-go)",
-        "(local-set-key (kbd \"C-c a\") #'my-go)",
-    ] {
-        assert_eq!(
-            rules_for(&format!("(defun my-go () (message \"hi\"))\n{form}\n")),
-            ["elisp-keymap-binds-non-command"],
-            "binder {form} did not report"
-        );
-    }
-}
-
-#[test]
-fn a_binding_to_a_symbol_this_file_does_not_define_is_left_alone() {
-    // The command almost certainly lives in another file, and reporting it
-    // would flag the ordinary case of binding somebody else's command.
-    assert_eq!(
-        rules_for("(define-key m (kbd \"C-c a\") #'other-go)\n"),
-        NONE
-    );
-}
-
-#[test]
-fn a_binding_to_a_bare_symbol_is_left_alone() {
-    // `(define-key m k my-go)` passes the *value* of `my-go`, which this
-    // cannot read; assuming the symbol was meant would be a guess.
-    assert_eq!(
-        rules_for("(defun my-go () (message \"hi\"))\n(define-key m (kbd \"C-c a\") my-go)\n"),
-        NONE
-    );
-}
-
-#[test]
-fn a_binding_to_a_nested_defun_is_left_alone() {
-    // Only top-level definitions are searched: a `defun` inside a `when` is
-    // as likely conditional as not.
-    assert_eq!(
-        rules_for("(when x (defun my-go () 1))\n(define-key m (kbd \"C-c a\") #'my-go)\n"),
-        NONE
-    );
-}
-
-#[test]
-fn a_binding_to_a_macro_of_the_same_name_is_left_alone() {
-    // A macro cannot be a command at all — that is
-    // `elisp-interactive-in-macro`'s complaint, not this one's.
-    assert_eq!(
-        rules_for("(defmacro my-go () 1)\n(define-key m (kbd \"C-c a\") #'my-go)\n"),
-        NONE
-    );
-}
-
-#[test]
-fn a_quoted_binder_call_is_data_and_is_left_alone() {
-    assert_eq!(
-        rules_for("(defun my-go () 1)\n'(define-key m k #'my-go)\n"),
-        NONE
-    );
-}
-
-#[test]
-fn a_binder_call_unquoted_back_into_a_backquote_is_still_code() {
+fn a_call_unquoted_back_into_a_backquote_is_still_code() {
     // The two-counter quote model earns itself here: a single depth counter
     // would call this data and miss the finding.
     assert_eq!(
-        rules_for("(defun my-go () 1)\n`(a ,(define-key m k #'my-go))\n"),
-        ["elisp-keymap-binds-non-command"]
+        rules_for("`(a ,(add-hook 'h (lambda () 1)))\n"),
+        ["elisp-hook-lambda"]
     );
 }
 
@@ -199,10 +103,7 @@ fn a_binder_call_unquoted_back_into_a_backquote_is_still_code() {
 fn a_comma_inside_a_hard_quote_does_not_escape_back_to_code() {
     // Inside `'(…)` a comma is a comma character in a literal list. `hard`
     // never clearing is what models that.
-    assert_eq!(
-        rules_for("(defun my-go () 1)\n'(a ,(define-key m k #'my-go))\n"),
-        NONE
-    );
+    assert_eq!(rules_for("'(a ,(add-hook 'h (lambda () 1)))\n"), NONE);
 }
 
 // ---------------------------------------------------------------------------
@@ -310,6 +211,39 @@ fn an_interactive_deeper_in_the_body_is_an_ordinary_call() {
 fn a_macro_is_never_reported_for_its_interactive_arity() {
     assert_eq!(rules_for("(defmacro my-go (n) (interactive) n)\n"), NONE);
     assert_eq!(rules_for("(cl-defmacro my-go (n) (interactive) n)\n"), NONE);
+}
+
+#[test]
+fn the_r_code_letter_supplies_two_arguments() {
+    // `r` is documented as "point and the mark, as two numeric arguments,
+    // smallest first" — the one letter in the manual's table that yields more
+    // than one value. Verified in GNU Emacs 30.2:
+    //   (defun t-r (beg end) (interactive "r") (list beg end))
+    //   (call-interactively #'t-r)  =>  (1 6)
+    //
+    // Counting it as one produced 184 false positives against 41 genuine
+    // findings over GNU Emacs's own 1654 `.el` files — the rule was mostly
+    // reporting region commands that work perfectly, `align` among them.
+    assert_eq!(
+        rules_for("(defun my-go (beg end) (interactive \"r\") (list beg end))\n"),
+        NONE
+    );
+    // A prompt after the letter still supplies nothing extra, and the leading
+    // modifiers supply nothing at all.
+    assert_eq!(
+        rules_for("(defun my-go (beg end) (interactive \"*r\") (list beg end))\n"),
+        NONE
+    );
+    // Combined with another segment: `r` two, `p` one.
+    assert_eq!(
+        rules_for("(defun my-go (beg end n) (interactive \"r\\np\") (list beg end n))\n"),
+        NONE
+    );
+    // And it is still only two — a third required parameter is unsupplied.
+    assert_eq!(
+        rules_for("(defun my-go (beg end n) (interactive \"r\") (list beg end n))\n"),
+        ["elisp-interactive-arity-mismatch"]
+    );
 }
 
 #[test]
@@ -444,9 +378,32 @@ fn save_excursion_without_a_buffer_switch_is_left_alone() {
 }
 
 #[test]
-fn a_deeply_nested_set_buffer_still_belongs_to_the_save_excursion() {
+fn a_set_buffer_that_is_not_the_first_body_form_is_left_alone() {
+    // This test used to assert the opposite, and it was the clearest example
+    // of a suite encoding its author's model rather than the language's. The
+    // rule's whole justification is that Emacs's byte compiler warns about
+    // this shape — and `byte-compile-save-excursion` reads
+    // `(car-safe (car-safe (cdr form)))`, i.e. only the first body form. A/B
+    // against `batch-byte-compile` confirms it: Emacs warns on
+    // `(save-excursion (set-buffer b) (point))` and is silent here.
+    //
+    // Over the 1654 `.el` files GNU Emacs 30.2 ships the walking version
+    // produced 227 findings, none of them the first-body-form case. What it
+    // actually reported was code like
+    // `(save-excursion (goto-char (point-min)) (when flag (set-buffer b) …))`,
+    // where the saved point *is* used before the switch — so the finding's own
+    // message, that the form saves point in a buffer it then leaves, was false.
     assert_eq!(
         rules_for("(defun f (b) (save-excursion (when x (dolist (y ys) (set-buffer b)))))\n"),
+        NONE
+    );
+}
+
+#[test]
+fn a_set_buffer_as_the_first_body_form_is_reported() {
+    // The case the byte compiler warns about, and the only one this reports.
+    assert_eq!(
+        rules_for("(defun f (b) (save-excursion (set-buffer b) (point)))\n"),
         ["elisp-save-excursion-set-buffer"]
     );
 }
@@ -708,8 +665,6 @@ fn the_correct_file_actually_contains_what_every_rule_looks_for() {
     // Without this, the sweep above passes by matching nothing at all — which
     // is exactly how a rule with a broken head filter looks.
     for (needle, at_least) in [
-        ("(define-key ", 3),
-        ("(keymap-set ", 1),
         ("(interactive", 4),
         ("(add-hook ", 1),
         ("(remove-hook ", 1),
@@ -778,7 +733,6 @@ fn the_dangerous_twin_fires_every_rule_exactly_once() {
         [
             "elisp-hook-lambda",
             "elisp-interactive-arity-mismatch",
-            "elisp-keymap-binds-non-command",
             "elisp-require-obsolete-cl",
             "elisp-save-excursion-set-buffer",
         ]

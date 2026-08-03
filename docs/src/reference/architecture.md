@@ -65,7 +65,7 @@ src/
 A contract test walks `src/` and refuses anything else.
 
 The lint `REGISTRY` is the canonical example of what *must* live here. It names
-all 296 rules, and every rule depends on the engine; putting the registry in
+all 295 rules, and every rule depends on the engine; putting the registry in
 either would be a cycle. So the engine takes a `RuleCatalog` as an argument and
 never learns which rules exist, the rules never learn the registry does, and
 the registry sits in the root reaching twenty-six feature packages for their
@@ -141,7 +141,7 @@ frequently extended part of the tree.
 | `policy` | Dialect scope, rule selection and gate decisions: logic that needs no tree. |
 | `engine` | The single pass, which walks the document once and dispatches each node to every rule whose `head_filter` matches. |
 
-291 of the 296 shipped rules live in twenty-five themed packages, split seven
+290 of the 295 shipped rules live in twenty-five themed packages, split seven
 ways. A twenty-sixth, `feature/lint-custom`, holds no rules at all: it is the
 pattern language and the second pass that run the rules a *project* writes for
 itself.
@@ -296,7 +296,7 @@ Emacs Lisp's truncating integer `/`. Each needs an arm in `contract.rs`'s
 `lint_rule_dialect_scope` and an entry in `DIALECT_SPECIFIC_REPORTS`, or the
 dialect matrix claims a Common Lisp support the rule declines.
 
-**`REGISTRY` is in neither.** It names all 296 rules, and every rule depends on
+**`REGISTRY` is in neither.** It names all 295 rules, and every rule depends on
 the engine, so putting it in the engine or in a rule package would be a cycle.
 It sits in the root crate, and the engine receives a `RuleCatalog` as an
 argument — which is why the engine can be a package at all.

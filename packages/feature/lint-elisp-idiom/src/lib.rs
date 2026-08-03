@@ -2,7 +2,6 @@
 
 pub mod hook_lambda;
 pub mod interactive_arity_mismatch;
-pub mod keymap_binds_non_command;
 pub mod require_obsolete_cl;
 pub mod save_excursion_set_buffer;
 

@@ -189,11 +189,13 @@ pub const PEDANTIC_RULES: [&str; tagged_count(RuleTag::Pedantic)] = {
 // 266 + the next batch's 20: 8 (`lint-form-shape`), 4 each (`lint-sequence`,
 // `lint-numeric`), 3 (`lint-string-char`) and 1 (`lint-package-hygiene`) = 286.
 //
-// 286 + this batch's 10: 5 (`lint-elisp-idiom`) and 5 (`lint-pathname-io`),
+// 286 + this batch's 9: 4 (`lint-elisp-idiom`) and 5 (`lint-pathname-io`),
 // both new packages. Twelve rules were proposed; two were dropped as exact
-// duplicates of rules already shipping and two more had their premises
-// refuted against a running Emacs.
-const _: () = assert!(RULE_COUNT == 296);
+// duplicates of rules already shipping, two more had their premises refuted
+// against a running Emacs, and `elisp-keymap-binds-non-command` was dropped
+// after implementation when a false-positive audit over GNU Emacs's own
+// sources returned 70 findings and 0 true positives.
+const _: () = assert!(RULE_COUNT == 295);
 // Unchanged at 99: every one of this branch's 37 rules is
 // `Fixability::ReportOnly`. Each one reports a judgment the tool cannot make
 // on the author's behalf — whether an annotation or the parameter list under it
@@ -231,13 +233,14 @@ const _: () = assert!(fixable_count() == 99);
 // `ftype-values-arity-mismatch` (a violated `ftype` is undefined behaviour at
 // low safety, and SBCL raises a full WARNING for it).
 //
-// 212 + 7 of this batch's 10 = 219. The other 3 are `Severity::Error` because
-// the code fails outright rather than reading badly: `elisp-keymap-binds-non-
-// command` (the binding loads and byte-compiles clean, then signals on the
-// keypress), `elisp-interactive-arity-mismatch` (`commandp` is true, so the
-// command appears in `M-x` and then signals `wrong-number-of-arguments`), and
+// 212 + 7 of this batch's 9 = 219. The other 2 are `Severity::Error` because
+// the code fails outright rather than reading badly:
+// `elisp-interactive-arity-mismatch` (`commandp` is true, so the command
+// appears in `M-x` and then signals `wrong-number-of-arguments`) and
 // `with-open-file-result-captures-stream` (the stream is closed before the
-// value that carries it is ever used).
+// value that carries it is ever used). Dropping
+// `elisp-keymap-binds-non-command` did not move this number: it was an
+// `Error` too.
 const _: () = assert!(warning_count() == 219);
 const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
 // 6 (through PR #82) + 8 of this branch's rules: `lint-call-shape`'s four
@@ -248,9 +251,13 @@ const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
 // path the rule cannot identify. Neither dropped rule was tagged `pedantic`,
 // so this does not move either. Nor does the next batch's 20: none of them
 // carries a tag at all, so `PEDANTIC_RULES` and `EXPERIMENTAL_RULES` are both
-// unchanged by it. Nor does this batch's 10, for the same reason: every one of
-// them reports a defect with a demonstrated failure, not a style preference.
-const _: () = assert!(PEDANTIC_RULES.len() == 14);
+// unchanged by it. This batch moves it by one: `elisp-hook-lambda` is tagged
+// `pedantic` because it is correct and still noisy — 106 findings over the
+// 1654 `.el` files GNU Emacs 30.2 ships, 31 of them on buffer-local hooks
+// where the lambda's buffer is about to be discarded and the re-evaluation
+// problem it warns about cannot arise. The other 8 report a defect with a
+// demonstrated failure and stay untagged.
+const _: () = assert!(PEDANTIC_RULES.len() == 15);
 
 fn meta_of(name: &str) -> Option<&'static crate::lint::model::RuleMeta> {
     REGISTRY

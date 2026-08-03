@@ -2,15 +2,15 @@
 //! code from data.
 //!
 //! Nothing here runs per visited node. Every helper is called from inside a
-//! rule that has already matched its head, and the two expensive ones
-//! ([`is_unevaluated_at`] and [`find_definition`]) are called only once a
-//! finding is otherwise ready to report. The `clean/forms/*` benchmarks lint
+//! rule that has already matched its head, and the expensive one
+//! ([`is_unevaluated_at`]) is called only once a finding is otherwise ready to
+//! report. The `clean/forms/*` benchmarks lint
 //! files with zero findings, so the per-file cost of a rule that matches
 //! nothing is exactly what they measure.
 
 use paredit_core_syntax::emacs_lisp::{EmacsLispCallableShape, EmacsLispOperator};
 use paredit_core_syntax::sexpr::{
-    ByteSpan, ExpressionKind, ExpressionPath, ExpressionView, ReaderPrefix, SyntaxTree,
+    ByteSpan, ExpressionKind, ExpressionView, ReaderPrefix, SyntaxTree,
 };
 
 /// An atom's text, exactly as the source spells it — *including* any reader
@@ -236,63 +236,6 @@ pub(crate) struct Definition<'a> {
     pub(crate) shape: EmacsLispCallableShape,
 }
 
-/// The `defun`-family form in `tree` that defines `name`, if the file has one,
-/// as an owned subtree paired with the shape its operator implies.
-///
-/// Only *top-level* forms are searched. A `defun` nested inside a `let` or a
-/// `progn` is still a definition at load time, but a name defined in one of
-/// those is as likely to be conditional as not, and reporting on a definition
-/// this crate cannot see the guard for would be a guess.
-///
-/// Returns `None` for a name this file does not define at all, which is the
-/// only honest answer for a command that lives in another file.
-///
-/// **Deliberately does not build the root view.** `SyntaxTree::root_view()`
-/// materializes the whole document — a `Vec` per node and a `String` per atom
-/// — and this runs once per key binding, so calling it here made the rule cost
-/// O(bindings × file). Measured before and after on a file of N `defun`s and N
-/// `define-key`s: the root-view version ran 17.9µs / 35.2µs / 75.6µs per
-/// binding at N = 32 / 64 / 128, a 4x cost for a 2x file. What replaces it is
-/// two cheap passes per candidate — a borrowed `head()` and a borrowed source
-/// slice — and a subtree materialization only for the form whose own text
-/// contains the name at all.
-///
-/// The `contains` is a *pre-filter*, never the verdict: a `defun` whose
-/// docstring happens to mention the name passes it and is then rejected by the
-/// exact comparison below, and a form that does not contain the name cannot
-/// possibly define it.
-pub(crate) fn find_definition(
-    tree: &SyntaxTree,
-    name: &str,
-) -> Option<(ExpressionView, EmacsLispCallableShape)> {
-    for index in 0..tree.root_children().len() {
-        let Ok(selection) = tree.select_path(&ExpressionPath::root_child(index)) else {
-            continue;
-        };
-        let Some(head) = selection.head() else {
-            continue;
-        };
-        let Some(shape) =
-            EmacsLispOperator::from_head(head).and_then(EmacsLispOperator::callable_shape)
-        else {
-            continue;
-        };
-        // A macro is expanded, never called, so it cannot be a command at all
-        // — `elisp-interactive-in-macro` owns that complaint.
-        if !shape.accepts_interactive() {
-            continue;
-        }
-        if !selection.text().contains(name) {
-            continue;
-        }
-        let view = selection.view();
-        if view.children.get(1).and_then(atom_text) == Some(name) {
-            return Some((view, shape));
-        }
-    }
-    None
-}
-
 impl Definition<'_> {
     /// The `(interactive …)` header of this definition, if it has one.
     ///
@@ -362,6 +305,15 @@ impl Definition<'_> {
 ///   argument list, so `(interactive (list a b))` supplies whatever that
 ///   returns. Reading it would be a guess, and a guess in this direction is a
 ///   false positive on correct code.
+///
+/// One code letter breaks the otherwise-reliable "one segment, one argument"
+/// rule: `r` is documented as "point and the mark, as two numeric arguments,
+/// smallest first", and it supplies **two**. Verified against GNU Emacs 30.2 —
+/// `(defun f (beg end) (interactive "r") (list beg end))` returns `(1 6)` under
+/// `call-interactively`. Counting it as one is not a rounding error: an audit
+/// over the 1654 `.el` files GNU Emacs ships found 184 false positives from
+/// this alone, against 41 genuine findings, so the rule was mostly reporting
+/// `region`-taking commands that work perfectly.
 pub(crate) fn interactive_argument_count(header: &ExpressionView) -> Option<usize> {
     let Some(descriptor) = header.children.get(1) else {
         return Some(0);
@@ -381,5 +333,15 @@ pub(crate) fn interactive_argument_count(header: &ExpressionView) -> Option<usiz
     if segments.iter().any(|segment| segment.is_empty()) {
         return None;
     }
-    Some(segments.len())
+    Some(segments.iter().map(|segment| segment_arity(segment)).sum())
+}
+
+/// How many arguments one `\n`-separated segment of an interactive spec
+/// supplies: two for `r`, one for every other code letter.
+///
+/// The code letter is the segment's first character; the rest is the letter's
+/// prompt, which supplies nothing. `r` is the only letter in the Emacs Lisp
+/// manual's table that yields more than one value.
+fn segment_arity(segment: &str) -> usize {
+    if segment.starts_with('r') { 2 } else { 1 }
 }

@@ -271,9 +271,7 @@ rule	format-unknown-directive	0
 rule	format-percent-ampersand-adjacent-redundancy	0
 rule	format-nested-directive-unbalanced	0
 rule	package-circular-in-package-chain	0
-rule	elisp-keymap-binds-non-command	0
 rule	elisp-interactive-arity-mismatch	0
-rule	elisp-hook-lambda	0
 rule	elisp-save-excursion-set-buffer	0
 rule	elisp-require-obsolete-cl	0
 rule	pathname-built-by-concatenation	0

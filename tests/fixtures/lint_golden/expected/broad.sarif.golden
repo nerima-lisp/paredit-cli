@@ -9638,22 +9638,6 @@
             },
             {
               "fullDescription": {
-                "text": "A key binding is dispatched through `command-execute`, which requires `commandp`. A `defun` with no `(interactive)` is not `commandp`, and `define-key` accepts it anyway — so the binding loads, byte-compiles and installs cleanly, and fails only when the key is pressed."
-              },
-              "id": "elisp-keymap-binds-non-command",
-              "properties": {
-                "category": "suspicious",
-                "fixable": false,
-                "rationale": "A key binding is dispatched through `command-execute`, which requires `commandp`. A `defun` with no `(interactive)` is not `commandp`, and `define-key` accepts it anyway — so the binding loads, byte-compiles and installs cleanly, and fails only when the key is pressed.",
-                "severity": "error",
-                "tags": []
-              },
-              "shortDescription": {
-                "text": "a key bound to a same-file defun that has no (interactive), so the binding cannot run"
-              }
-            },
-            {
-              "fullDescription": {
                 "text": "`call-interactively` passes exactly the arguments the `(interactive …)` descriptor names — none at all when there is no descriptor, one per newline-separated code letter when it is a string. A required parameter left unsupplied is a `wrong-number-of-arguments` signal at the first invocation, and nothing before that reports it."
               },
               "id": "elisp-interactive-arity-mismatch",
@@ -9678,7 +9662,10 @@
                 "fixable": false,
                 "rationale": "`add-hook` compares with `equal`, so an anonymous function is deduplicated only while it is textually unchanged. Edit the lambda and re-evaluate the file and the hook holds both versions; `add-hook`'s own docstring recommends a function symbol for exactly this reason, and notes the comparison cost as a second one.",
                 "severity": "warning",
-                "tags": []
+                "tags": [
+                  "pedantic",
+                  "style"
+                ]
               },
               "shortDescription": {
                 "text": "a lambda on a hook, which re-evaluating the file adds a second copy of"

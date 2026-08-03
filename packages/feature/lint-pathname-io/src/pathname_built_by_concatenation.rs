@@ -132,13 +132,18 @@ pub fn construction_of(designator: &ExpressionView) -> Option<Construction> {
             return None;
         }
         // The pieces are everything after the operator and the result type.
-        return designator
-            .children
-            .get(2..)?
+        let pieces = designator.children.get(2..)?;
+        if !pieces
             .iter()
             .filter_map(string_literal)
             .any(contributes_a_separator)
-            .then_some(Construction::Concatenate);
+        {
+            return None;
+        }
+        if is_fully_determined_and_tame(pieces) {
+            return None;
+        }
+        return Some(Construction::Concatenate);
     }
 
     if symbol_is(head, "format") {
@@ -153,6 +158,31 @@ pub fn construction_of(designator: &ExpressionView) -> Option<Construction> {
     }
 
     None
+}
+
+/// Characters that make a namestring component *wild* when it is re-read.
+///
+/// CLHS 19.2.2.2. This is what turns a hand-assembled path into a defect rather
+/// than merely a portability smell: `(pathname "/tmp/a*b.txt")` has a `:name` of
+/// `#<PATTERN "a" :MULTI-CHAR-WILD "b">`, and `open` on it signals.
+const WILD_CHARACTERS: [char; 3] = ['*', '?', '['];
+
+/// Whether every piece is a string literal that cannot introduce a wildcard.
+///
+/// When that holds, the assembled namestring is known in full at read time and
+/// contains no wild character, so the failure this rule exists to predict —
+/// a component silently becoming a `:wild` pattern — cannot occur.
+///
+/// This narrowing came from an audit over SBCL's sources and 38 Quicklisp
+/// systems, where the un-narrowed rule produced 9 findings and every one was of
+/// this shape. Reporting them would be worse than useless, because the obvious
+/// remedy is wrong: `(merge-pathnames "bar.lisp" "/tmp/foo")` silently *drops*
+/// `foo`, since `merge-pathnames` reads the last segment as a name. Concatenation
+/// is genuinely the simpler correct spelling here.
+fn is_fully_determined_and_tame(pieces: &[ExpressionView]) -> bool {
+    pieces
+        .iter()
+        .all(|piece| string_literal(piece).is_some_and(|text| !text.contains(WILD_CHARACTERS)))
 }
 
 /// Reads one filesystem call and reports the hand-assembled designator it was
@@ -275,6 +305,45 @@ mod tests {
     #[test]
     fn does_not_flag_a_concatenation_with_no_literal_at_all() {
         assert_eq!(found("(load (concatenate 'string a b))"), None);
+    }
+
+    #[test]
+    fn does_not_flag_an_all_literal_concatenation_with_no_wild_character() {
+        // Every piece is a literal and none holds `*`, `?` or `[`, so the
+        // assembled namestring is known in full at read time and cannot become
+        // a `:wild` pattern — the failure this rule exists to predict.
+        //
+        // This narrowing came from an audit over SBCL's sources and 38
+        // Quicklisp systems: the un-narrowed rule produced 9 findings and all 9
+        // were this shape. Reporting them would be actively harmful, because
+        // the remedy that looks obvious is wrong —
+        // `(merge-pathnames "bar.lisp" "/tmp/foo")` is `#P"/tmp/bar.lisp"`,
+        // silently dropping `foo`, since the last segment reads as a name.
+        assert_eq!(
+            found(r#"(load (concatenate 'string "/tmp/d" "/" "name.txt"))"#),
+            None
+        );
+    }
+
+    #[test]
+    fn still_flags_an_all_literal_concatenation_that_holds_a_wild_character() {
+        // Verified in SBCL 2.6.6: `(wild-pathname-p "/tmp/a*b.txt")` is T, and
+        // `open` on it signals a `file-error` — `NO-NATIVE-NAMESTRING-ERROR`,
+        // naming the `:NAME` component `#<PATTERN "a" :MULTI-CHAR-WILD "b">`.
+        assert_eq!(
+            found(r#"(load (concatenate 'string "/tmp/d" "/" "a*b.txt"))"#),
+            Some(("load".to_owned(), Construction::Concatenate))
+        );
+    }
+
+    #[test]
+    fn still_flags_a_concatenation_whose_pieces_are_not_all_known() {
+        // A variable can hold anything, wild characters included, so the
+        // narrowing above must not extend to it.
+        assert_eq!(
+            found(r#"(load (concatenate 'string "/tmp/d" "/" name))"#),
+            Some(("load".to_owned(), Construction::Concatenate))
+        );
     }
 
     #[test]

@@ -68,34 +68,38 @@ pub const META: RuleMeta = RuleMeta::new(
 
 const HEADS: [NormalizedHead; 1] = [NormalizedHead::new("save-excursion")];
 
-/// Forms that establish their own current-buffer scope, or their own body
-/// entirely. A `set-buffer` under one of these is not the outer
-/// `save-excursion`'s problem.
-const OPAQUE: [&str; 8] = [
-    "save-excursion",
-    "save-current-buffer",
-    "with-current-buffer",
-    "with-temp-buffer",
-    "with-output-to-temp-buffer",
-    "lambda",
-    "defun",
-    "defmacro",
-];
+// A list of scope-establishing forms (`with-current-buffer`,
+// `save-current-buffer`, `with-temp-buffer`, `lambda`, …) used to live here, to
+// stop the body walk descending into a `set-buffer` that belonged to some inner
+// form. The walk is gone — see `buffer_switch_in` — and with it the need for the
+// list: a nested scope cannot simultaneously *be* the first body form and
+// *contain* the `set-buffer`, so every exclusion it bought is now structural.
+// The rule's caveat still documents the behaviour, because the behaviour has not
+// changed.
 
-/// The first `(set-buffer …)` in `body` that belongs to this `save-excursion`.
+/// The `(set-buffer …)` that opens `body`, if that is how it opens.
 ///
-/// A hand-rolled stack rather than recursion: a rule must not blow the stack
-/// on a deeply nested but perfectly legal file.
+/// Deliberately only the **first** body form, which is exactly what Emacs's own
+/// `byte-compile-save-excursion` tests — it reads
+/// `(car-safe (car-safe (cdr form)))` and nothing deeper. Matching the compiler
+/// is the whole justification for this rule, so matching it loosely is worse
+/// than not matching it at all.
+///
+/// An earlier version walked the entire body. Over the 1654 `.el` files GNU
+/// Emacs 30.2 ships that produced 227 findings and **not one** was the
+/// first-body-form case: Emacs fixed those decades ago precisely because the
+/// compiler warns about them. What it reported instead was code like
+/// `(save-excursion (goto-char (point-min)) (when flag (set-buffer buf) …))`,
+/// where the saved point is used before the switch and the finding's own
+/// message — that the form "saves point in a buffer it then leaves" — is false.
+///
+/// `OPAQUE` is therefore no longer consulted here; it remains documented in the
+/// rule's caveat because the narrowed rule inherits the same exclusions for
+/// free (a nested scope cannot be the first body form and a `set-buffer` at
+/// once).
 fn buffer_switch_in(body: &[ExpressionView]) -> Option<&ExpressionView> {
-    let mut stack: Vec<&ExpressionView> = body.iter().rev().collect();
-    while let Some(view) = stack.pop() {
-        match list_head(view) {
-            Some("set-buffer") => return Some(view),
-            Some(head) if OPAQUE.contains(&head) => continue,
-            _ => stack.extend(view.children.iter().rev()),
-        }
-    }
-    None
+    let first = body.first()?;
+    (list_head(first) == Some("set-buffer")).then_some(first)
 }
 
 #[derive(Debug)]

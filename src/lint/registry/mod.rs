@@ -31,11 +31,19 @@ use super::rule::RuleEntry;
 // existed; `lint-package-hygiene` is the twenty-fourth package the registry
 // reaches into.
 //
-// 286 + this batch's 10, both packages new: 5 (`lint-elisp-idiom`) and 5
-// (`lint-pathname-io`) = 296. This is the first batch aimed squarely at a
+// 286 + this batch's 9, both packages new: 4 (`lint-elisp-idiom`) and 5
+// (`lint-pathname-io`) = 295. This is the first batch aimed squarely at a
 // dialect other than Common Lisp: `dialect_scope()` defaults to
 // `COMMON_LISP_ONLY`, so before it only 13 of 286 rules ran on `.el` at all.
-pub const RULE_COUNT: usize = 296;
+//
+// It shipped 9 of 10 implemented. `elisp-keymap-binds-non-command` was dropped
+// after an audit over the 1654 `.el` files GNU Emacs 30.2 ships: 70 findings,
+// 0 true positives. 57 bind translation functions into `function-key-map` and
+// friends, which are called with a prompt and *must not* be `commandp`; the
+// rest are private keymaps dispatched by hand through `funcall`, never
+// `command-execute`. A denylist would not save it — the private-map cases are
+// indistinguishable from command maps.
+pub const RULE_COUNT: usize = 295;
 
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
@@ -1197,10 +1205,6 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(
         &paredit_feature_lint_package_hygiene::package_circular_in_package_chain::rule::META,
         &paredit_feature_lint_package_hygiene::package_circular_in_package_chain::rule::RULE,
-    ),
-    RuleEntry::new(
-        &paredit_feature_lint_elisp_idiom::keymap_binds_non_command::rule::META,
-        &paredit_feature_lint_elisp_idiom::keymap_binds_non_command::rule::RULE,
     ),
     RuleEntry::new(
         &paredit_feature_lint_elisp_idiom::interactive_arity_mismatch::rule::META,

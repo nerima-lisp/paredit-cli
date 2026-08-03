@@ -24,7 +24,8 @@
 use paredit_core_lint_engine::LintResult;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
 use paredit_core_lint_engine::model::{
-    Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleExplanation, RuleMeta, Severity,
+    Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleExplanation, RuleMeta, RuleTag,
+    Severity,
 };
 use paredit_core_lint_engine::policy::RuleDialectScope;
 use paredit_core_lint_engine::rule::LintRule;
@@ -55,7 +56,16 @@ pub const META: RuleMeta = RuleMeta::new(
         "`'(lambda …)` is not reported here: `elisp-quoted-lambda` already reports it, and says \
          more.",
     ),
-);
+)
+// Tagged `pedantic`, so only the `pedantic` preset includes it.
+//
+// The rule is correct — `add-hook`'s docstring does recommend a symbol — but an
+// audit over the 1654 `.el` files GNU Emacs 30.2 ships produced 106 findings,
+// 31 of them on *buffer-local* hooks, where the lambda is scoped to a buffer
+// that is about to be discarded and the re-evaluation problem does not arise.
+// That is the tag's definition: correct, and noise on a codebase that has not
+// adopted the convention. Emacs itself is such a codebase.
+.with_tags(&[RuleTag::Pedantic, RuleTag::Style]);
 
 /// `(add-hook HOOK FUNCTION …)` and `(remove-hook HOOK FUNCTION …)` agree on
 /// where FUNCTION sits.
