@@ -300,8 +300,12 @@ fn cli_lint_list_rules_prints_the_catalog_without_files() {
         // `RuleTag::Style`, which no preset filters on, so the rise here is
         // again the full count. + all 3 of this branch's = 301, the whole
         // suite's 316 less the same 15: all three are untagged, so once more
-        // the rise is the full count.
-        .stdout(predicate::str::contains("\"rule_count\": 301"))
+        // the rise is the full count. + 3 of this branch's 4 = 304, which is
+        // the suite's 320 less *16* — the divisor moved for the first time in
+        // four batches, because `lfe-catch-swallows-exit` ships tagged
+        // `pedantic`. So this rises by 3 where the suite rises by 4, and the
+        // two numbers are not the same arithmetic.
+        .stdout(predicate::str::contains("\"rule_count\": 304"))
         .stdout(predicate::str::contains("\"self-assignment\""))
         .stdout(predicate::str::contains(
             "a setq/setf/psetq/psetf that assigns a place to itself",
@@ -970,7 +974,7 @@ fn cli_lint_list_rules_marks_severity() {
     assert_eq!(severity_of("redundant-quote"), "warning");
     assert_eq!(severity_of("literal-place"), "error");
     let warnings = rules.iter().filter(|r| r["severity"] == "warning").count();
-    // The default preset is `recommended`, which holds back the fourteen
+    // The default preset is `recommended`, which holds back the sixteen
     // `pedantic` rules; `--preset all` is what lists the whole suite.
     // 181 (through the 37-rule batch) + 17 of the 20-rule batch = 198, + 6 of
     // the 9-rule batch — 2 are `Severity::Error` and `elisp-hook-lambda` is
@@ -984,7 +988,16 @@ fn cli_lint_list_rules_marks_severity() {
     // `pedantic` rules, all of them warnings. + 0 of this branch's 3: all
     // three `lint-compile-time` rules are `Severity::Error`, so this stays at
     // 217 and the suite total stays at 232.
-    assert_eq!(warnings, 217);
+    //
+    // + 2 of this branch's 4 = 219, and this is the batch where the two
+    // subtractions come apart. Three of the four are `Severity::Warning`
+    // (`hy-identity-comparison-with-literal`, `hy-bare-except`,
+    // `lfe-catch-swallows-exit`) and `hy-mutable-default-argument` is an
+    // `Error`, so the suite's warning total rises by 3 to 235. But
+    // `lfe-catch-swallows-exit` is also tagged `pedantic`, so the default
+    // preset holds it back and only 2 of the 3 are visible here: 235 less the
+    // now-16 `pedantic` rules, all still warnings, = 219.
+    assert_eq!(warnings, 219);
 }
 
 #[test]
@@ -1010,7 +1023,13 @@ fn cli_lint_list_rules_marks_fixability() {
     // show up here and nowhere else. Unmoved by this branch's 10: every one of
     // them is `ReportOnly`. Unmoved by this branch's 3 for the same reason —
     // all three `lint-compile-time` rules are `ReportOnly`, so the suite total
-    // and the preset-filtered total both stay at 103.
+    // and the preset-filtered total both stay at 103. Unmoved by this branch's
+    // 4 as well, and this one exercises the guard the comment above describes:
+    // the batch *does* add a `pedantic` rule, taking the held-back set from 15
+    // to 16, and this number still does not move — because
+    // `lfe-catch-swallows-exit` is `ReportOnly` like the other three. The
+    // sentence "none of the pedantic rules is fixable" is now load-bearing over
+    // 16 rules rather than 15.
     assert_eq!(
         fixable_count, 103,
         "the fixable rules the default preset admits"

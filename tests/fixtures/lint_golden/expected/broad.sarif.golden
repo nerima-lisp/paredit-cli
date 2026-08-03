@@ -10056,6 +10056,72 @@
               "shortDescription": {
                 "text": "a defconstant whose initform allocates, so the compile-time and load-time values are not eql"
               }
+            },
+            {
+              "fullDescription": {
+                "text": "Hy compiles `defn` to a Python `FunctionDef`, so a parameter default is evaluated once when the function is defined and the resulting object lives on the function itself. A mutable default is therefore shared by every call: measured against Hy 1.3.1, `(defn f [[acc []]] (.append acc 1) acc)` returns `[1, 1, 1]` from its third call. Note that this is a *Python* rule, not a Lisp one — Common Lisp evaluates `&optional` defaults on entry to each call, so the same shape is correct there."
+              },
+              "id": "hy-mutable-default-argument",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "Hy compiles `defn` to a Python `FunctionDef`, so a parameter default is evaluated once when the function is defined and the resulting object lives on the function itself. A mutable default is therefore shared by every call: measured against Hy 1.3.1, `(defn f [[acc []]] (.append acc 1) acc)` returns `[1, 1, 1]` from its third call. Note that this is a *Python* rule, not a Lisp one — Common Lisp evaluates `&optional` defaults on entry to each call, so the same shape is correct there.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a Hy parameter default that every call shares, because Python evaluates it once"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Hy's `is` compiles to Python's `is`, which asks whether two expressions are the *same object*. For a number or a string that is an interning accident: CPython caches small integers and short strings, so `(is x 5)` answers `True` today and starts answering `False` the moment the value leaves the cached range. CPython's own compiler emits `SyntaxWarning: \"is\" with 'int' literal. Did you mean \"==\"?` for exactly this shape, and the warning reaches Hy unchanged because Hy compiles to a Python AST."
+              },
+              "id": "hy-identity-comparison-with-literal",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "Hy's `is` compiles to Python's `is`, which asks whether two expressions are the *same object*. For a number or a string that is an interning accident: CPython caches small integers and short strings, so `(is x 5)` answers `True` today and starts answering `False` the moment the value leaves the cached range. CPython's own compiler emits `SyntaxWarning: \"is\" with 'int' literal. Did you mean \"==\"?` for exactly this shape, and the warning reaches Hy unchanged because Hy compiles to a Python AST.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "`is` compared against a value literal, which tests object identity, not equality"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "An `except` clause with an empty binding list compiles to a Python `ExceptHandler` with no type, which is the bare `except:` — it catches `BaseException`, so it swallows the `KeyboardInterrupt` raised by Ctrl-C and the `SystemExit` raised by `sys.exit`. Measured against Hy 1.3.1, `(except [] …)` catches both and `(except [e Exception] …)` catches neither. Python's own `pycodestyle` reports the same shape as E722."
+              },
+              "id": "hy-bare-except",
+              "properties": {
+                "category": "conditions",
+                "fixable": false,
+                "rationale": "An `except` clause with an empty binding list compiles to a Python `ExceptHandler` with no type, which is the bare `except:` — it catches `BaseException`, so it swallows the `KeyboardInterrupt` raised by Ctrl-C and the `SystemExit` raised by `sys.exit`. Measured against Hy 1.3.1, `(except [] …)` catches both and `(except [e Exception] …)` catches neither. Python's own `pycodestyle` reports the same shape as E722.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "`(except [] …)` catches every BaseException, Ctrl-C and SystemExit included"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Erlang's `catch` BIF encodes failure into its return value: an exit or error becomes `{'EXIT', Reason}` and a throw becomes the thrown term, both returned as though nothing went wrong. Since `{'EXIT', Reason}` is also an ordinary tuple a function may return, the caller cannot tell the two apart. Measured on LFE 2.2.0, `(catch (exit 'boom))` and a plain `(tuple 'EXIT 'boom)` produce the identical term. `try … catch` separates the success and failure paths instead, and keeps the stacktrace that `catch` discards."
+              },
+              "id": "lfe-catch-swallows-exit",
+              "properties": {
+                "category": "conditions",
+                "fixable": false,
+                "rationale": "Erlang's `catch` BIF encodes failure into its return value: an exit or error becomes `{'EXIT', Reason}` and a throw becomes the thrown term, both returned as though nothing went wrong. Since `{'EXIT', Reason}` is also an ordinary tuple a function may return, the caller cannot tell the two apart. Measured on LFE 2.2.0, `(catch (exit 'boom))` and a plain `(tuple 'EXIT 'boom)` produce the identical term. `try … catch` separates the success and failure paths instead, and keeps the stacktrace that `catch` discards.",
+                "severity": "warning",
+                "tags": [
+                  "pedantic"
+                ]
+              },
+              "shortDescription": {
+                "text": "`(catch Expr)` returns failures as ordinary terms, indistinguishable from success"
+              }
             }
           ]
         }
