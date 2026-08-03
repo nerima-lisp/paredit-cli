@@ -200,7 +200,50 @@ use super::rule::RuleEntry;
 // `:initform`; `:type list` with `:include` is fine and only *disagreeing*
 // types are constrained; and `vector-push-extend` needs a fill pointer, not
 // `:adjustable`, so requiring the latter would have flagged working code.
-pub const RULE_COUNT: usize = 334;
+//
+// 334 + this batch's 11, three new packages, none of them Common Lisp: 5
+// (`lint-racket-depth`), 2 (`lint-elisp-depth`) and 4 (`lint-clojure-depth`) =
+// 345. It is the first batch to mix the two wiring shapes in one branch: only
+// `lint-clojure-depth` ships a `cli/` directory per rule, so its four come with
+// a standalone `inspect <rule>` command each and `INTROSPECTION_COMMANDS` moves
+// 340 -> 344, while the Racket five and the Emacs Lisp two are registry-only
+// and move none of the command-oriented lists.
+//
+// The Racket five are the first rules to declare `[Dialect::Racket]` *alone*.
+// `lint-scheme-idiom` reaches Racket already, but through `[Scheme, Racket]`,
+// and the distinction is the point rather than an accident: `begin0`,
+// `case-lambda`, `parameterize`, `match` and the `for/…` comprehension family
+// are Racket's own surface. `racket-begin0-single-form` says so in its own
+// header — the sibling `scheme-begin-single-form` anchors on the head `begin`,
+// so the dispatcher never offers it a `begin0` node and the two rules cannot
+// collide.
+//
+// That single-dialect Racket scope is what made this batch move the fix-engine
+// fixture set again. `fixable_rules_match_the_fix_engine` in
+// `lint_report/workflow.rs` drives one fixture per dialect, and its Scheme
+// fixture parses as `Dialect::Scheme` — which `[Dialect::Racket]` excludes — so
+// the two `Fixability::Fixable` rules here reached the fix engine from nothing.
+// A Racket fixture was added rather than the assertion relaxed, for the reason
+// PR #88 recorded when the Scheme fixture was added against the identical
+// failure: a `Fixable` rule the fix engine never exercises is a `--fix` that
+// silently does nothing.
+//
+// Of the four pinned counts in [`catalog`], three move. `RULE_COUNT` 334 -> 345,
+// `fixable_count()` 104 -> 106 (`racket-begin0-single-form` and
+// `racket-case-lambda-single-clause`; both repairs copy an inner span verbatim
+// and neither invents a decision the author has not already made) and
+// `warning_count()` 241 -> 247. The six warnings are the two Emacs Lisp rules
+// and four of the Racket five; the five errors are
+// `racket-match-unreachable-clause` — a clause an earlier catch-all pattern
+// makes dead — and all four Clojure rules, each of which throws or deadlocks
+// rather than reading badly: a depleted go-block pool stops every go block in
+// the process, a parking op the `go` transform never rewrote asserts or returns
+// `nil`, a `contains?` over a sequence throws `IllegalArgumentException` (or is
+// permanently `false`, which is worse), and a reference operator crossed with
+// the wrong constructor throws `ClassCastException` on the first call.
+// `PEDANTIC_RULES.len()` is unchanged at 16: none of the 11 carries a tag at
+// all, so `EXPERIMENTAL_RULES` is still empty too.
+pub const RULE_COUNT: usize = 345;
 
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
@@ -1554,5 +1597,49 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(
         &paredit_feature_lint_data_structure::vector_push_without_fill_pointer::rule::META,
         &paredit_feature_lint_data_structure::vector_push_without_fill_pointer::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_racket_depth::match_unreachable_clause::rule::META,
+        &paredit_feature_lint_racket_depth::match_unreachable_clause::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_racket_depth::for_comprehension_value_discarded::rule::META,
+        &paredit_feature_lint_racket_depth::for_comprehension_value_discarded::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_racket_depth::begin0_single_form::rule::META,
+        &paredit_feature_lint_racket_depth::begin0_single_form::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_racket_depth::case_lambda_single_clause::rule::META,
+        &paredit_feature_lint_racket_depth::case_lambda_single_clause::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_racket_depth::parameterize_empty_bindings::rule::META,
+        &paredit_feature_lint_racket_depth::parameterize_empty_bindings::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_elisp_depth::process_filter_assumes_whole_output::rule::META,
+        &paredit_feature_lint_elisp_depth::process_filter_assumes_whole_output::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_elisp_depth::repeating_timer_handle_discarded::rule::META,
+        &paredit_feature_lint_elisp_depth::repeating_timer_handle_discarded::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_clojure_depth::go_block_blocking_channel_op::rule::META,
+        &paredit_feature_lint_clojure_depth::go_block_blocking_channel_op::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_clojure_depth::parking_op_outside_go_machinery::rule::META,
+        &paredit_feature_lint_clojure_depth::parking_op_outside_go_machinery::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_clojure_depth::contains_on_non_associative::rule::META,
+        &paredit_feature_lint_clojure_depth::contains_on_non_associative::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_clojure_depth::reference_type_operator_mismatch::rule::META,
+        &paredit_feature_lint_clojure_depth::reference_type_operator_mismatch::rule::RULE,
     ),
 ];

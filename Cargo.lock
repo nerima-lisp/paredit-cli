@@ -677,6 +677,7 @@ dependencies = [
  "paredit-feature-lint-build-system",
  "paredit-feature-lint-call-shape",
  "paredit-feature-lint-carp-idiom",
+ "paredit-feature-lint-clojure-depth",
  "paredit-feature-lint-clojure-idiom",
  "paredit-feature-lint-compile-time",
  "paredit-feature-lint-concurrency",
@@ -688,6 +689,7 @@ dependencies = [
  "paredit-feature-lint-custom",
  "paredit-feature-lint-data-structure",
  "paredit-feature-lint-documentation",
+ "paredit-feature-lint-elisp-depth",
  "paredit-feature-lint-elisp-idiom",
  "paredit-feature-lint-fennel-janet-idiom",
  "paredit-feature-lint-form-shape",
@@ -702,6 +704,7 @@ dependencies = [
  "paredit-feature-lint-pathname-io",
  "paredit-feature-lint-performance",
  "paredit-feature-lint-portability",
+ "paredit-feature-lint-racket-depth",
  "paredit-feature-lint-repl-debug",
  "paredit-feature-lint-safety",
  "paredit-feature-lint-scheme-idiom",
@@ -1024,6 +1027,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "paredit-feature-lint-clojure-depth"
+version = "1.4.0"
+dependencies = [
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
+ "serde_json",
+]
+
+[[package]]
 name = "paredit-feature-lint-clojure-idiom"
 version = "1.4.0"
 dependencies = [
@@ -1138,6 +1152,14 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-documentation"
+version = "1.4.0"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
+]
+
+[[package]]
+name = "paredit-feature-lint-elisp-depth"
 version = "1.4.0"
 dependencies = [
  "paredit-core-lint-engine",
@@ -1281,6 +1303,16 @@ version = "1.4.0"
 dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
+]
+
+[[package]]
+name = "paredit-feature-lint-racket-depth"
+version = "1.4.0"
+dependencies = [
+ "paredit-core-cli",
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
+ "serde_json",
 ]
 
 [[package]]

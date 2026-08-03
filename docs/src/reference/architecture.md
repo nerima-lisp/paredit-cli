@@ -1,6 +1,6 @@
 # Architecture
 
-`paredit-cli` is a Cargo workspace: a thin composition root plus 66 packages
+`paredit-cli` is a Cargo workspace: a thin composition root plus 74 packages
 under `packages/core/` and `packages/feature/`. Knowing which package owns a
 thing is the fastest way to know where a change belongs.
 
@@ -17,7 +17,7 @@ core/syntax ──▶ core/semantics ──▶ core/edit ──▶ core/cli
      └──▶ core/workspace          core/lint-engine ──┘
                     │
                     ▼
-              feature/*  (57 packages, mostly independent of each other)
+              feature/*  (65 packages, mostly independent of each other)
                     │
                     ▼
               paredit-cli  (command tree, dispatch, REGISTRY)
@@ -65,10 +65,10 @@ src/
 A contract test walks `src/` and refuses anything else.
 
 The lint `REGISTRY` is the canonical example of what *must* live here. It names
-all 320 rules, and every rule depends on the engine; putting the registry in
+all 345 rules, and every rule depends on the engine; putting the registry in
 either would be a cycle. So the engine takes a `RuleCatalog` as an argument and
 never learns which rules exist, the rules never learn the registry does, and
-the registry sits in the root reaching thirty-two feature packages for their
+the registry sits in the root reaching forty feature packages for their
 `META` and `RULE`. That is the criterion: **a module that enumerates or
 aggregates several features** belongs in neither core nor any one feature.
 
@@ -127,7 +127,7 @@ semantic enum (`ReportLimit::{Complete, Limited(NonZeroUsize)}`,
 Derive redundant presentation values (booleans, counts) at the serialization
 boundary instead of storing them.
 
-## Lint rules: one trait, one registry line, thirty-two packages
+## Lint rules: one trait, one registry line, forty packages
 
 The lint suite is the clearest example of the split's shape, and the most
 frequently extended part of the tree.
@@ -141,8 +141,8 @@ frequently extended part of the tree.
 | `policy` | Dialect scope, rule selection and gate decisions: logic that needs no tree. |
 | `engine` | The single pass, which walks the document once and dispatches each node to every rule whose `head_filter` matches. |
 
-315 of the 320 shipped rules live in thirty-one themed packages, split seven
-ways. A thirty-second, `feature/lint-custom`, holds no rules at all: it is the
+340 of the 345 shipped rules live in thirty-nine themed packages, split seven
+ways. A fortieth, `feature/lint-custom`, holds no rules at all: it is the
 pattern language and the second pass that run the rules a *project* writes for
 itself.
 

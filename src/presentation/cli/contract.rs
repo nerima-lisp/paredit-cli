@@ -267,7 +267,7 @@ impl SupportStatus {
 /// here, the stack floor is the first thing to check — and note that an
 /// inherited `RUST_MIN_STACK` from the environment silently overrides
 /// `.cargo/config.toml`, because cargo's `[env]` is unforced.
-const INTROSPECTION_COMMANDS: [&str; 340] = [
+const INTROSPECTION_COMMANDS: [&str; 344] = [
     "inspect diff",
     "inspect check",
     "inspect dialect",
@@ -625,6 +625,10 @@ const INTROSPECTION_COMMANDS: [&str; 340] = [
     "inspect eval-when-execute-only",
     "inspect eval-when-body-never-runs",
     "inspect defconstant-non-eql-value",
+    "inspect go-block-blocking-channel-op",
+    "inspect parking-op-outside-go-machinery",
+    "inspect contains-on-non-associative",
+    "inspect reference-type-operator-mismatch",
 ];
 
 const FORMAT_COMMANDS: [&str; 3] = [
@@ -986,7 +990,11 @@ const SEMANTIC_OPERATIONS: [SemanticOperation; 3] = [
 /// and a spread `[…]` literal are Clojure's, while `begin`, `let*` shadowing
 /// rules, `memq`/`assq` and the named `let` are Scheme's. Three of the four
 /// Scheme rules name Racket alongside Scheme, which is the first scope here to
-/// name more than one dialect. Each answer is read from the rule's own
+/// name more than one dialect. Four more arrived with `lint-clojure-depth`, all
+/// `CLOJURE_ONLY` and all core.async or reference-type vocabulary — the only
+/// commands in this table whose heads (`let`, `loop`, `binding`, `go`) are
+/// ordinary Common Lisp operators as well, so the scope is doing more work here
+/// than anywhere else in the list. Each answer is read from the rule's own
 /// [`LintRule::dialect_scope`] — the very declaration the engine's dispatcher
 /// consults before it walks anything — so this matrix cannot claim a dialect
 /// the rule would decline, or stay silent about one it handles.
@@ -1069,6 +1077,22 @@ fn lint_rule_dialect_scope(command_path: &str) -> Option<RuleDialectScope> {
         "inspect scheme-named-let-never-recurs" => {
             paredit_feature_lint_scheme_idiom::named_let_never_recurs::rule::RULE.dialect_scope()
         }
+        "inspect go-block-blocking-channel-op" => {
+            paredit_feature_lint_clojure_depth::go_block_blocking_channel_op::rule::RULE
+                .dialect_scope()
+        }
+        "inspect parking-op-outside-go-machinery" => {
+            paredit_feature_lint_clojure_depth::parking_op_outside_go_machinery::rule::RULE
+                .dialect_scope()
+        }
+        "inspect contains-on-non-associative" => {
+            paredit_feature_lint_clojure_depth::contains_on_non_associative::rule::RULE
+                .dialect_scope()
+        }
+        "inspect reference-type-operator-mismatch" => {
+            paredit_feature_lint_clojure_depth::reference_type_operator_mismatch::rule::RULE
+                .dialect_scope()
+        }
         _ => return None,
     })
 }
@@ -1101,7 +1125,7 @@ pub(super) fn support_status(command_path: &str, dialect: &str) -> SupportStatus
         "inspect leftover-trace-call" => {
             Some(matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp))
         }
-        // The twenty-three commands whose rule declares a dialect scope other
+        // The twenty-seven commands whose rule declares a dialect scope other
         // than Common Lisp alone answer from that declaration directly.
         other => lint_rule_dialect_scope(other).map(|scope| scope.includes(dialect)),
     };
@@ -1345,7 +1369,18 @@ mod tests {
     /// still what keeps this list from becoming a place to hide a rule that is
     /// merely under-supported: a report named here has to be supported
     /// *somewhere*, and not everywhere.
-    const DIALECT_SPECIFIC_REPORTS: [&str; 14] = [
+    ///
+    /// The last four are `lint-clojure-depth`, all `CLOJURE_ONLY`, and they are
+    /// the entry most dependent on that declaration rather than on the rules'
+    /// vocabulary: `let`, `loop`, `binding` and `go` are all Common Lisp
+    /// operators too — `go` is `tagbody`'s transfer, which takes a tag and not
+    /// a body — so these four head-match a great deal of Common Lisp. Nothing
+    /// but the scope keeps them off it, which is why the package pins the
+    /// declaration with its own test as well as being listed here. The other
+    /// seven rules of the same branch (`lint-racket-depth`,
+    /// `lint-elisp-depth`) are registry-only: they ship no `cli/` directory, so
+    /// they have no command to name here and this list does not move for them.
+    const DIALECT_SPECIFIC_REPORTS: [&str; 18] = [
         "inspect elisp-file",
         "inspect atom-swap-with-side-effect",
         "inspect future-promise-never-realized",
@@ -1360,6 +1395,10 @@ mod tests {
         "inspect scheme-let-star-independent-bindings",
         "inspect scheme-memq-assq-literal-key",
         "inspect scheme-named-let-never-recurs",
+        "inspect go-block-blocking-channel-op",
+        "inspect parking-op-outside-go-machinery",
+        "inspect contains-on-non-associative",
+        "inspect reference-type-operator-mismatch",
     ];
 
     #[test]

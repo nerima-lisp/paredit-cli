@@ -151,6 +151,9 @@ paredit-feature-lint-loop-facility = { path = "packages/feature/lint-loop-facili
 paredit-feature-lint-generic-dispatch = { path = "packages/feature/lint-generic-dispatch" }
 paredit-feature-lint-binding-analysis = { path = "packages/feature/lint-binding-analysis" }
 paredit-feature-lint-data-structure = { path = "packages/feature/lint-data-structure" }
+paredit-feature-lint-racket-depth = { path = "packages/feature/lint-racket-depth" }
+paredit-feature-lint-elisp-depth = { path = "packages/feature/lint-elisp-depth" }
+paredit-feature-lint-clojure-depth = { path = "packages/feature/lint-clojure-depth" }
 paredit-feature-emacs-lisp = { path = "packages/feature/emacs-lisp" }
 paredit-feature-conditional-conversion = { path = "packages/feature/conditional-conversion" }
 paredit-feature-external-check = { path = "packages/feature/external-check" }

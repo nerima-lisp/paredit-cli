@@ -4499,6 +4499,146 @@
               "shortDescription": {
                 "text": "a vector-push on a vector made with no :fill-pointer"
               }
+            },
+            {
+              "id": "racket-match-unreachable-clause",
+              "properties": {
+                "category": "dead-code",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a match clause an earlier catch-all pattern makes unreachable"
+              }
+            },
+            {
+              "id": "racket-for-comprehension-value-discarded",
+              "properties": {
+                "category": "allocation",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a for/list-family comprehension whose container is built and then dropped"
+              }
+            },
+            {
+              "id": "racket-begin0-single-form",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a begin0 wrapping a single expression, which is just that expression"
+              }
+            },
+            {
+              "id": "racket-case-lambda-single-clause",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a case-lambda with one clause, which is a lambda written the long way"
+              }
+            },
+            {
+              "id": "racket-parameterize-empty-bindings",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a parameterize whose binding list is empty, so it rebinds nothing"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A process filter receives whatever bytes Emacs read, not a message. Output is delivered in chunks of at most `read-process-output-max` (65536 by default), so a record longer than one chunk — or merely one that straddles a chunk boundary — reaches the filter split in two. Handing that argument straight to a parser or a record splitter silently corrupts every record on a boundary. The manual's prescription is to append the chunk to a buffer or a process property first, then extract complete records from the accumulator."
+              },
+              "id": "elisp-process-filter-assumes-whole-output",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "A process filter receives whatever bytes Emacs read, not a message. Output is delivered in chunks of at most `read-process-output-max` (65536 by default), so a record longer than one chunk — or merely one that straddles a chunk boundary — reaches the filter split in two. Handing that argument straight to a parser or a record splitter silently corrupts every record on a boundary. The manual's prescription is to append the chunk to a buffer or a process property first, then extract complete records from the accumulator.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a process filter parsing its string argument as a complete message"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "`run-with-timer`, `run-at-time` and `run-with-idle-timer` return the timer object, and `cancel-timer` takes nothing else. When the REPEAT argument is non-nil the timer fires forever, so discarding the return value leaves the program with no way to stop it — the only route back is scanning `timer-list`. A one-shot timer is self-limiting and is not reported."
+              },
+              "id": "elisp-repeating-timer-handle-discarded",
+              "properties": {
+                "category": "resource",
+                "fixable": false,
+                "rationale": "`run-with-timer`, `run-at-time` and `run-with-idle-timer` return the timer object, and `cancel-timer` takes nothing else. When the REPEAT argument is non-nil the timer fires forever, so discarding the return value leaves the program with no way to stop it — the only route back is scanning `timer-list`. A one-shot timer is self-limiting and is not reported.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a repeating timer whose returned handle is discarded, leaving nothing to cancel it with"
+              }
+            },
+            {
+              "id": "go-block-blocking-channel-op",
+              "properties": {
+                "category": "concurrency",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a core.async blocking op (<!!, >!!, alts!!, alt!!) reached from a go body, which can deplete the fixed go-block thread pool"
+              }
+            },
+            {
+              "id": "parking-op-outside-go-machinery",
+              "properties": {
+                "category": "concurrency",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a core.async parking op (<!, >!, alts!, alt!) inside a go body but behind a function or thread boundary the go transform does not rewrite"
+              }
+            },
+            {
+              "id": "contains-on-non-associative",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a contains? whose collection is a sequence, or a literal vector asked about a non-index key, so the call can never answer true"
+              }
+            },
+            {
+              "id": "reference-type-operator-mismatch",
+              "properties": {
+                "category": "concurrency",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "an atom/ref/volatile operator applied to a local bound to a different reference constructor, which throws ClassCastException"
+              }
             }
           ]
         }

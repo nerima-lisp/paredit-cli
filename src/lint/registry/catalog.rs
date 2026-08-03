@@ -39,7 +39,14 @@ pub const CATEGORIES: [&str; RuleCategory::ALL.len()] = {
 /// inline descriptions in the report, so an agent can discover the rule set,
 /// its groupings, and its `--rule`/`--exclude`/`--category` names without
 /// consulting the documentation.
-pub const RULE_DOCS: [(&str, &str, &str); RULE_COUNT] = {
+///
+/// `static` rather than `const`, unlike its siblings here: at three pointer
+/// pairs per rule this array crossed clippy's 16 KiB `array-size-threshold`
+/// with the 345th rule (345 × 48 = 16560 bytes), and a `const` is substituted
+/// into each of its five use sites rather than referenced. Nothing reads it in
+/// a `const` context — every consumer iterates it at run time — so the
+/// derivation below is unchanged and only the storage class moves.
+pub static RULE_DOCS: [(&str, &str, &str); RULE_COUNT] = {
     let mut docs = [("", "", ""); RULE_COUNT];
     let mut index = 0;
     while index < RULE_COUNT {
@@ -227,7 +234,12 @@ pub const PEDANTIC_RULES: [&str; tagged_count(RuleTag::Pedantic)] = {
 // batches dropped most of what they proposed against a running SBCL.
 // 328 + 6 (`lint-data-structure`). Three of eight premises were refuted by
 // running them, and each would have fired on correct code.
-const _: () = assert!(RULE_COUNT == 334);
+// 334 + 11: 5 (`lint-racket-depth`), 2 (`lint-elisp-depth`), 4
+// (`lint-clojure-depth`), all three new and none of them Common Lisp. Only
+// `lint-clojure-depth` ships a `cli/` directory, so its four add a standalone
+// command each (`INTROSPECTION_COMMANDS` 340 -> 344) and the other seven move
+// no command-oriented list.
+const _: () = assert!(RULE_COUNT == 345);
 // Unchanged at 99: every one of this branch's 37 rules is
 // `Fixability::ReportOnly`. Each one reports a judgment the tool cannot make
 // on the author's behalf — whether an annotation or the parameter list under it
@@ -294,7 +306,21 @@ const _: () = assert!(RULE_COUNT == 334);
 // Unmoved by `lint-loop-facility`: all three are `ReportOnly`. Repairing a
 // parallel-binding read means choosing between `and` and a second `for`, which
 // changes the loop's values -- the author's call, not the tool's.
-const _: () = assert!(fixable_count() == 104);
+// 104 + 2 = 106, both from `lint-racket-depth` and both the mechanical shape:
+// `racket-begin0-single-form` replaces `(begin0 e)` with the source of `e`
+// verbatim, reader prefix included, and `racket-case-lambda-single-clause`
+// copies the sole clause's inside into a `lambda`, preserving the accepted
+// arities exactly. Neither invents a decision. The other 9 are `ReportOnly`:
+// a `for/list` whose container is dropped may want `for` or may want its value
+// used, an empty `parameterize` may want deleting or may want its bindings
+// restored, a `match` clause an earlier catch-all shadows may want reordering
+// or deleting, and every Clojure repair -- `<!!` to `<!` versus a `thread`, the
+// sibling reference operator versus the other constructor -- is a choice
+// between coordination semantics only the author can make. The two Emacs Lisp
+// rules decline for the same reason: an accumulator has to be introduced
+// somewhere, and a timer handle has to be stored in a place the rule cannot
+// name.
+const _: () = assert!(fixable_count() == 106);
 // 164 (through PR #82) + 31 of this branch's 37 rules. The other 6 are
 // `Severity::Error`: `when-unless-implicit-nil-misused` and the five
 // `lint-safety` rules that report an exploitable defect rather than a risk —
@@ -384,7 +410,22 @@ const _: () = assert!(fixable_count() == 104);
 // across disagreeing `:type`s, which stops the file loading), and two fail at
 // run time on every call (`vector-push` with no fill pointer, and a literal
 // string key on an eql table, which misses silently forever).
-const _: () = assert!(warning_count() == 241);
+// 241 + 6 of this batch's 11 = 247. The 6 are both `lint-elisp-depth` rules and
+// 4 of the 5 `lint-racket-depth` ones, each a spelling whose behaviour is at
+// least defensible: a `begin0` or `case-lambda` wrapping one thing computes the
+// right answer the long way, an empty `parameterize` rebinds nothing and is
+// harmless, a dropped `for/list` container only wastes the consing, a process
+// filter handed a whole message parses it correctly whenever the message fits
+// one chunk, and a discarded repeating-timer handle leaves a timer running
+// rather than a wrong value. The other 5 are `Severity::Error`: all four
+// `lint-clojure-depth` rules throw or deadlock at run time --
+// `ClassCastException` from a crossed reference operator,
+// `IllegalArgumentException` (or a permanent `false`) from `contains?` over a
+// sequence, a depleted fixed go-block pool that stops every go block in the
+// process, and a parking op outside the go transform that asserts or silently
+// yields `nil` -- and `racket-match-unreachable-clause` reports a clause that
+// can never be taken, which is dead code rather than a preference.
+const _: () = assert!(warning_count() == 247);
 const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
 // 6 (through PR #82) + 8 of this branch's rules: `lint-call-shape`'s four
 // threshold rules, whose limits are conventions a codebase either adopted or
@@ -424,6 +465,14 @@ const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
 // implementation. Correct, and noise on a codebase that has not adopted the
 // convention — which is the tag's definition. The other 3 carry no tag, and
 // `EXPERIMENTAL_RULES` is still empty.
+// This batch's 11 leave it at 16: not one of them carries a `RuleTag` at all,
+// so `PEDANTIC_RULES` and `EXPERIMENTAL_RULES` are both unchanged. Worth saying
+// why, since 11 rules across three dialects is where a `pedantic` would be
+// expected: each of the 11 reports a demonstrated failure rather than a
+// convention — a throw, a deadlock, a clause that can never be taken, a timer
+// nothing can cancel, or a parse that corrupts every record straddling a chunk
+// boundary — and none of them turns on a house style a codebase either adopted
+// or did not.
 const _: () = assert!(PEDANTIC_RULES.len() == 16);
 
 fn meta_of(name: &str) -> Option<&'static crate::lint::model::RuleMeta> {
