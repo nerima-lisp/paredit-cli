@@ -1445,3 +1445,239 @@ fn backtick_is_still_quasiquote_outside_janet() {
         );
     }
 }
+
+/// Janet's `root` state lists `'` in the same `PFLAG_READERMAC` group as `,`
+/// `;` `~` `|` (`src/core/parse.c`), and `popstate` expands it to the tuple
+/// `(quote <form>)`. It was the one member of that group with no arm here, so
+/// the quote glued onto whatever followed it.
+///
+/// Every expectation below was read off Janet 1.41.3's own reader before it
+/// was written here: the `janet_value` column is what
+/// `janet -e '(pp (parse ...))'` prints, not a restatement of what this parser
+/// happens to do.
+#[test]
+fn janet_quote_is_a_reader_prefix() {
+    struct Case {
+        input: &'static str,
+        /// Source text of each child of the single top-level list.
+        children: &'static [&'static str],
+        /// What Janet's own reader makes of the form, for the record.
+        janet_value: &'static str,
+    }
+
+    let cases = [
+        // The regression that found this: without a `'` arm the quote glued
+        // onto the opening `"` of the string after it and the whole document
+        // failed with "unterminated string starting at byte 6". This is
+        // `spork/spork/cjanet.janet:31` reduced.
+        Case {
+            input: r#"(a '" " b)"#,
+            children: &["a", r#"'" ""#, "b"],
+            janet_value: r#"(a (quote " ") b)"#,
+        },
+        Case {
+            input: "(a 'foo b)",
+            children: &["a", "'foo", "b"],
+            janet_value: "(a (quote foo) b)",
+        },
+        Case {
+            input: "(a '(b c))",
+            children: &["a", "'(b c)"],
+            janet_value: "(a (quote (b c)))",
+        },
+        // `#` opens a *line comment* in Janet, so `'` before a brace is the
+        // other half of `janet/test/suite-peg.janet:405`: the `{` was being
+        // read as an opening brace of a struct that never closed.
+        Case {
+            input: r#"(a '"{" b)"#,
+            children: &["a", r#"'"{""#, "b"],
+            janet_value: r#"(a (quote "{") b)"#,
+        },
+        // Stacked prefixes nest, they do not collapse.
+        Case {
+            input: "(a ''b)",
+            children: &["a", "''b"],
+            janet_value: "(a (quote (quote b)))",
+        },
+        // A quote in front of the other Janet reader forms.
+        Case {
+            input: "(a '@{})",
+            children: &["a", "'@{}"],
+            janet_value: "(a (quote @{}))",
+        },
+        Case {
+            input: "(a '`long`)",
+            children: &["a", "'`long`"],
+            janet_value: r#"(a (quote "long"))"#,
+        },
+        Case {
+            input: "(a '[b c])",
+            children: &["a", "'[b c]"],
+            janet_value: "(a (quote [b c]))",
+        },
+    ];
+
+    for case in cases {
+        let tree = SyntaxTree::parse_with_dialect(case.input, Dialect::Janet)
+            .unwrap_or_else(|error| panic!("{}: {error}", case.input));
+        let form = &tree.root_view().children[0];
+        let children = form
+            .children
+            .iter()
+            .map(|child| child.span.slice(case.input))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            children, case.children,
+            "{} (janet reads {})",
+            case.input, case.janet_value
+        );
+    }
+
+    // The prefix is recorded as `Quote`, not merely swallowed into the span.
+    let tree = SyntaxTree::parse_with_dialect("(a 'foo)", Dialect::Janet).expect("valid");
+    assert_eq!(
+        tree.root_view().children[0].children[1].reader_prefixes,
+        vec![ReaderPrefix::Quote]
+    );
+}
+
+/// A dangling `'` at end of input is a truncated form, not the symbol `'`.
+///
+/// Janet agrees: `janet -e "(pp (parse-all \"'\"))"` fails with "unexpected end
+/// of source, opened at line 1, column 1". Before the `'` arm existed paredit
+/// accepted it as a one-character atom.
+#[test]
+fn janet_dangling_quote_is_refused() {
+    let error = SyntaxTree::parse_with_dialect("'", Dialect::Janet)
+        .expect_err("a quote with nothing after it is not a form");
+    assert!(
+        matches!(error, ParseError::MissingReaderForm(0)),
+        "{error:?}"
+    );
+
+    // `(a ')` is *not* refused, and that is a known defect rather than an
+    // intended rule. `form` accumulates prefixes, finds a closing delimiter
+    // rather than a datum, and calls `close_list` without ever consuming the
+    // prefixes it collected -- so the quote is dropped and the document parses
+    // clean. Janet refuses the same input ("mismatched delimiter )").
+    //
+    // It is pinned here because it is *cross-dialect and pre-existing*: Common
+    // Lisp, Scheme, Clojure, Emacs Lisp, Fennel and the legacy reader all drop
+    // it identically, on this commit and before it. Fixing it means changing
+    // every dialect's behaviour, which is a separate change from adding a
+    // Janet reader arm; this test exists so that change has to update a stated
+    // expectation instead of a silent one.
+    let tree = SyntaxTree::parse_with_dialect("(a ')", Dialect::Janet)
+        .expect("known defect: the prefix is dropped rather than refused");
+    let form = &tree.root_view().children[0];
+    assert_eq!(form.children.len(), 1, "the quote is dropped, not recorded");
+    assert!(form.children[0].reader_prefixes.is_empty());
+}
+
+/// `'` keeps meaning quote everywhere else, and this pins the other dialects so
+/// a later edit to `classify_janet` cannot quietly widen. Fennel already had
+/// its own `'` arm; the legacy reader and the named dialects share
+/// `classify_quote_prefix`.
+#[test]
+fn janet_quote_arm_does_not_change_other_dialects() {
+    for dialect in [
+        Dialect::CommonLisp,
+        Dialect::EmacsLisp,
+        Dialect::Scheme,
+        Dialect::Racket,
+        Dialect::Clojure,
+        Dialect::Fennel,
+        Dialect::Lfe,
+        Dialect::Hy,
+        Dialect::Carp,
+        Dialect::Unknown,
+    ] {
+        let input = "(f '(a b))";
+        let tree = SyntaxTree::parse_with_dialect(input, dialect)
+            .unwrap_or_else(|error| panic!("{}: {error}", dialect.label()));
+        let form = &tree.root_view().children[0];
+        let children = form
+            .children
+            .iter()
+            .map(|child| child.span.slice(input))
+            .collect::<Vec<_>>();
+        assert_eq!(children, vec!["f", "'(a b)"], "{}", dialect.label());
+        assert_eq!(
+            form.children[1].reader_prefixes,
+            vec![ReaderPrefix::Quote],
+            "{}",
+            dialect.label()
+        );
+    }
+}
+
+/// Clojure's `NamespaceMapReader` reads the namespace with a full `read`, then
+/// skips `isWhitespace` before demanding the `{`, so `#:foo {:a 1}` is as legal
+/// as `#:foo{:a 1}`. Requiring the brace to touch the namespace made the spaced
+/// spelling an unsupported dispatch, which fails the whole parse -- so one such
+/// literal silently dropped its entire file from every lint run.
+///
+/// The read/throw split below is taken from Clojure's own reader test suite,
+/// `test/clojure/test_clojure/reader.cljc` lines 745-771.
+#[test]
+fn clojure_namespaced_maps_allow_whitespace_before_the_brace() {
+    // Asserted equal to their tight-brace spellings by reader.cljc:745-752.
+    let must_read = [
+        "#:a{1 nil, :b nil}",
+        "#:a {1 nil, :b nil}",
+        "#::{1 nil, :a nil}",
+        // reader.cljc:749 uses *two* spaces, so the skip is a loop.
+        "#::  {1 nil, :a nil}",
+        "#::s{1 nil, :a nil}",
+        "#::s  {1 nil, :a nil}",
+        // `isWhitespace` in LispReader counts a comma, and so does this.
+        "#:a,{1 1}",
+        "#:a\n{1 1}",
+    ];
+    for input in must_read {
+        SyntaxTree::parse_with_dialect(input, Dialect::Clojure)
+            .unwrap_or_else(|error| panic!("{input:?}: {error}"));
+    }
+
+    // Refused by Clojure, and still refused here. `#: s{:a 1}` is
+    // reader.cljc:764 ("Namespaced map must specify a namespace"); the comment
+    // case is refused because LispReader's loop skips `isWhitespace` only, so
+    // a `;` is its "must specify a map" error rather than trivia.
+    let must_refuse = [
+        "#:::",
+        "#: {:a 1}",
+        "#:{:a 1}",
+        "#:a b",
+        "#:a",
+        "#:a ;; c\n{:a 1}",
+    ];
+    for input in must_refuse {
+        SyntaxTree::parse_with_dialect(input, Dialect::Clojure)
+            .expect_err(&format!("{input:?} is not a namespaced map"));
+    }
+}
+
+/// The dispatch width covers `#:ns` alone, never the brace, and the whitespace
+/// between them stays trivia. That is what keeps the spaced spelling formatting
+/// back to itself, and it is the property the width return value encodes.
+#[test]
+fn clojure_namespaced_map_width_stops_at_the_namespace() {
+    let policy = DialectReaderPolicy::new(Dialect::Clojure);
+    let width = |input: &str| policy.clojure_namespaced_map_width(input.as_bytes(), 0);
+
+    assert_eq!(width("#:foo{:a 1}"), Some(5));
+    assert_eq!(width("#:foo {:a 1}"), Some(5));
+    assert_eq!(width("#:foo   {:a 1}"), Some(5));
+    assert_eq!(width("#::foo{:a 1}"), Some(6));
+    assert_eq!(width("#::foo  {:a 1}"), Some(6));
+    assert_eq!(width("#::{:a 1}"), Some(3));
+    assert_eq!(width("#:: {:a 1}"), Some(3));
+    // No namespace, and no auto-resolve marker to excuse it.
+    assert_eq!(width("#:{:a 1}"), None);
+    assert_eq!(width("#: {:a 1}"), None);
+    // A namespace with no map after it.
+    assert_eq!(width("#:foo bar"), None);
+    assert_eq!(width("#:foo"), None);
+    // Comments are not whitespace to Clojure's reader here.
+    assert_eq!(width("#:foo ;; c\n{:a 1}"), None);
+}

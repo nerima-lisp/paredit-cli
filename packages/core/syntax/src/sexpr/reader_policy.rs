@@ -488,7 +488,61 @@ impl DialectReaderPolicy {
         }
     }
 
-    fn clojure_namespaced_map_width(self, bytes: &[u8], pos: usize) -> Option<usize> {
+    /// Byte width of the `#:ns` dispatch introducing a namespaced map literal.
+    ///
+    /// The width covers the dispatch alone -- `#:foo`, `#::foo`, `#::` -- and
+    /// never the `{`. The brace is where the `MultiDatum` payload starts, and
+    /// `skip_form` consumes it; the two together become one opaque reader-form
+    /// node spanning the whole literal.
+    ///
+    /// That opacity is this model's known limitation, and it is unchanged here:
+    /// `#:foo{:a 1}` reports zero atom occurrences, so a rule looking for map
+    /// keys sees nothing inside a namespaced map. Representing the dispatch as
+    /// a [`ReaderPrefix`] on the `{...}` list -- the way `#{...}` keeps its
+    /// elements visible through `HashLiteral` -- is the shape that would fix
+    /// that, but `ReaderPrefix` is a payload-free enum whose `as_source`
+    /// returns a `&'static str`, and `#:foo` has no fixed spelling. Giving it
+    /// one is a change to the prefix representation itself, rippling through
+    /// the formatter and every prefix consumer, and it would rewrite the tree
+    /// of every `#:foo{...}` that already parses. This fix deliberately does
+    /// neither: it only widens *which* namespaced maps parse at all, and
+    /// leaves the shape of the ones that already did byte-identical.
+    ///
+    /// Clojure's `NamespaceMapReader` (`LispReader.java`) allows whitespace
+    /// between the namespace and the brace, and this must too:
+    ///
+    /// ```text
+    /// } else if(nextChar != '{') {  // #:foo { } or #::foo { }
+    ///     unread(r, nextChar);
+    ///     sym = read(r, true, null, false, opts, pendingForms);
+    ///     nextChar = read1(r);
+    ///     while(isWhitespace(nextChar))
+    ///         nextChar = read1(r);
+    /// }
+    /// if(nextChar != '{')
+    ///     throw Util.runtimeException("Namespaced map must specify a map");
+    /// ```
+    ///
+    /// Requiring the brace to touch the namespace made `#:foo {:a 1}` an
+    /// unsupported dispatch, and an unsupported dispatch fails the whole parse
+    /// -- so a single such literal silently dropped its entire file from every
+    /// lint run. `#::it {:a #::it {}}` in clj-kondo's own corpus is the case
+    /// that found it.
+    ///
+    /// `skip_form` skips trivia before reading a `MultiDatum` payload, so the
+    /// whitespace needs no representation in the width; it stays trivia, which
+    /// is what keeps a format round-trip byte-identical.
+    ///
+    /// Comments are deliberately not skipped. Clojure's loop advances over
+    /// `isWhitespace` only, so `#:foo ;; c` then `{}` is its "must specify a
+    /// map" error, and refusing it here agrees rather than inventing a rule.
+    /// `isWhitespace` counts a comma as whitespace and so does
+    /// [`Self::is_whitespace`], so `#:foo,{:a 1}` reads for both.
+    ///
+    /// Visible to the crate for the same reason [`Self::long_string_extent`]
+    /// is: the width is a shared decision worth pinning directly, rather than
+    /// only through documents that happen to exercise it.
+    pub(super) fn clojure_namespaced_map_width(self, bytes: &[u8], pos: usize) -> Option<usize> {
         let mut cursor = pos + 2;
         let auto_resolved = bytes.get(cursor) == Some(&b':');
         if auto_resolved {
@@ -496,15 +550,22 @@ impl DialectReaderPolicy {
         }
         let namespace_start = cursor;
         while let Some(&byte) = bytes.get(cursor) {
-            if byte == b'{' {
-                return (auto_resolved || cursor > namespace_start).then_some(cursor - pos);
-            }
-            if self.is_atom_boundary(bytes, cursor) {
-                return None;
+            if byte == b'{' || self.is_atom_boundary(bytes, cursor) {
+                break;
             }
             cursor += 1;
         }
-        None
+        let namespace_end = cursor;
+        // `#:{...}` and `#: {...}` are both "Namespaced map must specify a
+        // namespace" in Clojure. Only the auto-resolved `#::` may omit one.
+        if !auto_resolved && namespace_end == namespace_start {
+            return None;
+        }
+        let mut probe = namespace_end;
+        while matches!(bytes.get(probe), Some(&byte) if self.is_whitespace(byte)) {
+            probe += 1;
+        }
+        (bytes.get(probe) == Some(&b'{')).then_some(namespace_end - pos)
     }
 
     fn clojure_tagged_literal_width(self, bytes: &[u8], pos: usize) -> Option<usize> {
@@ -532,6 +593,21 @@ impl DialectReaderPolicy {
 
     const fn classify_janet(self, byte: u8, next: Option<u8>) -> Option<ReaderMacro> {
         match byte {
+            // Janet's `root` state lists `'` in the same `PFLAG_READERMAC`
+            // group as `,` `;` `~` `|` (`src/core/parse.c`), and `popstate`
+            // expands it to the two-element tuple `(quote <form>)` -- exactly
+            // one following datum, the same shape Common Lisp gives it. It was
+            // the only member of that group missing here.
+            //
+            // Its absence was not a cosmetic gap. `'` is not in Janet's
+            // `symchars` either, but `is_atom_boundary` does not know that, so
+            // with no reader-macro arm the quote glued onto whatever followed:
+            // `'foo` read as the single atom `'foo` rather than a quote prefix
+            // on `foo`, and `(a '" " b)` failed outright with "unterminated
+            // string" because the atom swallowed the opening quotation mark of
+            // the string after it. That accounted for both remaining parse
+            // failures over a 210-file Janet/spork corpus.
+            b'\'' => prefix(ReaderPrefix::Quote, 1),
             b';' => prefix(ReaderPrefix::UnquoteSplicing, 1),
             b'~' => prefix(ReaderPrefix::Quasiquote, 1),
             b',' => prefix(ReaderPrefix::Unquote, 1),
