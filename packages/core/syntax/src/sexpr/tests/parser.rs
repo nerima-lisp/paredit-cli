@@ -567,6 +567,87 @@ fn rejects_reader_prefixes_without_a_form() {
     }
 }
 
+/// A reader prefix with a *closing delimiter* after it is refused, in every
+/// dialect, exactly as one at end of input is.
+///
+/// It used to parse clean with the prefix silently dropped: `form` collected
+/// the prefixes, found `)` instead of a datum, and called `close_list`
+/// without ever consuming them. `(a ')` therefore became the tree for `(a)`,
+/// `edit format` re-emitted it without the quote, and the result parsed — a
+/// meaning change no reparse-based write guard could see. `skip_form`, the
+/// scanning twin of `form`, already refused the same shape.
+///
+/// The position reported is the *prefix's*, not the delimiter's, matching
+/// [`ParseError::MissingReaderForm`]'s end-of-input spelling above.
+#[test]
+fn rejects_a_reader_prefix_before_a_closing_delimiter() {
+    let dialects = [
+        Dialect::CommonLisp,
+        Dialect::EmacsLisp,
+        Dialect::Scheme,
+        Dialect::Racket,
+        Dialect::Clojure,
+        Dialect::Fennel,
+        Dialect::Lfe,
+        Dialect::Unknown,
+    ];
+
+    for dialect in dialects {
+        assert_eq!(
+            SyntaxTree::parse_with_dialect("(a ')", dialect).unwrap_err(),
+            ParseError::MissingReaderForm(3),
+            "dialect: {}",
+            dialect.label()
+        );
+        assert_eq!(
+            SyntaxTree::parse_with_dialect("(a `)", dialect).unwrap_err(),
+            ParseError::MissingReaderForm(3),
+            "dialect: {}",
+            dialect.label()
+        );
+        // Nested, and alone, so the fix is not merely about a top-level list.
+        assert_eq!(
+            SyntaxTree::parse_with_dialect("(a (b ') c)", dialect).unwrap_err(),
+            ParseError::MissingReaderForm(6),
+            "dialect: {}",
+            dialect.label()
+        );
+        assert_eq!(
+            SyntaxTree::parse_with_dialect("(')", dialect).unwrap_err(),
+            ParseError::MissingReaderForm(1),
+            "dialect: {}",
+            dialect.label()
+        );
+        // A prefix that *does* have a form after it is untouched, including on
+        // the last element of a list — the neighbouring case a fix here could
+        // plausibly over-reach into.
+        let tree = SyntaxTree::parse_with_dialect("(a 'b)", dialect)
+            .unwrap_or_else(|error| panic!("{} rejected (a 'b): {error:?}", dialect.label()));
+        assert_eq!(tree.root_view().children[0].children.len(), 2);
+        assert_eq!(
+            tree.root_view().children[0].children[1].reader_prefixes,
+            vec![ReaderPrefix::Quote],
+            "dialect: {}",
+            dialect.label()
+        );
+    }
+}
+
+/// A stray closing delimiter with no prefix in front of it still reports the
+/// delimiter, not a missing reader form — the prefix check added for
+/// `rejects_a_reader_prefix_before_a_closing_delimiter` must not swallow the
+/// pre-existing diagnostic.
+#[test]
+fn a_bare_stray_closing_delimiter_still_reports_itself() {
+    assert_eq!(
+        SyntaxTree::parse(")").unwrap_err(),
+        ParseError::UnexpectedClose {
+            delimiter: ')',
+            position: 0
+        }
+    );
+}
+
 #[test]
 fn rejects_reader_comments_without_a_form() {
     for input in ["#;", "#_"] {
@@ -1555,23 +1636,23 @@ fn janet_dangling_quote_is_refused() {
         "{error:?}"
     );
 
-    // `(a ')` is *not* refused, and that is a known defect rather than an
-    // intended rule. `form` accumulates prefixes, finds a closing delimiter
-    // rather than a datum, and calls `close_list` without ever consuming the
-    // prefixes it collected -- so the quote is dropped and the document parses
-    // clean. Janet refuses the same input ("mismatched delimiter )").
+    // `(a ')` is now refused too, which is the change this stated expectation
+    // was written to force. `form` used to accumulate prefixes, find a closing
+    // delimiter rather than a datum, and call `close_list` without ever
+    // consuming them -- so the quote was dropped and the document parsed clean.
+    // Janet refuses the same input ("mismatched delimiter )"), and so does
+    // every other dialect here now; the defect was cross-dialect and
+    // pre-existing, and `skip_form` -- the scanning twin of `form` -- had
+    // already been refusing this shape, so the two paths now agree.
     //
-    // It is pinned here because it is *cross-dialect and pre-existing*: Common
-    // Lisp, Scheme, Clojure, Emacs Lisp, Fennel and the legacy reader all drop
-    // it identically, on this commit and before it. Fixing it means changing
-    // every dialect's behaviour, which is a separate change from adding a
-    // Janet reader arm; this test exists so that change has to update a stated
-    // expectation instead of a silent one.
-    let tree = SyntaxTree::parse_with_dialect("(a ')", Dialect::Janet)
-        .expect("known defect: the prefix is dropped rather than refused");
-    let form = &tree.root_view().children[0];
-    assert_eq!(form.children.len(), 1, "the quote is dropped, not recorded");
-    assert!(form.children[0].reader_prefixes.is_empty());
+    // See `rejects_a_reader_prefix_before_a_closing_delimiter` for the full
+    // eight-dialect matrix and the `(a 'b)` control.
+    let error = SyntaxTree::parse_with_dialect("(a ')", Dialect::Janet)
+        .expect_err("a prefix with a closing delimiter after it is not a form");
+    assert!(
+        matches!(error, ParseError::MissingReaderForm(3)),
+        "{error:?}"
+    );
 }
 
 /// `'` keeps meaning quote everywhere else, and this pins the other dialects so

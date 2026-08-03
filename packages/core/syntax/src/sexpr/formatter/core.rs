@@ -1196,6 +1196,33 @@ impl Formatter {
         }
     }
 
+    /// Whether `node` carries reader-prefix text that only
+    /// [`Self::format_node`] emits.
+    ///
+    /// [`Self::format_node`] writes a node's prefixes (or their canonical
+    /// expansion) *before* it dispatches on the node's head, so every
+    /// shape-specific renderer in `formatter/lists` may open its own subject's
+    /// delimiter freely: the prefix is already out. What those renderers may
+    /// not do is open a *child's* delimiter, because nothing wrote that
+    /// child's prefix — and six of them did exactly that, for the child they
+    /// treat as a binding list, a binding entry, or a clause.
+    ///
+    /// The result was silent corruption rather than a visible defect:
+    /// `` (let `(a b) x) `` re-emitted as `(let (a b) x)` still parses, so it
+    /// passes every reparse-based write guard while meaning something else.
+    ///
+    /// Handing such a child back to [`Self::format_inline_or_node`] is also
+    /// the right *layout* answer and not merely the safe one — `` `(a b) `` in
+    /// a `let`'s binding slot is a quasiquoted datum, not a binding list, and
+    /// laying it out as the shape it is not was never correct.
+    ///
+    /// An opaque reader form (`#+sbcl (…)`) needs no entry here: the parser
+    /// gives it [`NodeKind::Atom`], so every one of those renderers already
+    /// falls through its `kind != List` guard.
+    pub(super) fn carries_reader_prefix(node: &Node) -> bool {
+        !node.reader_prefixes().is_empty()
+    }
+
     pub(super) fn is_opaque_reader_form(&self, node: &Node) -> bool {
         node.opaque_reader_form
             || node

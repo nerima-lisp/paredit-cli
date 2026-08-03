@@ -6,7 +6,7 @@
 //! closes it by asserting *invariants* rather than outputs, over code the
 //! authors did not write.
 //!
-//! Five invariants, each of which holds regardless of what the file contains:
+//! Six invariants, each of which holds regardless of what the file contains:
 //!
 //! 1. **Parsing terminates without panicking.** A parse *error* is fine — real
 //!    Lisp carries reader macros this tool does not model — but a panic is a
@@ -27,6 +27,16 @@
 //!    oracle from outside the round-trip: a child rendered at or left of the
 //!    delimiter that contains it no longer reads as being inside it, in any
 //!    Lisp anyone writes.
+//! 6. **Formatting preserves the tree.** Parse the input, parse the formatted
+//!    output, and compare the two trees with spans excluded — spans are the
+//!    one thing formatting is meant to change. This is the second oracle from
+//!    outside the round-trip, and it catches what invariant 3 structurally
+//!    cannot: a formatter that *drops* something renders the same wrong text
+//!    on every pass, so idempotence holds, and the corrupted text still
+//!    parses, so the reparse check holds too. Six real dialects' worth of
+//!    `edit format` silently dropping a reader prefix
+//!    (`` (let `(a b) x) `` → `(let (a b) x)`) passed invariants 1-5 and
+//!    failed only this one.
 //!
 //! ## Where the corpus comes from
 //!
@@ -145,6 +155,45 @@ const MAX_COLUMN_VIOLATIONS_PER_FILE: usize = 5;
 
 /// A byte range in the formatted text, half open.
 type Region = (usize, usize);
+
+/// One expression's identity for invariant 6, spans deliberately excluded.
+///
+/// Spans are the one thing formatting is *supposed* to change, so
+/// [`paredit_cli::sexpr::ExpressionView`]'s own `PartialEq` — which compares
+/// them — cannot answer this question. What is compared instead is everything
+/// the reader would have had to see differently for the document to mean
+/// something else: the node kind, which delimiter pair it uses, its
+/// reader-prefix stack, and an atom's text.
+#[derive(PartialEq, Eq, Debug)]
+struct Shape {
+    kind: ExpressionKind,
+    delimiter: Option<paredit_cli::sexpr::Delimiter>,
+    reader_prefixes: Vec<ReaderPrefix>,
+    text: Option<String>,
+    children: usize,
+}
+
+/// Every expression of `tree`, in a fixed pre-order, as [`Shape`]s.
+///
+/// Flattened rather than compared tree-against-tree so that a mismatch names a
+/// position, and iterative for the same reason [`Layout::of`] is: corpus files
+/// nest deeply enough to overflow a test thread's stack.
+fn shapes(tree: &SyntaxTree) -> Vec<Shape> {
+    let root = tree.root_view();
+    let mut shapes = Vec::new();
+    let mut stack = vec![&root];
+    while let Some(view) = stack.pop() {
+        shapes.push(Shape {
+            kind: view.kind,
+            delimiter: view.delimiter,
+            reader_prefixes: view.reader_prefixes.clone(),
+            text: view.text.clone(),
+            children: view.children.len(),
+        });
+        stack.extend(view.children.iter().rev());
+    }
+    shapes
+}
 
 /// The lists and the opaque tokens of one parsed document.
 ///
@@ -444,7 +493,7 @@ struct Tally {
     verbatim_lines: usize,
 }
 
-/// Checks the five invariants on one file, returning failures rather than
+/// Checks the six invariants on one file, returning failures rather than
 /// panicking so one run reports every offender.
 fn check_file(path: &Path, tally: &mut Tally) -> Vec<String> {
     let Ok(metadata) = fs::metadata(path) else {
@@ -499,6 +548,33 @@ fn check_file(path: &Path, tally: &mut Tally) -> Vec<String> {
                     "{}: formatting is not idempotent; a second pass changed {} bytes",
                     path.display(),
                     once.len().abs_diff(twice.len()),
+                ));
+            }
+
+            // Invariant 6: formatting preserves the tree. Idempotence
+            // (invariant 3) cannot see a dropped reader prefix — a
+            // consistently wrong rendering is a fixed point, and the
+            // corrupted text reparses cleanly, so invariant 3 and the
+            // reparse check above both pass on it. Comparing the input's
+            // tree with the output's is an oracle from outside that
+            // round-trip, and it is what caught `` (let `(a b) x) ``
+            // rendering as `(let (a b) x)`.
+            let before = shapes(&tree);
+            let after = shapes(&reparsed);
+            if before != after {
+                let first = before
+                    .iter()
+                    .zip(&after)
+                    .position(|(left, right)| left != right);
+                failures.push(format!(
+                    "{}: formatting changed the tree ({} expressions in, {} out{})",
+                    path.display(),
+                    before.len(),
+                    after.len(),
+                    first.map_or(String::new(), |index| format!(
+                        "; first difference at expression {index}: {:?} became {:?}",
+                        before[index], after[index]
+                    ))
                 ));
             }
 

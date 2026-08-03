@@ -50,7 +50,10 @@ impl Formatter {
         output: &mut String,
     ) {
         let node = tree.node(node_id);
-        if node.kind != NodeKind::List || node.children.is_empty() {
+        if node.kind != NodeKind::List
+            || node.children.is_empty()
+            || Formatter::carries_reader_prefix(node)
+        {
             self.format_inline_or_node(tree, node_id, depth, output);
             return;
         }
@@ -159,7 +162,14 @@ impl Formatter {
     /// two-element list `(name value)` — the only shape alignment applies to.
     fn alignable_binding_name(&self, tree: &SyntaxTree, node_id: NodeId) -> Option<String> {
         let node = tree.node(node_id);
-        if node.kind != NodeKind::List || node.children.len() != 2 {
+        // A prefixed entry is excluded for the same reason a bare symbol is —
+        // it is not the `(name value)` shape — and, additionally, because the
+        // aligned branch writes the entry's opening delimiter itself and would
+        // drop the prefix; see `Formatter::carries_reader_prefix`.
+        if node.kind != NodeKind::List
+            || node.children.len() != 2
+            || Formatter::carries_reader_prefix(node)
+        {
             return None;
         }
         // Start column `0`, for the same reason as
