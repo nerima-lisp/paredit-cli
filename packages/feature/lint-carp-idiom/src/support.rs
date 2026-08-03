@@ -17,26 +17,33 @@
 //! @x ;; same as (copy x)
 //! ```
 //!
-//! This workspace's reader implements **neither**. `reader_policy.rs` routes
-//! Carp through `classify_legacy`, which knows `#;`, `#_`, `#+`, `#-` and the
-//! shared quote prefixes, and nothing about `@` or `&`. The consequences are
-//! measured and recorded in this package's README; the two that constrain the
-//! rules here are:
+//! This workspace's reader now implements both, along with `~x` (deref) and
+//! `$[…]` (static array). `reader_policy.rs` gives Carp its own
+//! `classify_carp` rather than routing it through the permissive
+//! `classify_legacy`, which knew `#;`, `#_`, `#+`, `#-` and the shared quote
+//! prefixes and nothing about `@` or `&`.
 //!
-//! - `@x` and `&x` lex as *one atom* whose text includes the sigil (`"@x"`),
-//!   so a head or symbol comparison must not assume the sigil was stripped.
-//! - `@(f x)` and `&(f x)` lex as a **bare `@` atom followed by a sibling
-//!   list**, which inflates the enclosing call's arity by one. Over the
-//!   upstream corpus that is 1493 sites in 116 of 248 files, so **no rule in
-//!   this crate may index or count a call's arguments** — the count is not
-//!   trustworthy for Carp. Every rule here keys on the head symbol alone.
+//! That history still constrains the rules here, because the rules were built
+//! against the old reading and stay correct under both:
+//!
+//! - `@x` and `&x` used to lex as *one atom* whose text included the sigil
+//!   (`"@x"`); they are now the atom `x` carrying a [`ReaderPrefix::Copy`] or
+//!   [`ReaderPrefix::Ref`]. A head or symbol comparison must therefore not
+//!   assume either shape — `atom_text` compares the text the reader produced.
+//! - `@(f x)` and `&(f x)` used to lex as a **bare `@` atom followed by a
+//!   sibling list**, inflating the enclosing call's arity by one at 1493 sites
+//!   in 116 of the upstream corpus's 248 files. They are now a single prefixed
+//!   form, so arity is trustworthy again — but every rule here still keys on
+//!   the head symbol alone, which was never weaker than counting arguments.
 //!
 //! Carp's unquote is `%` and its unquote-splicing is `%@`
 //! (`docs/Quasiquotation.md`), neither of which the reader recognizes as a
-//! prefix either. [`QuoteState::quasi`] therefore never counts back down for
-//! Carp, so everything textually inside a `` ` `` template reads as data. That
-//! suppresses findings rather than inventing them, which is the side to be
-//! wrong on.
+//! prefix; that is a deliberate omission rather than an oversight, since
+//! recognizing them would make the interior of every `` ` `` template read as
+//! code and *add* findings on macro bodies. [`QuoteState::quasi`] therefore
+//! never counts back down for Carp, so everything textually inside a `` ` ``
+//! template reads as data. That suppresses findings rather than inventing
+//! them, which is the side to be wrong on.
 
 use paredit_core_syntax::sexpr::{
     ByteSpan, Delimiter, ExpressionKind, ExpressionView, ReaderPrefix, SyntaxTree,

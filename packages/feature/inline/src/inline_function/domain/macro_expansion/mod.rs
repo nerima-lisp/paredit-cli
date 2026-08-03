@@ -261,13 +261,21 @@ fn render_prefixed_expression(
         // writes upper case, so this normalises the spelling of a literal
         // rather than changing it. Every span-based path -- the formatter and
         // all structural edits -- keeps the original bytes.
+        //
+        // Carp's `&`/`@`/`~`/`$` join these: each re-emits its own spelling and
+        // keeps expanding the form underneath, which is why they carry a real
+        // `as_source` rather than borrowing another variant's.
         ReaderPrefix::HashLiteral
         | ReaderPrefix::LfeBinary
         | ReaderPrefix::LfeMap
         | ReaderPrefix::LfeStruct
         | ReaderPrefix::Metadata
         | ReaderPrefix::ReaderConditional
-        | ReaderPrefix::ReaderConditionalSplicing => Ok(format!(
+        | ReaderPrefix::ReaderConditionalSplicing
+        | ReaderPrefix::Ref
+        | ReaderPrefix::Copy
+        | ReaderPrefix::Deref
+        | ReaderPrefix::StaticArray => Ok(format!(
             "{}{}",
             prefix.as_source(),
             render_prefixed_expression(

@@ -2669,3 +2669,150 @@ fn hy_discarded_forms_use_the_same_string_extent() {
         assert_eq!(children, expected, "{input}");
     }
 }
+
+// ---------------------------------------------------------------------------
+// Carp. Every expectation below is read off the `sexpr` dispatch and the
+// `aChar` / `pat` / `emptyCharacters` productions in Carp's own
+// `src/Parsing.hs`, not off this reader's previous behaviour: Carp shared the
+// permissive legacy reader until now, and that reader implemented none of it.
+// ---------------------------------------------------------------------------
+
+/// `&`, `@` and `~` prefix the *following form*, not just a symbol.
+///
+/// This is the defect these tests exist for. `readerMacro` consumes the sigil
+/// and recurses into `sexpr`, so `@(g y)` is one form. Reading it as a bare
+/// `@` atom plus a sibling inflated the enclosing call's arity by one, which
+/// happened 1493 times across 116 of the 248 files in `carp-lang/Carp`.
+#[test]
+fn carp_sigils_prefix_the_following_form() {
+    for (input, prefix, expected) in [
+        ("(f @(g y))", ReaderPrefix::Copy, "@(g y)"),
+        ("(f &(g y))", ReaderPrefix::Ref, "&(g y)"),
+        ("(f ~(g y))", ReaderPrefix::Deref, "~(g y)"),
+        ("(f @x)", ReaderPrefix::Copy, "@x"),
+        ("(f &x)", ReaderPrefix::Ref, "&x"),
+        ("(f $[1 2])", ReaderPrefix::StaticArray, "$[1 2]"),
+    ] {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::Carp)
+            .unwrap_or_else(|error| panic!("{input}: {error}"));
+        let form = &tree.root_view().children[0];
+        assert_eq!(form.children.len(), 2, "{input}");
+        assert_eq!(form.children[1].span.slice(input), expected, "{input}");
+        assert_eq!(form.children[1].reader_prefixes, vec![prefix], "{input}");
+    }
+}
+
+/// Sigils stack, because `readerMacro` recurses into `sexpr` rather than into
+/// `atom`: `@@x` is `(copy (copy x))` and `&@x` is `(ref (copy x))`.
+#[test]
+fn carp_sigils_stack_in_source_order() {
+    let input = "(f &@x)";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::Carp).expect("valid");
+    let form = &tree.root_view().children[0];
+    assert_eq!(
+        form.children[1].reader_prefixes,
+        vec![ReaderPrefix::Ref, ReaderPrefix::Copy]
+    );
+}
+
+/// `@"a b"` is a copy of a *string literal*, so the string stays whole.
+///
+/// Because `@` used to glue onto the following token, the opening quote was
+/// swallowed and `(f @"a b")` silently became the two atoms `@"a` and `b"`.
+#[test]
+fn carp_copy_prefix_keeps_a_string_literal_whole() {
+    let input = r#"(f @"a b")"#;
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::Carp).expect("valid");
+    let form = &tree.root_view().children[0];
+    assert_eq!(form.children.len(), 2);
+    assert_eq!(form.children[1].span.slice(input), r#"@"a b""#);
+}
+
+/// `aChar` is `\` plus one character, and the character may be a delimiter.
+///
+/// `\{` is what made `core/Format.carp` fail to parse: the brace was read as a
+/// real delimiter and unbalanced the file. `\ ` is a space character literal
+/// and occurs in `core/String.carp`; `\space` needs no separate arm because
+/// the atom scanner carries the remaining letters into the same atom.
+#[test]
+fn carp_character_literals_cover_delimiters_and_named_characters() {
+    for (input, expected) in [
+        ("(f \\a)", "\\a"),
+        ("(f \\{)", "\\{"),
+        ("(f \\})", "\\}"),
+        ("(f \\()", "\\("),
+        ("(f \\))", "\\)"),
+        ("(f \\[)", "\\["),
+        ("(f \\])", "\\]"),
+        ("(f \\\")", "\\\""),
+        ("(f \\space)", "\\space"),
+        ("(f \\ )", "\\ "),
+    ] {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::Carp)
+            .unwrap_or_else(|error| panic!("{input}: {error}"));
+        let form = &tree.root_view().children[0];
+        assert_eq!(form.children.len(), 2, "{input}");
+        assert_eq!(form.children[1].span.slice(input), expected, "{input}");
+    }
+}
+
+/// `#"…"` is a `Pattern` literal: one dispatch byte and one datum.
+///
+/// `parseInternalPattern` admits a `"` only as `\"`, so a backslash-aware scan
+/// ends the literal where Carp ends it.
+#[test]
+fn carp_pattern_literal_is_one_span() {
+    for (input, expected) in [
+        (r#"(f #"[a-z]+")"#, r#"#"[a-z]+""#),
+        (r#"(f #"a\"b")"#, r#"#"a\"b""#),
+    ] {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::Carp)
+            .unwrap_or_else(|error| panic!("{input}: {error}"));
+        let form = &tree.root_view().children[0];
+        assert_eq!(form.children.len(), 2, "{input}");
+        assert_eq!(form.children[1].span.slice(input), expected, "{input}");
+    }
+}
+
+/// A comma is whitespace, not an unquote: `emptyCharacters` lists it beside
+/// space and tab. It separates `deftype` fields and `defn` parameters
+/// throughout `core/`, e.g. `(deftype Point [x Int, y Int])`.
+#[test]
+fn carp_comma_is_whitespace() {
+    let input = "(deftype Point [x Int, y Int])";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::Carp).expect("valid");
+    let fields = &tree.root_view().children[0].children[2];
+    assert_eq!(fields.children.len(), 4);
+    assert!(
+        fields
+            .children
+            .iter()
+            .all(|child| child.reader_prefixes.is_empty())
+    );
+}
+
+/// Forms Carp's reader has no dispatch for are refused rather than read as
+/// something else.
+///
+/// `#` is absent from `validCharacters` and `atom` has no branch that accepts
+/// it, so every `#` form except `#"…"` is a read error upstream -- including
+/// the `#;`, `#_`, `#+`, `#-`, `#.`, `#'`, `#?`, `#(`, `#[` and `#{` Carp
+/// inherited from the legacy reader. An unterminated `#"` or `@"` must fail
+/// loudly rather than swallow the rest of the file.
+#[test]
+fn carp_refuses_what_its_reader_has_no_dispatch_for() {
+    for input in [
+        "(f #(g))",
+        "(f #{1})",
+        "#+sbcl (f)",
+        "#;(f)",
+        "(f #\"abc)",
+        "(f @\"abc)",
+        "\\",
+    ] {
+        assert!(
+            SyntaxTree::parse_with_dialect(input, Dialect::Carp).is_err(),
+            "{input} should be refused"
+        );
+    }
+}

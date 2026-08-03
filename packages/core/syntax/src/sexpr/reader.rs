@@ -51,13 +51,24 @@ pub fn apply_reader_prefix_context(
             // binary segment is `(value (size N) (unit 8))` and a map literal's
             // values are arbitrary forms, so rename and reference tracking must
             // keep descending into them.
+            //
+            // Carp's `&x`/`@x`/`~x`/`$[...]` join them for the same reason and
+            // more directly: each wraps an ordinary subexpression -- `(ref x)`,
+            // `(copy x)`, a deref, a static array literal -- so `x` is a live
+            // reference that rename and reference tracking must still see.
+            // Treating them as opaque would hide roughly a fifth of every Carp
+            // file from those commands.
             ReaderPrefix::HashLiteral
             | ReaderPrefix::LfeBinary
             | ReaderPrefix::LfeMap
             | ReaderPrefix::LfeStruct
             | ReaderPrefix::Metadata
             | ReaderPrefix::ReaderConditional
-            | ReaderPrefix::ReaderConditionalSplicing => {}
+            | ReaderPrefix::ReaderConditionalSplicing
+            | ReaderPrefix::Ref
+            | ReaderPrefix::Copy
+            | ReaderPrefix::Deref
+            | ReaderPrefix::StaticArray => {}
         }
     }
 
