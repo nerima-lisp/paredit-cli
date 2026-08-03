@@ -480,7 +480,20 @@ impl<'a> Parser<'a> {
     /// no prefix and cannot interpolate, and that path already applies the
     /// same escape rule. Only a prefixed string (which may be an f-string) and
     /// a `#[` bracket string need the sub-reader.
+    /// Whether a Hy string literal starts at the cursor.
+    ///
+    /// The dialect test is hoisted to the top and the whole function is
+    /// `#[inline]`, so for the other nine dialects this collapses to a single
+    /// comparison against a loop-invariant field rather than two guarded calls
+    /// and two byte reads. That matters because this is called once per *form*
+    /// from `parse_form`'s match and again from the discarded-form scanner: on
+    /// an 8 MiB Common Lisp document the difference is millions of calls that
+    /// can only ever answer `false`.
+    #[inline]
     fn at_hy_string(&self) -> bool {
+        if !self.policy.has_prefixed_strings() && !self.policy.has_bracket_strings() {
+            return false;
+        }
         let pos = self.pos.get();
         if self
             .policy
