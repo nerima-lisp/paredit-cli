@@ -4062,6 +4062,166 @@
               "shortDescription": {
                 "text": "a top-level in-package that re-enters a package the file had already left"
               }
+            },
+            {
+              "fullDescription": {
+                "text": "A key binding is dispatched through `command-execute`, which requires `commandp`. A `defun` with no `(interactive)` is not `commandp`, and `define-key` accepts it anyway — so the binding loads, byte-compiles and installs cleanly, and fails only when the key is pressed."
+              },
+              "id": "elisp-keymap-binds-non-command",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "A key binding is dispatched through `command-execute`, which requires `commandp`. A `defun` with no `(interactive)` is not `commandp`, and `define-key` accepts it anyway — so the binding loads, byte-compiles and installs cleanly, and fails only when the key is pressed.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a key bound to a same-file defun that has no (interactive), so the binding cannot run"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "`call-interactively` passes exactly the arguments the `(interactive …)` descriptor names — none at all when there is no descriptor, one per newline-separated code letter when it is a string. A required parameter left unsupplied is a `wrong-number-of-arguments` signal at the first invocation, and nothing before that reports it."
+              },
+              "id": "elisp-interactive-arity-mismatch",
+              "properties": {
+                "category": "arity",
+                "fixable": false,
+                "rationale": "`call-interactively` passes exactly the arguments the `(interactive …)` descriptor names — none at all when there is no descriptor, one per newline-separated code letter when it is a string. A required parameter left unsupplied is a `wrong-number-of-arguments` signal at the first invocation, and nothing before that reports it.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "an interactive spec that supplies fewer arguments than the lambda list requires"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "`add-hook` compares with `equal`, so an anonymous function is deduplicated only while it is textually unchanged. Edit the lambda and re-evaluate the file and the hook holds both versions; `add-hook`'s own docstring recommends a function symbol for exactly this reason, and notes the comparison cost as a second one."
+              },
+              "id": "elisp-hook-lambda",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "`add-hook` compares with `equal`, so an anonymous function is deduplicated only while it is textually unchanged. Edit the lambda and re-evaluate the file and the hook holds both versions; `add-hook`'s own docstring recommends a function symbol for exactly this reason, and notes the comparison cost as a second one.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a lambda on a hook, which re-evaluating the file adds a second copy of"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "`save-excursion` saves point in whichever buffer is current when it runs, so wrapping a `set-buffer` saves point in the buffer being left rather than the one being worked in. The current buffer *is* restored — that part has not changed — but the point protection the form appears to ask for is not the one it provides. Emacs's own byte compiler emits `Use 'with-current-buffer' rather than save-excursion+set-buffer` for this exact pair."
+              },
+              "id": "elisp-save-excursion-set-buffer",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "`save-excursion` saves point in whichever buffer is current when it runs, so wrapping a `set-buffer` saves point in the buffer being left rather than the one being worked in. The current buffer *is* restored — that part has not changed — but the point protection the form appears to ask for is not the one it provides. Emacs's own byte compiler emits `Use 'with-current-buffer' rather than save-excursion+set-buffer` for this exact pair.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "save-excursion wrapping set-buffer, which saves point in the buffer it then leaves"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "`cl.el` and `cl-compat.el` ship from `lisp/obsolete/` and announce themselves as deprecated on load. They exist only to define the unprefixed aliases that `cl-lib` replaced with `cl-`-prefixed names."
+              },
+              "id": "elisp-require-obsolete-cl",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "`cl.el` and `cl-compat.el` ship from `lisp/obsolete/` and announce themselves as deprecated on load. They exist only to define the unprefixed aliases that `cl-lib` replaced with `cl-`-prefixed names.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a require of the obsolete cl package, which prints a deprecation notice when loaded"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A namestring assembled with `concatenate` or `format` picks a separator the program has no business choosing, and the result is then re-parsed as the host's pathname syntax — so a component containing `*` or `?` silently becomes a wild pathname and `open` signals a file-error. `merge-pathnames` and `make-pathname` compose the components directly, and the host applies its own syntax once."
+              },
+              "id": "pathname-built-by-concatenation",
+              "properties": {
+                "category": "portability",
+                "fixable": false,
+                "rationale": "A namestring assembled with `concatenate` or `format` picks a separator the program has no business choosing, and the result is then re-parsed as the host's pathname syntax — so a component containing `*` or `?` silently becomes a wild pathname and `open` signals a file-error. `merge-pathnames` and `make-pathname` compose the components directly, and the host applies its own syntax once.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a filesystem call whose designator is a string glued together around a path separator"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "`:if-exists` defaults to `:error` for any pathname whose version is not `:newest`, which is every pathname on a host without file versions. So an output form that omits it works while the file is absent and signals `file-error` once it is not — a failure that first appears on the second run, or in production."
+              },
+              "id": "output-stream-without-if-exists",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "`:if-exists` defaults to `:error` for any pathname whose version is not `:newest`, which is every pathname on a host without file versions. So an output form that omits it works while the file is absent and signals `file-error` once it is not — a failure that first appears on the second run, or in production.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a file opened for output with no :if-exists, so an existing file signals file-error"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A pathname component keeps the case its namestring was written in, and CLHS 19.2.2.1.2 leaves the host's customary case to the host. `string=` and `equal` are case-sensitive, so a test against a lowercase literal silently fails for `FOO.LISP` — and `:case :common` inverts the case rather than normalizing it, so asking for it does not help. `string-equal` is the case-insensitive comparison."
+              },
+              "id": "pathname-component-compared-case-sensitively",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "A pathname component keeps the case its namestring was written in, and CLHS 19.2.2.1.2 leaves the host's customary case to the host. `string=` and `equal` are case-sensitive, so a test against a lowercase literal silently fails for `FOO.LISP` — and `:case :common` inverts the case rather than normalizing it, so asking for it does not help. `string-equal` is the case-insensitive comparison.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a pathname component compared with string=/equal against a literal, which the host's case defeats"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "`directory` returns the truenames of the files its pathspec matches. A pathspec naming a directory with no wild component matches exactly one file — that directory — so the call returns a one-element list containing the argument rather than its contents, and does so without any error."
+              },
+              "id": "directory-without-wild-component",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "`directory` returns the truenames of the files its pathspec matches. A pathspec naming a directory with no wild component matches exactly one file — that directory — so the call returns a one-element list containing the argument rather than its contents, and does so without any error.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a (directory \"…/\") whose pathspec has no wildcard, so it matches only the directory itself"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "`with-open-file` closes its stream as the body exits. A closure that reads the stream, or a list, vector, or instance holding it, survives that exit — so the failure surfaces wherever the value is finally used rather than here, on a stream whose provenance is by then invisible."
+              },
+              "id": "with-open-file-result-captures-stream",
+              "properties": {
+                "category": "resource",
+                "fixable": false,
+                "rationale": "`with-open-file` closes its stream as the body exits. A closure that reads the stream, or a list, vector, or instance holding it, survives that exit — so the failure surfaces wherever the value is finally used rather than here, on a stream whose provenance is by then invisible.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a with-open-file whose result is a closure over, or an aggregate holding, the stream it closed"
+              }
             }
           ]
         }

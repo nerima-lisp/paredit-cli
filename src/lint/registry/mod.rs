@@ -30,7 +30,12 @@ use super::rule::RuleEntry;
 // (`lint-package-hygiene`, new) = 286. Four of the five packages already
 // existed; `lint-package-hygiene` is the twenty-fourth package the registry
 // reaches into.
-pub const RULE_COUNT: usize = 286;
+//
+// 286 + this batch's 10, both packages new: 5 (`lint-elisp-idiom`) and 5
+// (`lint-pathname-io`) = 296. This is the first batch aimed squarely at a
+// dialect other than Common Lisp: `dialect_scope()` defaults to
+// `COMMON_LISP_ONLY`, so before it only 13 of 286 rules ran on `.el` at all.
+pub const RULE_COUNT: usize = 296;
 
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
@@ -1192,5 +1197,45 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(
         &paredit_feature_lint_package_hygiene::package_circular_in_package_chain::rule::META,
         &paredit_feature_lint_package_hygiene::package_circular_in_package_chain::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_elisp_idiom::keymap_binds_non_command::rule::META,
+        &paredit_feature_lint_elisp_idiom::keymap_binds_non_command::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_elisp_idiom::interactive_arity_mismatch::rule::META,
+        &paredit_feature_lint_elisp_idiom::interactive_arity_mismatch::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_elisp_idiom::hook_lambda::rule::META,
+        &paredit_feature_lint_elisp_idiom::hook_lambda::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_elisp_idiom::save_excursion_set_buffer::rule::META,
+        &paredit_feature_lint_elisp_idiom::save_excursion_set_buffer::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_elisp_idiom::require_obsolete_cl::rule::META,
+        &paredit_feature_lint_elisp_idiom::require_obsolete_cl::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_pathname_io::pathname_built_by_concatenation::META,
+        &paredit_feature_lint_pathname_io::pathname_built_by_concatenation::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_pathname_io::output_stream_without_if_exists::META,
+        &paredit_feature_lint_pathname_io::output_stream_without_if_exists::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_pathname_io::pathname_component_compared_case_sensitively::META,
+        &paredit_feature_lint_pathname_io::pathname_component_compared_case_sensitively::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_pathname_io::directory_without_wild_component::META,
+        &paredit_feature_lint_pathname_io::directory_without_wild_component::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_pathname_io::with_open_file_result_captures_stream::META,
+        &paredit_feature_lint_pathname_io::with_open_file_result_captures_stream::RULE,
     ),
 ];

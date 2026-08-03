@@ -188,7 +188,12 @@ pub const PEDANTIC_RULES: [&str; tagged_count(RuleTag::Pedantic)] = {
 //
 // 266 + the next batch's 20: 8 (`lint-form-shape`), 4 each (`lint-sequence`,
 // `lint-numeric`), 3 (`lint-string-char`) and 1 (`lint-package-hygiene`) = 286.
-const _: () = assert!(RULE_COUNT == 286);
+//
+// 286 + this batch's 10: 5 (`lint-elisp-idiom`) and 5 (`lint-pathname-io`),
+// both new packages. Twelve rules were proposed; two were dropped as exact
+// duplicates of rules already shipping and two more had their premises
+// refuted against a running Emacs.
+const _: () = assert!(RULE_COUNT == 296);
 // Unchanged at 99: every one of this branch's 37 rules is
 // `Fixability::ReportOnly`. Each one reports a judgment the tool cannot make
 // on the author's behalf — whether an annotation or the parameter list under it
@@ -202,6 +207,12 @@ const _: () = assert!(RULE_COUNT == 286);
 // records that removing the coercion changes the result on exactly the inputs
 // that motivate the rule, and `package-circular-in-package-chain` would have to
 // move forms between two regions of one package to repair anything.
+//
+// Still 99 after this batch's 10. `elisp-require-obsolete-cl` is the
+// interesting one: rewriting `(require 'cl)` to `(require 'cl-lib)` looks
+// mechanical but is not, because the unprefixed names `cl.el` provides do not
+// exist in `cl-lib`. Offering that fix would make a working file stop working,
+// so the rule says so in its own header and stays `ReportOnly`.
 const _: () = assert!(fixable_count() == 99);
 // 164 (through PR #82) + 31 of this branch's 37 rules. The other 6 are
 // `Severity::Error`: `when-unless-implicit-nil-misused` and the five
@@ -219,7 +230,15 @@ const _: () = assert!(fixable_count() == 99);
 // (`format` signals at run time on an unclosed `~[`/`~{`/`~<`/`~(`), and
 // `ftype-values-arity-mismatch` (a violated `ftype` is undefined behaviour at
 // low safety, and SBCL raises a full WARNING for it).
-const _: () = assert!(warning_count() == 212);
+//
+// 212 + 7 of this batch's 10 = 219. The other 3 are `Severity::Error` because
+// the code fails outright rather than reading badly: `elisp-keymap-binds-non-
+// command` (the binding loads and byte-compiles clean, then signals on the
+// keypress), `elisp-interactive-arity-mismatch` (`commandp` is true, so the
+// command appears in `M-x` and then signals `wrong-number-of-arguments`), and
+// `with-open-file-result-captures-stream` (the stream is closed before the
+// value that carries it is ever used).
+const _: () = assert!(warning_count() == 219);
 const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
 // 6 (through PR #82) + 8 of this branch's rules: `lint-call-shape`'s four
 // threshold rules, whose limits are conventions a codebase either adopted or
@@ -229,7 +248,8 @@ const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
 // path the rule cannot identify. Neither dropped rule was tagged `pedantic`,
 // so this does not move either. Nor does the next batch's 20: none of them
 // carries a tag at all, so `PEDANTIC_RULES` and `EXPERIMENTAL_RULES` are both
-// unchanged by it.
+// unchanged by it. Nor does this batch's 10, for the same reason: every one of
+// them reports a defect with a demonstrated failure, not a style preference.
 const _: () = assert!(PEDANTIC_RULES.len() == 14);
 
 fn meta_of(name: &str) -> Option<&'static crate::lint::model::RuleMeta> {

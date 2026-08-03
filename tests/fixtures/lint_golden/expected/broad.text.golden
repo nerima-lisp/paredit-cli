@@ -271,6 +271,16 @@ rule	format-unknown-directive	0
 rule	format-percent-ampersand-adjacent-redundancy	0
 rule	format-nested-directive-unbalanced	0
 rule	package-circular-in-package-chain	0
+rule	elisp-keymap-binds-non-command	0
+rule	elisp-interactive-arity-mismatch	0
+rule	elisp-hook-lambda	0
+rule	elisp-save-excursion-set-buffer	0
+rule	elisp-require-obsolete-cl	0
+rule	pathname-built-by-concatenation	0
+rule	output-stream-without-if-exists	0
+rule	pathname-component-compared-case-sensitively	0
+rule	directory-without-wild-component	0
+rule	with-open-file-result-captures-stream	0
 finding	self-assignment	error	suspicious	fixable=false	broad.lisp	6875	setq assigns place x to itself	self-assignment/5f1a5b802aa99b47/0
 finding	duplicate-setf-places	error	duplicate	fixable=false	broad.lisp	6961	setf assigns variable total more than once; the earlier assignment is dead	duplicate-setf-places/8104810ed815b9fd/0
 finding	setf-arity	error	arity	fixable=false	broad.lisp	7021	setf has 3 arguments; place/value pairs require an even count	setf-arity/b0a5b422aad6d4d2/0
