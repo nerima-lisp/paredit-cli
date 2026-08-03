@@ -46,7 +46,10 @@ impl Formatter {
         output: &mut String,
     ) {
         let node = tree.node(node_id);
-        if node.kind != NodeKind::List || node.children.is_empty() {
+        if node.kind != NodeKind::List
+            || node.children.is_empty()
+            || Self::carries_reader_prefix(node)
+        {
             self.format_node(tree, node_id, depth, output);
             return;
         }
@@ -131,7 +134,10 @@ impl Formatter {
         output: &mut String,
     ) {
         let node = tree.node(node_id);
-        if node.kind != NodeKind::List || node.children.len() <= 2 {
+        if node.kind != NodeKind::List
+            || node.children.len() <= 2
+            || Self::carries_reader_prefix(node)
+        {
             self.format_inline_or_node(tree, node_id, depth, output);
             return;
         }

@@ -678,7 +678,20 @@ impl<'a> Parser<'a> {
             byte if self.policy.delimiter_from_open(byte).is_some() => {
                 self.open_list_with_prefixes(prefixes);
             }
-            byte if self.policy.delimiter_from_close(byte).is_some() => self.close_list()?,
+            // A reader prefix with a closing delimiter after it is a truncated
+            // form, exactly as one at end of input is, and is refused the same
+            // way. This arm used to fall through to `close_list` while
+            // `prefixes` stayed on the floor, so `(a ')` parsed clean as `(a)`:
+            // the quote vanished from the tree, `edit format` re-emitted the
+            // document without it, and the result still parsed -- a silent
+            // meaning change no write guard could see. `skip_form`, the
+            // scanning twin of this function, already refused the same shape.
+            byte if self.policy.delimiter_from_close(byte).is_some() => {
+                if let Some(prefix) = prefixes.first() {
+                    return Err(ParseError::MissingReaderForm(prefix.span.start().get()));
+                }
+                self.close_list()?;
+            }
             byte if DialectReaderPolicy::is_raw_delimiter(byte) => {
                 return Err(self.raw_delimiter_error());
             }

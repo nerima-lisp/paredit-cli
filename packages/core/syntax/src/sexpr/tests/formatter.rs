@@ -2387,3 +2387,172 @@ fn no_line_is_indented_at_or_left_of_its_enclosing_delimiter() {
         }
     }
 }
+
+/// A reader prefix on a *child* the layout has a special shape for — a
+/// binding list, an `flet` binding, a `cond`/`case` clause, a `do` var-list —
+/// survives the reformat.
+///
+/// [`Formatter::format_node`] writes a node's prefixes before it dispatches on
+/// the node's head, so a renderer may open its own subject's delimiter freely.
+/// Six renderers in `formatter/lists` opened a *child's* delimiter too, and
+/// nothing had written that child's prefix: `` (let `(a b) x) `` came back as
+/// `(let (a b) x)`.
+///
+/// That is the worst shape a defect in this tool can take. The output still
+/// parses, so every reparse-based write guard passes it, and formatting it
+/// again reproduces it exactly, so idempotence passes too. Only comparing the
+/// input tree with the output tree sees it — which is what
+/// `no_shape_specific_layout_drops_a_child_reader_prefix` below does, and what
+/// `tests/corpus.rs`'s invariant 6 does at scale.
+#[test]
+fn a_reader_prefix_on_a_shape_specific_child_survives_formatting() {
+    let cases = [
+        // The primary-dialect repro. `let`'s second child is laid out by
+        // `format_sequence_list`, which opened `(` itself.
+        (Dialect::CommonLisp, "(let `(a b) x)", "(let `(a b)\n  x)\n"),
+        (Dialect::CommonLisp, "(let '(a b) x)", "(let '(a b)\n  x)\n"),
+        (
+            Dialect::CommonLisp,
+            "(let* `(a b) x)",
+            "(let* `(a b)\n  x)\n",
+        ),
+        // `flet`'s bindings list, via `format_local_callable_bindings` …
+        (
+            Dialect::CommonLisp,
+            "(flet `((f (x) x)) y)",
+            "(flet `((f (x) x))\n  y)\n",
+        ),
+        // … and one binding inside it, via `format_local_callable_binding`.
+        (
+            Dialect::CommonLisp,
+            "(flet ('(f (x) x)) y)",
+            "(flet ('(f (x) x))\n  y)\n",
+        ),
+        // `#.` is a prefix like any other here: dropping it turns a read-time
+        // computation into an ordinary call.
+        (
+            Dialect::CommonLisp,
+            "(flet (#.(f (x) x)) y)",
+            "(flet (#.(f (x) x))\n  y)\n",
+        ),
+        // `cond` and `case` clauses, via `format_body_clause`.
+        (
+            Dialect::CommonLisp,
+            "(cond '(a b c))",
+            "(cond\n  '(a b c))\n",
+        ),
+        (
+            Dialect::CommonLisp,
+            "(case x '(a b c))",
+            "(case x\n  '(a b c))\n",
+        ),
+        // `do`'s var-list, via `format_clause_sequence_form`.
+        (
+            Dialect::CommonLisp,
+            "(do `((i 0 (1+ i))) ((> i 3)) x)",
+            "(do `((i 0 (1+ i)))\n  ((> i 3))\n  x)\n",
+        ),
+        // Not a Common Lisp defect wearing other dialects' clothes: the
+        // renderers are shared, so every dialect that reaches one has it.
+        (
+            Dialect::Janet,
+            "(do x ~(def a b))",
+            "(do x\n  ~(def a b))\n",
+        ),
+        (
+            Dialect::Janet,
+            "(do x ,(def a b))",
+            "(do x\n  ,(def a b))\n",
+        ),
+        (Dialect::Fennel, "(do x `(fn a b))", "(do x\n  `(fn a b))\n"),
+        // Clojure's binding *vector* resolves to the same `ListStyle::Binding`.
+        (Dialect::Clojure, "(let `[a b] x)", "(let `[a b]\n  x)\n"),
+    ];
+
+    for (dialect, input, expected) in cases {
+        let tree = SyntaxTree::parse_with_dialect(input, dialect).expect("valid");
+        assert_eq!(
+            Formatter::with_dialect(2, dialect).format(&tree),
+            expected,
+            "{} / {input}",
+            dialect.label()
+        );
+    }
+}
+
+/// The same defect at a width that cannot compact, so the fallback is the
+/// multi-line renderer rather than `compact_node`.
+///
+/// Pinned separately because the two paths emit a prefix for different
+/// reasons — `compact_node` writes `reader_prefix_spans` itself, while
+/// `format_node` writes them before dispatching — so a fix reaching only one
+/// of them would leave this case corrupting.
+#[test]
+fn a_reader_prefix_survives_on_a_binding_list_too_wide_to_compact() {
+    let input = "(let `((alpha 111111111) (beta 222222222) (gamma 33333333) \
+                 (delta 4444444) (epsilon 5555555)) x)";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("valid");
+    let formatted = Formatter::with_dialect(2, Dialect::CommonLisp).format(&tree);
+    assert!(
+        formatted.starts_with("(let `("),
+        "quasiquote dropped from a wide binding list:\n{formatted}"
+    );
+}
+
+/// The tree-equality oracle as a test rather than as a corpus sweep: parse the
+/// input, parse the formatted output, and compare the reader-prefix stack at
+/// every expression.
+///
+/// Spans are excluded because moving them is the formatter's whole job.
+/// A prefix stack is not, and it is invisible to every other check in this
+/// file, because dropping one leaves text that parses.
+#[test]
+fn no_shape_specific_layout_drops_a_child_reader_prefix() {
+    fn prefix_stacks(tree: &SyntaxTree) -> Vec<Vec<crate::sexpr::ReaderPrefix>> {
+        let root = tree.root_view();
+        let mut stacks = Vec::new();
+        let mut stack = vec![&root];
+        while let Some(view) = stack.pop() {
+            stacks.push(view.reader_prefixes.clone());
+            stack.extend(view.children.iter().rev());
+        }
+        stacks
+    }
+
+    let cases = [
+        (Dialect::CommonLisp, "(let `(a b) x)"),
+        (Dialect::CommonLisp, "(let* '((x 1)) x)"),
+        (Dialect::CommonLisp, "(flet `((f (x) x)) y)"),
+        (Dialect::CommonLisp, "(labels ('(f (x) (g x))) y)"),
+        (Dialect::CommonLisp, "(cond '(a b c) `(d e f))"),
+        (Dialect::CommonLisp, "(case x '(a b c))"),
+        (Dialect::CommonLisp, "(ecase x `((a) b c))"),
+        (Dialect::CommonLisp, "(do `((i 0 (1+ i))) '((> i 3) r) x)"),
+        (
+            Dialect::CommonLisp,
+            "(defmacro m (v) `(symbol-macrolet ,(loop for x in v collect x) body))",
+        ),
+        (Dialect::Clojure, "(let `[a b] x)"),
+        (Dialect::Clojure, "(with-open `[a b] body)"),
+        (Dialect::Janet, "(do x ~(def a b))"),
+        (Dialect::Fennel, "(do x `(fn a b))"),
+        // A prefix on the last element of a list, which is where an
+        // off-by-one in prefix handling shows up first.
+        (Dialect::CommonLisp, "(a b 'c)"),
+        (Dialect::CommonLisp, "(let ((x 1)) 'y)"),
+        (Dialect::CommonLisp, "(cond (a 'b) (t 'c))"),
+    ];
+
+    for (dialect, input) in cases {
+        let tree = SyntaxTree::parse_with_dialect(input, dialect).expect("valid input");
+        let formatted = Formatter::with_dialect(2, dialect).format(&tree);
+        let reparsed =
+            SyntaxTree::parse_with_dialect(&formatted, dialect).expect("formatted output reparses");
+        assert_eq!(
+            prefix_stacks(&tree),
+            prefix_stacks(&reparsed),
+            "{} / {input} formatted to:\n{formatted}",
+            dialect.label()
+        );
+    }
+}
