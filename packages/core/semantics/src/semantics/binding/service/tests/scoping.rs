@@ -164,6 +164,69 @@ fn a_bare_name_never_reads_a_local_function() {
 }
 
 #[test]
+fn a_function_designator_is_a_reference_to_the_local_function() {
+    // `#'g` is how a local function is passed to `mapcar`, and it is the only
+    // spelling that reaches one from argument position. Dropping it made a
+    // called function indistinguishable from an unused one.
+    let sharp = "(flet ((g () 1)) (mapcar #'g list))";
+    let table = build(sharp);
+    assert_eq!(
+        reference_labels(&table, binding_at(&table, 8), sharp),
+        vec!["g@27"]
+    );
+
+    // `(function g)` is the same designator spelled out, and must resolve the
+    // same way: the reader produces a list here rather than a prefixed atom,
+    // so the two spellings travel different paths through the walk.
+    let long_hand = "(flet ((g () 1)) (mapcar (function g) list))";
+    let table = build(long_hand);
+    assert_eq!(
+        reference_labels(&table, binding_at(&table, 8), long_hand),
+        vec!["g@35"]
+    );
+}
+
+#[test]
+fn a_function_designator_reads_the_function_namespace_only() {
+    // `#'` names a function, so it never reaches a variable: `#'g` under
+    // `(let ((g 1)) ...)` designates the global `g`, not the binding. This is
+    // what the walk's prefix guard was protecting, and overriding the
+    // namespace rather than dropping the occurrence keeps that protection.
+    let variable = "(let ((g 1)) (mapcar #'g list))";
+    let table = build(variable);
+    assert!(reference_labels(&table, binding_at(&table, 7), variable).is_empty());
+
+    // The two namespaces are read independently in one form.
+    let both = "(let ((g 1)) (flet ((g () 2)) (list g #'g)))";
+    let table = build(both);
+    assert_eq!(
+        reference_labels(&table, binding_at(&table, 7), both),
+        vec!["g@36"]
+    );
+    assert_eq!(
+        reference_labels(&table, binding_at(&table, 21), both),
+        vec!["g@40"]
+    );
+}
+
+#[test]
+fn a_quoted_function_designator_is_still_inert() {
+    // The prefix decides the *namespace*; quoting still decides whether the
+    // occurrence is evaluated at all, and it is checked first.
+    for input in [
+        "(flet ((g () 1)) '#'g)",
+        "(flet ((g () 1)) `(a #'g))",
+        "(flet ((g () 1)) `(a (function g)))",
+    ] {
+        let table = build(input);
+        assert!(
+            reference_labels(&table, binding_at(&table, 8), input).is_empty(),
+            "{input:?}: quoted data holds no live reference"
+        );
+    }
+}
+
+#[test]
 fn labels_sees_itself_but_flet_does_not() {
     let recursive = "(labels ((f (n) (f n))) (f 1))";
     let table = build(recursive);

@@ -157,6 +157,22 @@ fn cl_flet_definitions_do_not_see_each_other() {
 }
 
 #[test]
+fn a_function_designator_reaches_a_local_function_here_too() {
+    // Emacs Lisp is the other two-namespace dialect, and `#'` means the same
+    // thing in it. `#'f` is how a `cl-flet` is handed to `mapcar`.
+    let body = "(cl-flet ((f (n) n)) (mapcar #'f list))";
+    assert_eq!(references_to(body, "f (n) n"), ["f"]);
+
+    let long_hand = "(cl-flet ((f (n) n)) (mapcar (function f) list))";
+    assert_eq!(references_to(long_hand, "f (n) n"), ["f"]);
+
+    // And still never a variable: `#'f` under `(let ((f 1)) ...)` names the
+    // global function, not the binding.
+    let variable = "(let ((f 1)) (mapcar #'f list))";
+    assert_eq!(references_to(variable, "f 1"), [] as [String; 0]);
+}
+
+#[test]
 fn cl_flet_star_extends_the_group_one_definition_at_a_time() {
     let body = "(cl-flet* ((f (n) n) (g (n) (f n))) (g 1))";
     // `f` is visible inside `g` and in the body, but not the other way round.

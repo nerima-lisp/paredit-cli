@@ -57,7 +57,12 @@ pub const CORRECT: &str = r#"
   (let ((sb-debug:*stack-top-hint* value))
     (invoke-debugger nil)))
 
-;; A local function reached only through `#'`, which the binding table drops.
+;; Local functions reached only through a function designator. These used to
+;; need the `UnexplainedOccurrence` guard, because the binding table dropped
+;; `#'` and `(function ...)` outright; they now resolve properly, so they are
+;; here as *resolution* cases rather than *suppression* ones. If a future
+;; change re-breaks designator resolution these go back to reporting, which is
+;; the point of keeping them.
 (defun function-quoted (items)
   (flet ((double (x) (* 2 x)))
     (mapcar #'double items)))
@@ -65,6 +70,29 @@ pub const CORRECT: &str = r#"
 (defun function-designator-long-hand (items)
   (flet ((triple (x) (* 3 x)))
     (mapcar (function triple) items)))
+
+;; A reference buried in a reader conditional in a *sibling* form, which is
+;; what `UnexplainedOccurrence` exists for now that designators resolve.
+;;
+;; Two things have to be true at once for this guard rather than `OpaqueScope`
+;; to be the one that fires. The dialect-aware parse folds `#+64-bit (...)`
+;; into a single opaque atom, so neither the binding table nor a symbol-level
+;; scan can see the reference inside it -- and the blob is outside the binder,
+;; so the binder's own scope is *not* opaque and the cheaper guard declines.
+;; `every_occurrence_is_explained` reaches past the form to the enclosing
+;; top-level one, finds an occurrence it cannot account for, and refuses to
+;; conclude anything.
+;;
+;; This is ASDF's `nest` shape crossed with SBCL's `target-sxhash.lisp`, where
+;; `bignum-hash` is read only from inside `#+64-bit (t (,bignum-hash key))`.
+(defmacro nest-forms (&rest forms) `(progn ,@forms))
+
+(defun blob-buried-sibling-reference (key)
+  (nest-forms
+   (let ((bignum-hash #'sxhash))
+     (values))
+   #+64-bit (funcall bignum-hash key)
+   #-64-bit nil))
 
 ;; A local function called normally, and a mutually recursive pair.
 (defun called-normally (n)

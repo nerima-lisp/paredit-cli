@@ -30,15 +30,33 @@ impl Walk<'_> {
         quasiquote_depth: usize,
         namespace: Namespace,
     ) {
-        // `#'x` designates the function namespace and is not a value
-        // reference; the shared query skips it for the same reason.
-        if view.reader_prefixes.contains(&ReaderPrefix::Function) {
-            return;
-        }
-
         if quasiquote_depth > 0 {
             return;
         }
+
+        // `#'x` designates the *function* namespace. The prefix overrides the
+        // position rather than cancelling the occurrence: `#'g` inside
+        // `(flet ((g () …)) …)` is a reference to that local `g`, and dropping
+        // it made a called function read as unused to every consumer of this
+        // table.
+        //
+        // Overriding rather than deleting the guard is what keeps the fix
+        // narrow. A plain `Namespace::Value` lookup would resolve
+        // `(let ((g 1)) #'g)` to the *variable* `g`, which is what the guard
+        // existed to prevent — `#'` on a variable names nothing in Common
+        // Lisp. `Namespace::Function` admits only `Function`/`Macro` bindings,
+        // so that lookup still misses, while `#'car` still resolves to nothing
+        // unless the file really did `flet` a local `car`, in which case it is
+        // a reference to it.
+        //
+        // Only Common Lisp and Emacs Lisp reach here with this prefix set:
+        // `#'` is a function designator in both, and in Scheme and Racket the
+        // reader rejects `#'` outright rather than producing the prefix.
+        let namespace = if view.reader_prefixes.contains(&ReaderPrefix::Function) {
+            Namespace::Function
+        } else {
+            namespace
+        };
 
         if is_reader_dispatch(view) {
             self.mark_opaque(OpacityCause::new(
@@ -100,6 +118,10 @@ impl Walk<'_> {
             && view.children.len() == 2
             && view.children[1].kind == ExpressionKind::Atom
         {
+            // The designated name is still a reference, in the function
+            // namespace, exactly as for the `#'` spelling. The head `function`
+            // is syntax and is consumed with the form.
+            self.atom_in(&view.children[1], quasiquote_depth, Namespace::Function);
             return true;
         }
 
