@@ -1,0 +1,30 @@
+[package]
+name = "paredit-feature-lint-carp-idiom"
+description = "Lint rules for Carp idiom, where the defects worth reporting are the ones its ownership-tracking compiler accepts"
+readme = "README.md"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+paredit-core-syntax = { path = "../../core/syntax" }
+paredit-core-lint-engine = { path = "../../core/lint-engine" }
+
+# No feature-package dependency, dev or otherwise. The cost table in this
+# package's report was taken with a temporary dev-dependency so a *shipped*
+# rule could be timed in the same pass; it was removed again because a
+# feature-to-feature edge needs an entry in the dependency allowlist contract,
+# and a scratch benchmark does not earn one.
+#
+# Any such crate must stay unnamed here even in a comment:
+# `tests/cli/feature_dependency_contract.rs` scans this file as whole text
+# rather than parsing it, so a crate-name prefix appearing anywhere in it —
+# a comment included — reads as a declared edge and fails the contract.
+
+# Mandatory: without it this package silently opts out of the workspace lint
+# table, including `unsafe_code = "deny"`, with no error at all.
+[lints]
+workspace = true

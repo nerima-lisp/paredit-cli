@@ -217,7 +217,10 @@ pub const PEDANTIC_RULES: [&str; tagged_count(RuleTag::Pedantic)] = {
 // registry-only — no `cli/` directory, so no standalone command and
 // `INTROSPECTION_COMMANDS` stays at 340 where the batch above left it. Three of
 // the four are Hy and the fourth is LFE; none of them runs on Common Lisp.
-const _: () = assert!(RULE_COUNT == 320);
+// 320 + 1 (`lint-carp-idiom`) = 321. One rule, not more: the Carp compiler
+// already rejects the ownership defects that looked most promising, so the only
+// one worth a lint is the one that builds silently.
+const _: () = assert!(RULE_COUNT == 321);
 // Unchanged at 99: every one of this branch's 37 rules is
 // `Fixability::ReportOnly`. Each one reports a judgment the tool cannot make
 // on the author's behalf — whether an annotation or the parameter list under it
@@ -278,7 +281,10 @@ const _: () = assert!(RULE_COUNT == 320);
 // meant to handle, which the tool cannot know. `lfe-catch-swallows-exit` is the
 // clearest of the four: rewriting `(catch Expr)` to `try … catch` requires
 // inventing the failure continuation the `catch` form never had.
-const _: () = assert!(fixable_count() == 103);
+// 103 + 1: `carp-deprecated-thread-macro` is the rare mechanical fix -- `=>`
+// and `->` are byte-identical macro bodies in Carp's own stdlib, so the repair
+// is a rename. It is still withheld when the file defines its own `->`.
+const _: () = assert!(fixable_count() == 104);
 // 164 (through PR #82) + 31 of this branch's 37 rules. The other 6 are
 // `Severity::Error`: `when-unless-implicit-nil-misused` and the five
 // `lint-safety` rules that report an exploitable defect rather than a risk —
@@ -349,7 +355,9 @@ const _: () = assert!(fixable_count() == 103);
 // trouble. Note `lfe-catch-swallows-exit` is one of the 3: it is a warning that
 // also carries `RuleTag::Pedantic`, so it counts here and is subtracted again
 // in the preset-filtered count `tests/cli/lint_report.rs` pins.
-const _: () = assert!(warning_count() == 235);
+// 235 + 1: the Carp rule is a `Warning`. Deprecated-but-working code is not an
+// error, and Carp's own stdlib still uses the spelling.
+const _: () = assert!(warning_count() == 236);
 const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
 // 6 (through PR #82) + 8 of this branch's rules: `lint-call-shape`'s four
 // threshold rules, whose limits are conventions a codebase either adopted or

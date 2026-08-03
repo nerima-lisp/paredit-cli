@@ -304,8 +304,9 @@ fn cli_lint_list_rules_prints_the_catalog_without_files() {
         // the suite's 320 less *16* — the divisor moved for the first time in
         // four batches, because `lfe-catch-swallows-exit` ships tagged
         // `pedantic`. So this rises by 3 where the suite rises by 4, and the
-        // two numbers are not the same arithmetic.
-        .stdout(predicate::str::contains("\"rule_count\": 304"))
+        // two numbers are not the same arithmetic. + this branch's 1 = 305,
+        // and the divisor holds at 16, so it is a plain +1 again.
+        .stdout(predicate::str::contains("\"rule_count\": 305"))
         .stdout(predicate::str::contains("\"self-assignment\""))
         .stdout(predicate::str::contains(
             "a setq/setf/psetq/psetf that assigns a place to itself",
@@ -997,7 +998,7 @@ fn cli_lint_list_rules_marks_severity() {
     // `lfe-catch-swallows-exit` is also tagged `pedantic`, so the default
     // preset holds it back and only 2 of the 3 are visible here: 235 less the
     // now-16 `pedantic` rules, all still warnings, = 219.
-    assert_eq!(warnings, 219);
+    assert_eq!(warnings, 220);
 }
 
 #[test]
@@ -1030,8 +1031,14 @@ fn cli_lint_list_rules_marks_fixability() {
     // `lfe-catch-swallows-exit` is `ReportOnly` like the other three. The
     // sentence "none of the pedantic rules is fixable" is now load-bearing over
     // 16 rules rather than 15.
+    //
+    // This branch finally moves it: `carp-deprecated-thread-macro` is
+    // `Fixability::Fixable` and untagged, so it lands in both the suite total
+    // and the preset-filtered one. It is the rare mechanical repair -- `=>`
+    // and `->` are byte-identical macro bodies in Carp's own stdlib, so the
+    // fix is a rename.
     assert_eq!(
-        fixable_count, 103,
+        fixable_count, 104,
         "the fixable rules the default preset admits"
     );
 
