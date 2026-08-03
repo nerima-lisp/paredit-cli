@@ -46,7 +46,15 @@ pub fn apply_reader_prefix_context(
             // anonymous functions and metadata targets), so treat them like
             // `Function` rather than opaque data: keep traversing normally
             // instead of hiding the contents from rename/reference tracking.
+            // LFE's `#B(…)`, `#M(…)` and `#S(…)` sit here for the same reason:
+            // their elements are ordinary expressions, not opaque data. A
+            // binary segment is `(value (size N) (unit 8))` and a map literal's
+            // values are arbitrary forms, so rename and reference tracking must
+            // keep descending into them.
             ReaderPrefix::HashLiteral
+            | ReaderPrefix::LfeBinary
+            | ReaderPrefix::LfeMap
+            | ReaderPrefix::LfeStruct
             | ReaderPrefix::Metadata
             | ReaderPrefix::ReaderConditional
             | ReaderPrefix::ReaderConditionalSplicing => {}
