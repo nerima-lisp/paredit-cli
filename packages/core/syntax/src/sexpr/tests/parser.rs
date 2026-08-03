@@ -1,7 +1,7 @@
 use super::*;
 use crate::dialect::Dialect;
 use crate::sexpr::parser::MAX_DISCARDED_FORM_STACK_FRAMES;
-use crate::sexpr::reader_policy::{DialectReaderPolicy, LongStringExtent};
+use crate::sexpr::reader_policy::{DialectReaderPolicy, HyStringExtent, LongStringExtent};
 
 #[test]
 fn parses_balanced_document() {
@@ -2096,5 +2096,385 @@ fn lfe_lexical_switches_are_scoped_to_lfe() {
             "{}",
             dialect.label()
         );
+    }
+}
+
+/// The four Hy reader defects, each pinned by the shape it produced before.
+///
+/// Every expectation here was checked against Hy 1.3.1's own reader
+/// (`hy.reader.read_many`) rather than derived from the documentation.
+#[test]
+fn hy_reads_its_own_string_and_unquote_syntax() {
+    struct Case {
+        input: &'static str,
+        children: &'static [&'static str],
+    }
+
+    let cases = [
+        // f-strings. Before, `f"hi {name}"` scanned as the token `f"hi`, a
+        // brace list, then an unterminated string, and the file did not parse.
+        Case {
+            input: r#"(print f"hi {name}")"#,
+            children: &["print", r#"f"hi {name}""#],
+        },
+        // Arbitrary Hy code lives in the braces -- `read_fcomponent` calls
+        // `parse_one_form` -- but the literal stays one opaque atom.
+        Case {
+            input: r#"(print f"{(+ 1 2)}")"#,
+            children: &["print", r#"f"{(+ 1 2)}""#],
+        },
+        // A nested string inside a field holds the outer closing quote
+        // hostage. This is why the scanner is a sub-reader rather than a
+        // search for the next `"`.
+        Case {
+            input: r#"(print f"{(str "}")}")"#,
+            children: &["print", r#"f"{(str "}")}""#],
+        },
+        // A nested f-string, and a `;` comment inside a field.
+        Case {
+            input: "(print f\"{f\"{x}\"}\")",
+            children: &["print", "f\"{f\"{x}\"}\""],
+        },
+        Case {
+            input: "(print f\"{(+ 1 ; c\n 2)}\")",
+            children: &["print", "f\"{(+ 1 ; c\n 2)}\""],
+        },
+        // Doubled braces are literal text, not fields.
+        Case {
+            input: r#"(print f"{{literal}}")"#,
+            children: &["print", r#"f"{{literal}}""#],
+        },
+        // Every other valid prefix. `r"a)b"` was the widest-reaching case: the
+        // atom scanner ran past the quote and stopped at the `)` *inside* the
+        // literal, reporting a stray closing delimiter.
+        Case {
+            input: r#"(re.match r"a)b" s)"#,
+            children: &["re.match", r#"r"a)b""#, "s"],
+        },
+        Case {
+            input: r#"(f b"x" rb"y" br"z" t"{q}" rf"w" fr"v" rt"u")"#,
+            children: &[
+                "f",
+                r#"b"x""#,
+                r#"rb"y""#,
+                r#"br"z""#,
+                r#"t"{q}""#,
+                r#"rf"w""#,
+                r#"fr"v""#,
+                r#"rt"u""#,
+            ],
+        },
+        // Bracket strings. The dangerous one: this used to yield a real `defn`
+        // node inside what is actually a raw string.
+        Case {
+            input: "(setv x #[[(defn evil [] 1)]])",
+            children: &["setv", "x", "#[[(defn evil [] 1)]]"],
+        },
+        Case {
+            input: "(setv x #[delim[hello]delim])",
+            children: &["setv", "x", "#[delim[hello]delim]"],
+        },
+        // The close is `]` + delim + `]`, so a bare `]]` inside is content.
+        Case {
+            input: "(setv x #[d[a]]b]d])",
+            children: &["setv", "x", "#[d[a]]b]d]"],
+        },
+        // Unbalanced delimiters inside are just bytes.
+        Case {
+            input: "(setv x #[[ ) ) ) ]])",
+            children: &["setv", "x", "#[[ ) ) ) ]]"],
+        },
+        // A bracket string whose delimiter is `f` or starts `f-` interpolates.
+        Case {
+            input: "(setv x #[f-q[{(+ 1 2)}]f-q])",
+            children: &["setv", "x", "#[f-q[{(+ 1 2)}]f-q]"],
+        },
+        // `#(` and `#{` keep their existing reading: Hy's tuple and set
+        // literals really do contain forms, unlike `#[`.
+        Case {
+            input: "(f #(1 2) #{3 4})",
+            children: &["f", "#(1 2)", "#{3 4}"],
+        },
+    ];
+
+    for case in cases {
+        let tree = SyntaxTree::parse_with_dialect(case.input, Dialect::Hy)
+            .unwrap_or_else(|error| panic!("{}: {error}", case.input));
+        let form = &tree.root_view().children[0];
+        let children = form
+            .children
+            .iter()
+            .map(|child| child.span.slice(case.input))
+            .collect::<Vec<_>>();
+        assert_eq!(children, case.children, "{}", case.input);
+    }
+}
+
+/// A Hy shebang is trivia, and only at offset 0.
+///
+/// `HyReader.parse` peeks the first two characters of the stream, so
+/// `\n#!/usr/bin/env hy` stays the "reader macro is not defined" error it has
+/// always been. Reading it as a line comment rather than stripping the line
+/// keeps every later byte offset unchanged.
+#[test]
+fn hy_shebang_is_trivia_only_at_offset_zero() {
+    let input = "#!/usr/bin/env hy\n(print 1)\n";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::Hy).expect("valid");
+    let roots = tree
+        .root_view()
+        .children
+        .iter()
+        .map(|child| child.span.slice(input))
+        .collect::<Vec<_>>();
+    assert_eq!(roots, vec!["(print 1)"]);
+
+    // Offset 0 only. A `#!` on a later line stays an ordinary dispatch, and
+    // the two junk atoms it produces are the pre-existing reading.
+    let later = "(print 1)\n#!/usr/bin/env hy\n";
+    let tree = SyntaxTree::parse_with_dialect(later, Dialect::Hy).expect("parses");
+    assert_eq!(tree.root_view().children.len(), 3, "{later:?}");
+}
+
+/// Hy's `~` is deliberately still a bare atom, not a reader prefix.
+///
+/// This pins the *known-wrong* reading on purpose, so that whoever makes `~` a
+/// prefix has to come here and read why it was held back. `classify_hy`
+/// carries the reasoning: several formatter paths open a child list without
+/// writing its reader prefixes, so promoting `~` deletes it from the output.
+/// Measured over 2825 real files, that newly changed the meaning of 14 files
+/// `edit format` had previously handled correctly.
+///
+/// The fix belongs with the formatter fix, not before it.
+#[test]
+fn hy_unquote_is_not_yet_a_reader_prefix() {
+    let input = "`(foo ~bar ~@baz)";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::Hy).expect("valid");
+    let form = &tree.root_view().children[0];
+    assert_eq!(form.reader_prefixes, vec![ReaderPrefix::Quasiquote]);
+    let children = form
+        .children
+        .iter()
+        .map(|child| (child.span.slice(input), child.reader_prefixes.clone()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        children,
+        vec![("foo", vec![]), ("~bar", vec![]), ("~@baz", vec![])]
+    );
+
+    // Clojure's `~`, which really is a prefix, must be unaffected either way.
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::Clojure).expect("valid");
+    let prefixes = tree.root_view().children[0]
+        .children
+        .iter()
+        .map(|child| child.reader_prefixes.clone())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        prefixes,
+        vec![
+            vec![],
+            vec![ReaderPrefix::Unquote],
+            vec![ReaderPrefix::UnquoteSplicing],
+        ]
+    );
+}
+
+/// An unterminated Hy literal fails loudly rather than swallowing the file.
+///
+/// Reading to EOF as one atom is the silent corruption this fix removes: every
+/// later command would be handed a tree in which the rest of the document is
+/// one giant symbol. Hy refuses all of these too.
+#[test]
+fn hy_unterminated_literals_are_refused() {
+    for input in [
+        r#"(print f"abc"#,
+        r#"(print f"{(+ 1 2"#,
+        "(setv x #[[abc)",
+        "(setv x #[delim[abc]nope])",
+        r#"(print r"abc"#,
+    ] {
+        let error = SyntaxTree::parse_with_dialect(input, Dialect::Hy)
+            .expect_err("an unterminated literal must be refused");
+        assert!(
+            matches!(
+                error,
+                ParseError::UnterminatedString(_) | ParseError::UnexpectedClose { .. }
+            ),
+            "{input:?}: {error}"
+        );
+    }
+
+    // The two bytes Hy names explicitly become delimiter errors, since that is
+    // what they are: a `]` in a bracket string's delimiter, and an undoubled
+    // `}` in f-string literal text.
+    assert!(matches!(
+        SyntaxTree::parse_with_dialect("(setv x #[a]b[y]a]b])", Dialect::Hy),
+        Err(ParseError::UnexpectedClose { delimiter: ']', .. })
+    ));
+    assert!(matches!(
+        SyntaxTree::parse_with_dialect(r#"(print f"}")"#, Dialect::Hy),
+        Err(ParseError::UnexpectedClose { delimiter: '}', .. })
+    ));
+}
+
+/// The prefix table, at the boundaries `prefixed_string` actually enforces.
+#[test]
+fn hy_string_prefix_width_matches_hys_validation() {
+    let policy = DialectReaderPolicy::new(Dialect::Hy);
+    // Distinct characters, a proper subset of `bfrt`, at most one of `b`/`f`/`t`.
+    for good in ["r", "b", "f", "t", "rb", "br", "rf", "fr", "rt", "tr"] {
+        let source = format!("{good}\"x\"");
+        assert_eq!(
+            policy.hy_string_prefix_width(source.as_bytes(), 0),
+            Some(good.len()),
+            "{good}"
+        );
+    }
+    // Two of `b`/`f`/`t`, a repeated character, or not a prefix at all.
+    for bad in ["bf", "ff", "bt", "q", "xf", "foo"] {
+        let source = format!("{bad}\"x\"");
+        assert_eq!(
+            policy.hy_string_prefix_width(source.as_bytes(), 0),
+            None,
+            "{bad}"
+        );
+    }
+    // A prefix is only a prefix immediately before a quote.
+    assert_eq!(policy.hy_string_prefix_width(b"r x", 0), None);
+    // And never outside Hy.
+    assert_eq!(
+        DialectReaderPolicy::new(Dialect::CommonLisp).hy_string_prefix_width(b"r\"x\"", 0),
+        None
+    );
+}
+
+/// The extent scanner, including the cases that decide where a literal ends.
+#[test]
+fn hy_string_extent_matches_hys_reader() {
+    let policy = DialectReaderPolicy::new(Dialect::Hy);
+    let closed = |width| Some(HyStringExtent::Closed { width });
+
+    assert_eq!(policy.hy_string_extent(br#"f"hi {name}""#, 0), closed(12));
+    assert_eq!(policy.hy_string_extent(br#"r"a)b""#, 0), closed(6));
+    // The nested string holds the outer closing quote hostage.
+    assert_eq!(policy.hy_string_extent(br#"f"{(str "}")}""#, 0), closed(14));
+    // Doubled braces are literal, so this closes at its own final quote.
+    assert_eq!(policy.hy_string_extent(br#"f"{{a}}""#, 0), closed(8));
+    // An escaped quote does not close a literal.
+    assert_eq!(policy.hy_string_extent(br#"f"a\"b {x}""#, 0), closed(11));
+    // Bracket strings: the close is `]` + delim + `]`, so `]]` here is content.
+    assert_eq!(policy.hy_string_extent(b"#[d[a]]b]d]", 0), closed(11));
+    assert_eq!(policy.hy_string_extent(b"#[[a]]", 0), closed(6));
+    // Scanning starts at `pos`, not at 0.
+    assert_eq!(policy.hy_string_extent(br#"(f r"a)b")"#, 3), closed(6));
+    // Unterminated, and not a string at all.
+    assert_eq!(
+        policy.hy_string_extent(br#"f"abc"#, 0),
+        Some(HyStringExtent::Unterminated)
+    );
+    assert_eq!(
+        policy.hy_string_extent(b"#[[abc", 0),
+        Some(HyStringExtent::Unterminated)
+    );
+    assert_eq!(policy.hy_string_extent(b"abc", 0), None);
+    assert_eq!(policy.hy_string_extent(b"", 0), None);
+    // And never one outside Hy.
+    assert_eq!(
+        DialectReaderPolicy::new(Dialect::Clojure).hy_string_extent(b"#[[a]]", 0),
+        None
+    );
+}
+
+/// Nothing above may leak into another dialect.
+///
+/// `#[`, `~` and an `r"..."` prefix all mean something else, or nothing, in the
+/// other ten readers. This pins them so a later edit to `has_prefixed_strings`
+/// or `has_bracket_strings` cannot quietly widen, the way the Janet long
+/// string test pins backtick.
+#[test]
+fn hy_string_and_unquote_rules_do_not_leak_to_other_dialects() {
+    for dialect in [
+        Dialect::CommonLisp,
+        Dialect::EmacsLisp,
+        Dialect::Scheme,
+        Dialect::Racket,
+        Dialect::Clojure,
+        Dialect::Fennel,
+        Dialect::Lfe,
+        Dialect::Carp,
+        Dialect::Janet,
+        Dialect::Unknown,
+    ] {
+        let policy = DialectReaderPolicy::new(dialect);
+        assert!(!policy.has_prefixed_strings(), "{}", dialect.label());
+        assert!(!policy.has_bracket_strings(), "{}", dialect.label());
+        assert_eq!(
+            policy.hy_string_prefix_width(b"r\"x\"", 0),
+            None,
+            "{}",
+            dialect.label()
+        );
+        assert_eq!(
+            policy.hy_string_extent(b"#[[a]]", 0),
+            None,
+            "{}",
+            dialect.label()
+        );
+
+        // `#[` stays whatever it already was: a hash-literal prefix on a
+        // bracket *list* in the dialects that have one, and a refusal in the
+        // rest. Comparing the sliced text would not discriminate -- Fennel's
+        // `#` prefix spans exactly the same bytes -- so this compares the
+        // node kind, which is the thing that actually changed for Hy.
+        let input = "(setv x #[[a]])";
+        if let Ok(tree) = SyntaxTree::parse_with_dialect(input, dialect) {
+            let third = &tree.root_view().children[0].children[2];
+            assert_eq!(
+                third.kind,
+                ExpressionKind::List,
+                "{}: `#[[a]]` must stay a list, not become one raw-string atom",
+                dialect.label()
+            );
+        }
+    }
+
+    // `~` is unquote in Clojure too; only Hy gained an arm, and Clojure's
+    // existing one must be untouched.
+    let input = "`(foo ~bar ~@baz)";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::Clojure).expect("valid");
+    let prefixes = tree.root_view().children[0]
+        .children
+        .iter()
+        .map(|child| child.reader_prefixes.clone())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        prefixes,
+        vec![
+            vec![],
+            vec![ReaderPrefix::Unquote],
+            vec![ReaderPrefix::UnquoteSplicing],
+        ]
+    );
+}
+
+/// The recording reader and the discarded-form scanner must agree.
+///
+/// `#_` is Hy's datum comment, so unlike Janet's unreachable arm this path runs
+/// on real input. If the two disagreed about where an f-string or bracket
+/// string ends, a `#_` would discard the wrong number of bytes.
+#[test]
+fn hy_discarded_forms_use_the_same_string_extent() {
+    for (input, expected) in [
+        (r#"(f #_ f"{(str "}")}" tail)"#, vec!["f", "tail"]),
+        ("(f #_ #[d[a]]b]d] tail)", vec!["f", "tail"]),
+        (r#"(f #_ r"a)b" tail)"#, vec!["f", "tail"]),
+    ] {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::Hy)
+            .unwrap_or_else(|error| panic!("{input}: {error}"));
+        let children = tree.root_view().children[0]
+            .children
+            .iter()
+            .map(|child| child.span.slice(input))
+            .collect::<Vec<_>>();
+        assert_eq!(children, expected, "{input}");
     }
 }
