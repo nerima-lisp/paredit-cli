@@ -5886,6 +5886,58 @@
             "primaryLocationLineHash": "fnv1a64:0e588b483baf867e:0"
           },
           "ruleId": "return-from-unmatched-block"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "broad.lisp"
+                },
+                "region": {
+                  "byteLength": 1,
+                  "byteOffset": 8637,
+                  "startColumn": 8,
+                  "startLine": 123
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "local binding `x` bound by `let` is never read in its body; remove it or declare it ignored"
+          },
+          "partialFingerprints": {
+            "pareditFindingId": "unused-local-binding/af63f54c86021707/0",
+            "primaryLocationLineHash": "fnv1a64:657f9c9189fd01e1:0"
+          },
+          "ruleId": "unused-local-binding"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "broad.lisp"
+                },
+                "region": {
+                  "byteLength": 1,
+                  "byteOffset": 8643,
+                  "startColumn": 14,
+                  "startLine": 123
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "local binding `y` bound by `let` is never read in its body; remove it or declare it ignored"
+          },
+          "partialFingerprints": {
+            "pareditFindingId": "unused-local-binding/af63f44c86021554/0",
+            "primaryLocationLineHash": "fnv1a64:657f9c9189fd01e1:1"
+          },
+          "ruleId": "unused-local-binding"
         }
       ],
       "tool": {
@@ -10185,6 +10237,54 @@
               },
               "shortDescription": {
                 "text": "a loop whose implicit accumulation is discarded by a `finally (return …)`"
+              }
+            },
+            {
+              "id": "defgeneric-method-option-incongruent",
+              "properties": {
+                "category": "object-system",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a (:method ...) option whose lambda list CLHS 7.6.4 will not let its own defgeneric accept"
+              }
+            },
+            {
+              "id": "initialization-primary-without-call-next-method",
+              "properties": {
+                "category": "object-system",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a primary initialize-instance or shared-initialize method that never calls call-next-method"
+              }
+            },
+            {
+              "id": "class-allocated-slot-with-initarg",
+              "properties": {
+                "category": "object-system",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a :allocation :class slot that also accepts an :initarg, so one construction rewrites every instance"
+              }
+            },
+            {
+              "id": "unused-local-binding",
+              "properties": {
+                "category": "dead-code",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a let/let*/flet/labels binding that nothing in its body reads"
               }
             }
           ]

@@ -306,7 +306,7 @@ fn cli_lint_list_rules_prints_the_catalog_without_files() {
         // `pedantic`. So this rises by 3 where the suite rises by 4, and the
         // two numbers are not the same arithmetic. + this branch's 1 = 305,
         // and the divisor holds at 16, so it is a plain +1 again.
-        .stdout(predicate::str::contains("\"rule_count\": 308"))
+        .stdout(predicate::str::contains("\"rule_count\": 312"))
         .stdout(predicate::str::contains("\"self-assignment\""))
         .stdout(predicate::str::contains(
             "a setq/setf/psetq/psetf that assigns a place to itself",
@@ -998,7 +998,7 @@ fn cli_lint_list_rules_marks_severity() {
     // `lfe-catch-swallows-exit` is also tagged `pedantic`, so the default
     // preset holds it back and only 2 of the 3 are visible here: 235 less the
     // now-16 `pedantic` rules, all still warnings, = 219.
-    assert_eq!(warnings, 221);
+    assert_eq!(warnings, 223);
 }
 
 #[test]

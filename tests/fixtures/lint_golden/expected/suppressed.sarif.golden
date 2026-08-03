@@ -4379,6 +4379,54 @@
               "shortDescription": {
                 "text": "a loop whose implicit accumulation is discarded by a `finally (return …)`"
               }
+            },
+            {
+              "id": "defgeneric-method-option-incongruent",
+              "properties": {
+                "category": "object-system",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a (:method ...) option whose lambda list CLHS 7.6.4 will not let its own defgeneric accept"
+              }
+            },
+            {
+              "id": "initialization-primary-without-call-next-method",
+              "properties": {
+                "category": "object-system",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a primary initialize-instance or shared-initialize method that never calls call-next-method"
+              }
+            },
+            {
+              "id": "class-allocated-slot-with-initarg",
+              "properties": {
+                "category": "object-system",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a :allocation :class slot that also accepts an :initarg, so one construction rewrites every instance"
+              }
+            },
+            {
+              "id": "unused-local-binding",
+              "properties": {
+                "category": "dead-code",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a let/let*/flet/labels binding that nothing in its body reads"
+              }
             }
           ]
         }

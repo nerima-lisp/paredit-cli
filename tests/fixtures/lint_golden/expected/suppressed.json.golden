@@ -1877,6 +1877,30 @@
       "count": 0,
       "description": "a loop whose implicit accumulation is discarded by a `finally (return …)`",
       "rule": "loop-accumulation-discarded-by-finally-return"
+    },
+    {
+      "category": "object-system",
+      "count": 0,
+      "description": "a (:method ...) option whose lambda list CLHS 7.6.4 will not let its own defgeneric accept",
+      "rule": "defgeneric-method-option-incongruent"
+    },
+    {
+      "category": "object-system",
+      "count": 0,
+      "description": "a primary initialize-instance or shared-initialize method that never calls call-next-method",
+      "rule": "initialization-primary-without-call-next-method"
+    },
+    {
+      "category": "object-system",
+      "count": 0,
+      "description": "a :allocation :class slot that also accepts an :initarg, so one construction rewrites every instance",
+      "rule": "class-allocated-slot-with-initarg"
+    },
+    {
+      "category": "dead-code",
+      "count": 0,
+      "description": "a let/let*/flet/labels binding that nothing in its body reads",
+      "rule": "unused-local-binding"
     }
   ],
   "policy": {
