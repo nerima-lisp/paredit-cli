@@ -7,6 +7,7 @@
 use paredit_core_lint_engine::LintResult;
 
 use crate::list_star_to_cons::domain::examine;
+use crate::support::is_hard_quoted_at;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
 use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
@@ -46,6 +47,13 @@ impl LintRule for Rule {
         examine(view, &mut list_star_form_count, &mut items);
         for item in items {
             let span = item.span;
+            // Rewriting hard-quoted data edits a user's data literal rather than
+            // code, and no round-trip property catches it. Read on the `hard`
+            // counter alone: a `` `(…) `` template's contents really are emitted as
+            // code. See `support::is_hard_quoted_at`.
+            if is_hard_quoted_at(context.tree(), span) {
+                continue;
+            }
             let fix = {
                 // (list* a b) is (cons a b).
                 let text = format!(

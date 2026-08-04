@@ -7,6 +7,7 @@
 use paredit_core_lint_engine::LintResult;
 
 use crate::redundant_end_nil::domain::examine;
+use crate::support::is_hard_quoted_at;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
 use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, Replacement, RuleCategory, RuleFix, RuleMeta, Severity,
@@ -74,7 +75,7 @@ impl LintRule for Rule {
 
     fn check(
         &self,
-        _context: &RuleContext<'_>,
+        context: &RuleContext<'_>,
         view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
     ) -> LintResult<()> {
@@ -83,6 +84,13 @@ impl LintRule for Rule {
         examine(view, &mut call_form_count, &mut items);
         for item in items {
             let span = item.span;
+            // Rewriting hard-quoted data edits a user's data literal rather than
+            // code, and no round-trip property catches it. Read on the `hard`
+            // counter alone: a `` `(…) `` template's contents really are emitted as
+            // code. See `support::is_hard_quoted_at`.
+            if is_hard_quoted_at(context.tree(), span) {
+                continue;
+            }
             let fix = {
                 RuleFix::multi(
                     "Drop the redundant :end nil".to_owned(),
