@@ -42,6 +42,18 @@ pub(super) enum LongStringExtent {
     Unterminated,
 }
 
+/// How far a Racket here string reaches from its opening `#<<`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum HereStringExtent {
+    /// Total byte width of the literal: `#<<`, the tag, the newline that ends
+    /// the opening line, the content, the terminating tag, and the newline
+    /// after it when there is one.
+    Closed { width: usize },
+    /// Either no newline after `#<<` before EOF, or no terminator line before
+    /// EOF. Racket raises a reader error for both.
+    Unterminated,
+}
+
 /// How far a Hy string literal reaches from its opening delimiter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum HyStringExtent {
@@ -148,6 +160,33 @@ impl DialectReaderPolicy {
             {
                 Some(LANG_DIRECTIVE.len())
             }
+            // `#!` followed by a space or a `/` is a Unix line comment in
+            // Racket, and it is skipped in `read-char/skip-whitespace-and-
+            // comments` beside `;` and `#|` rather than in `read-dispatch`:
+            //
+            // ```racket
+            // [(and (char=? #\# ec)
+            //       (eqv? #\! (readtable-effective-char/# rt (peek-char/special in config 0 source)))
+            //       (let ([c3 (peek-char/special in config 1 source)])
+            //         (or (eqv? #\space c3) (eqv? #\/ c3))))
+            //  (skip-unix-line-comment! in config)
+            // ```
+            //
+            // Two differences from the Emacs Lisp and Hy arms below, and both
+            // come straight from that placement. It is *not* restricted to
+            // offset 0 — being in the whitespace skipper means it applies
+            // wherever a datum could start — and `skip-unix-line-comment!`
+            // continues onto the next line when the byte before the newline is
+            // a `\`, so the width has to be scanned rather than fixed. The
+            // scan returns the full extent so `skip_trivia`'s "run to the next
+            // newline" loop finds the cursor already there.
+            //
+            // Without this, `#!/bin/sh` and `#! /usr/bin/env racket` scanned as
+            // junk atoms sitting at top level as if they were code — the same
+            // silent defect the Hy arm below records, at exit 0. It is what
+            // made 13 of 4492 real `.rkt` files disagree with Racket's own
+            // reader about how many top-level forms they contain.
+            Dialect::Racket if byte == b'#' => racket_unix_line_comment_width(bytes, pos),
             // An Emacs Lisp script starts `#!/usr/bin/emacs --script`, and
             // Emacs skips that line the way it skips a comment. Reading it as
             // one keeps the byte offsets of everything after it unchanged,
@@ -258,6 +297,39 @@ impl DialectReaderPolicy {
         matches!(self.dialect, Dialect::Janet)
     }
 
+    /// Whether a `"` ends the token before it rather than belonging to it.
+    ///
+    /// Racket only, and narrowly on purpose. `char-delimiter?`
+    /// (`racket/src/expander/read/delimiter.rkt`) lists `"` beside whitespace
+    /// and the brackets, so `(format"~a" x)` is the symbol `format` followed by
+    /// a string — no space required, and Racket's own benchmark suite writes it
+    /// that way.
+    ///
+    /// Reading it as one token was not merely coarse. The atom swallowed the
+    /// opening quote, stopped at the space *inside* the literal, and the rest
+    /// of the string became sibling atoms; `edit format` then re-emitted them
+    /// as separate forms and put a line break inside what Racket reads as
+    /// string data. That is silent corruption at exit 0, and it is what the
+    /// corpus round trip against Racket's own reader caught in
+    /// `benchmarks/shootout/wordfreq.rkt`.
+    ///
+    /// Every dialect here except Hy terminates a token at `"` for the same
+    /// reason, so this is a general gap. It stays gated on Racket because
+    /// widening it is a behaviour change for nine other readers that needs
+    /// each one's own corpus audit — and because Hy is the counter-example
+    /// that shows the rule cannot simply be made unconditional:
+    /// [`Self::has_prefixed_strings`] exists because there an identifier
+    /// immediately before a `"` really is a prefix on the literal.
+    ///
+    /// Racket's other non-bracket delimiters — `'`, `` ` `` and `,` — are
+    /// deliberately still missing. They mis-read a token the same way, but they
+    /// cannot corrupt one: the merged atom is re-emitted verbatim, so a format
+    /// round trip over the corpus is byte-identical for them. Fixing them is
+    /// worth doing on its own evidence, not as a rider here.
+    pub(super) const fn string_terminates_a_token(self) -> bool {
+        matches!(self.dialect, Dialect::Racket)
+    }
+
     pub(super) fn is_atom_boundary(self, bytes: &[u8], pos: usize) -> bool {
         bytes.get(pos).is_none_or(|byte| {
             self.is_whitespace(*byte)
@@ -267,6 +339,7 @@ impl DialectReaderPolicy {
                 // for the nine dialects without long strings the test folds
                 // away instead of costing a comparison per byte.
                 || (self.has_long_strings() && *byte == b'`')
+                || (self.string_terminates_a_token() && *byte == b'"')
                 || self.line_comment_width(bytes, pos).is_some()
         })
     }
@@ -377,6 +450,85 @@ impl DialectReaderPolicy {
         hy_string_extent_at(bytes, pos, MAX_HY_STRING_NESTING)
     }
 
+    /// Whether `#<<` opens a here string in this dialect.
+    ///
+    /// Racket only. `read-dispatch` (`racket/src/expander/read/main.rkt`)
+    /// sends `#<` to a peek for a second `<` and nowhere else:
+    ///
+    /// ```racket
+    /// [(#\<)
+    ///  (define c2 (peek-char/special in config))
+    ///  (cond
+    ///   [(eqv? #\< c2)
+    ///    (consume-char in #\<)
+    ///    (read-here-string in config)]
+    ///   [else
+    ///    (reader-error in config #:due-to c2 "bad syntax `~a<`" dispatch-c)])]
+    /// ```
+    ///
+    /// No Scheme has the form, which is why this is gated on the dialect
+    /// rather than added to the shared `#`-dispatch table.
+    pub(super) const fn has_here_strings(self) -> bool {
+        matches!(self.dialect, Dialect::Racket)
+    }
+
+    /// How far the Racket here string starting at `pos` reaches, if one starts
+    /// there.
+    ///
+    /// `read-here-string` (`racket/src/expander/read/string.rkt`) reads the
+    /// terminator first — every character after `#<<` up to, but not
+    /// including, the first newline — and then matches it against the content
+    /// with a non-backtracking state machine seeded from
+    /// `(cons #\newline tag)`:
+    ///
+    /// ```racket
+    /// (let loop ([terminator (cdr full-terminator)] [terminator-accum null])
+    ///   ...
+    ///   [(and (null? terminator) (char=? c #\newline)) (void)]
+    /// ```
+    ///
+    /// Four consequences, and each one is load-bearing:
+    ///
+    /// * The tag is the *whole* rest of the opening line, spaces included.
+    ///   `#<<END ` and `#<<END` are different terminators.
+    /// * The loop starts at `(cdr full-terminator)`, so the terminator may
+    ///   match at the very first content byte: `#<<END\nEND\n` is the empty
+    ///   string, not an unterminated literal.
+    /// * A terminator line is the tag and nothing else. Leading whitespace
+    ///   fails the match against `(car terminator)`; trailing whitespace fails
+    ///   the `(char=? c #\newline)` test and falls into the `else` branch,
+    ///   which flushes the matched characters back into the content. So
+    ///   `  END` and `END ` are ordinary content lines.
+    /// * The EOF branch is `(unless (null? terminator) (reader-error ...))`,
+    ///   so a tag matched at the very end of input with no newline after it
+    ///   *does* terminate. `#<<END\nx\nEND` at EOF is a complete literal.
+    ///
+    /// The state machine is equivalent to the scan below because a partial
+    /// match can only ever consume tag characters, and a tag can never contain
+    /// a newline — so no newline is ever swallowed by a failed partial match,
+    /// and every position after a newline is tried.
+    ///
+    /// A tag that never reappears is [`HereStringExtent::Unterminated`] rather
+    /// than a literal running to EOF, for the reason
+    /// [`Self::long_string_extent`] gives: an atom that swallows the rest of
+    /// the file is silent corruption, and Racket refuses the same input with
+    /// "found end-of-file before terminating".
+    ///
+    /// ### Why the terminating newline is inside the span
+    ///
+    /// Racket consumes it, and so must this: a here string is the one literal
+    /// here that is not self-delimiting. Its terminator is only a terminator
+    /// when a newline or EOF follows, so an extent that stopped one byte
+    /// earlier would let the formatter emit `(list #<<E ... E)` — the closing
+    /// paren landing on the terminator line and quietly turning a complete
+    /// literal into an unterminated one.
+    pub(super) fn here_string_extent(self, bytes: &[u8], pos: usize) -> Option<HereStringExtent> {
+        if !self.has_here_strings() || bytes.get(pos..pos + 3) != Some(HERE_STRING_OPEN) {
+            return None;
+        }
+        Some(here_string_extent_at(bytes, pos))
+    }
+
     /// How many bytes introduce a character literal at `pos`, if one starts
     /// there.
     ///
@@ -456,7 +608,8 @@ impl DialectReaderPolicy {
             Dialect::Carp => Self::classify_carp(byte, next),
             Dialect::CommonLisp => self.classify_common_lisp(bytes, pos),
             Dialect::EmacsLisp => self.classify_emacs_lisp(bytes, pos),
-            Dialect::Scheme | Dialect::Racket => self.classify_scheme(bytes, pos),
+            Dialect::Scheme => self.classify_scheme(bytes, pos),
+            Dialect::Racket => self.classify_racket(bytes, pos),
             Dialect::Clojure => self.classify_clojure(bytes, pos),
             Dialect::Janet => self.classify_janet(byte, next),
             Dialect::Fennel => self.classify_fennel(byte, next),
@@ -883,6 +1036,195 @@ impl DialectReaderPolicy {
             // nothing to do with them beyond keeping them in the tree as
             // atoms, which is what `None` achieves.
             Some(b'!') => None,
+            _ => Some(ReaderMacro::UnsupportedDispatch { width: 1 }),
+        }
+    }
+
+    /// Racket's `#`-dispatch table, from `read-dispatch` in
+    /// `racket/src/expander/read/main.rkt`.
+    ///
+    /// Racket used to share [`Self::classify_scheme`], and the two tables have
+    /// diverged far enough that sharing was the defect: **1777 of 4492 real
+    /// `.rkt` files (39.6%) failed to parse** over `racket/racket` plus
+    /// `racket/typed-racket`, every one of them an
+    /// `UnsupportedReaderDispatch { dispatch: "#" }`. A file that does not
+    /// parse is a file none of this workspace's commands can say anything
+    /// about, so this capped every Racket lint rule at 60% of its corpus.
+    ///
+    /// [`Self::classify_scheme`] is left byte-identical. Several of the forms
+    /// below — `#'`, `` #` ``, `#,`, `#,@` — are R6RS lexical syntax that Guile,
+    /// Chez and Chicken all accept, so Scheme has a real gap here too, but
+    /// closing it is a change to a *different* dialect's reader that needs its
+    /// own Scheme corpus audit rather than a rider on this one.
+    ///
+    /// | source | reading | handled by |
+    /// |---|---|---|
+    /// | `#;` | datum comment | this arm |
+    /// | `#(` `#[` `#{` | vector | [`ReaderPrefix::HashLiteral`] |
+    /// | `#3(…)` `#fx(…)` `#fl6(…)` | sized / fixnum / flonum vector | [`racket_vector_dispatch_width`] |
+    /// | `#0=` `#0#` | graph definition and reference | [`classify_numeric_dispatch`] |
+    /// | `#s(…)` | prefab struct | this arm |
+    /// | `#&x` | box | this arm |
+    /// | `#'x` | `syntax` | [`ReaderPrefix::Function`] |
+    /// | `` #`x `` `#,x` `#,@x` | `quasisyntax` / `unsyntax` / `unsyntax-splicing` | this arm |
+    /// | `#\c` | character | `character_literal_prefix_width` |
+    /// | `#"…"` | byte string | [`ReaderPrefix::HashLiteral`] |
+    /// | `#<<TAG` | here string | [`Self::here_string_extent`] |
+    /// | `#%app` | *a symbol named* `#%app` | scans as a plain atom |
+    /// | `#:mode` | keyword | scans as a plain atom |
+    /// | `#t` `#f` `#true` `#false` | booleans | scan as plain atoms |
+    /// | `#e` `#i` `#d` `#b` `#o` `#x` | number prefixes | scan as plain atoms |
+    /// | `#hash(…)` `#hasheq(…)` `#hasheqv(…)` `#hashalw(…)` | hash literal | [`racket_hash_dispatch_width`] |
+    /// | `#rx"…"` `#px"…"` `#rx#"…"` | regexp | this arm |
+    /// | `#ci…` `#cs…` | case-folding dispatch | this arm |
+    /// | `#lang …` `#!…` | language directive | `line_comment_width` / plain atom |
+    /// | `#reader` `#~` `#2d…` | reader extension, compiled code, 2D syntax | refused loudly |
+    ///
+    /// ### `#%foo` is an identifier, not a dispatch
+    ///
+    /// This is the one entry where guessing would have put the fix in the
+    /// wrong place entirely. `read-dispatch` sends `%` to the *symbol* reader:
+    ///
+    /// ```racket
+    /// [(#\%)
+    ///  (read-symbol-or-number c in config #:extra-prefix dispatch-c #:mode 'symbol)]
+    /// ```
+    ///
+    /// `#:extra-prefix` seeds the accumulator with the `#`, so `#%app` reads as
+    /// the symbol whose name is the four characters `#%app` — `'#%kernel`,
+    /// `#%module-begin` and `#%plain-lambda` are ordinary identifiers that
+    /// happen to start with `#%`. Returning `None` here hands the whole token
+    /// to the atom scanner, which already stops in the right place because `#`
+    /// and `%` are not atom boundaries. There is no reader macro to add.
+    ///
+    /// ### Why `` #` ``/`#,`/`#,@` are opaque while `#'` keeps its child
+    ///
+    /// [`ReaderPrefix`] carries a fixed `as_source` spelling and three
+    /// re-emission paths write it straight back into source text, so a prefix
+    /// may only be used where a spelling already exists. `#'` has one —
+    /// `ReaderPrefix::Function`, which `quote_edit::quote_operators` already
+    /// documents as "not the `#'` reader macro" and deliberately confines its
+    /// `(function x)` longhand to Common Lisp and Emacs Lisp precisely because
+    /// "Scheme and Racket read it as `syntax`, not `function`". So `#'x` keeps
+    /// `x` visible to rename, reference tracking and every lint rule.
+    ///
+    /// `` #` ``, `#,` and `#,@` have no spelling in that enum. Giving them one
+    /// means three new variants, and `reader::apply_reader_prefix_context`
+    /// matches [`ReaderPrefix`] *exhaustively* — it is a shared table, in the
+    /// crate every dialect and all 347 lint rules depend on. Reading them as
+    /// opaque reader forms instead needs no shared edit, and it is also the
+    /// suppressing direction: the interior of a `` #`(…) `` template is read as
+    /// inert data rather than as live code that could invent findings. The
+    /// alternative today is not "visible" but "the file does not parse at all",
+    /// so blind still beats wrong. Promoting them to real prefixes is a
+    /// worthwhile follow-up with its own false-positive audit.
+    fn classify_racket(self, bytes: &[u8], pos: usize) -> Option<ReaderMacro> {
+        let byte = *bytes.get(pos)?;
+        let next = bytes.get(pos + 1).copied();
+        let third = bytes.get(pos + 2).copied();
+
+        if byte == b'#' && next == Some(b';') {
+            return Some(ReaderMacro::Discard { width: 2 });
+        }
+        if let Some(prefix) = classify_quote_prefix(byte, next) {
+            return Some(prefix);
+        }
+        if byte != b'#' {
+            return None;
+        }
+        // `#0=`/`#0#` first: `read-vector-or-graph` collects the digit run
+        // before it decides, and `#3(` below shares that run.
+        if let Some(dispatch) = classify_numeric_dispatch(bytes, pos, false) {
+            return Some(dispatch);
+        }
+        if let Some(width) = racket_vector_dispatch_width(bytes, pos) {
+            return Some(ReaderMacro::MultiDatum {
+                width,
+                payload_forms: 1,
+            });
+        }
+        match next {
+            // A vector, a byte string, or a bracketed vector: one dispatch
+            // byte glued to the literal that follows, which is exactly what
+            // `HashLiteral` spells. Keeping the elements visible rather than
+            // opaque matters — `#(a b)` really does contain data a rule may
+            // want to read.
+            Some(b'(' | b'[' | b'{' | b'"') => prefix(ReaderPrefix::HashLiteral, 1),
+            Some(b'\'') => prefix(ReaderPrefix::Function, 2),
+            Some(b'`') => Some(ReaderMacro::MultiDatum {
+                width: 2,
+                payload_forms: 1,
+            }),
+            // `#,@` is three bytes, not two: `read-dispatch`'s `#\,` arm peeks
+            // for an `@` and consumes it before delegating to `read-quote`.
+            // Both spellings take exactly one following datum.
+            Some(b',') => Some(ReaderMacro::MultiDatum {
+                width: 2 + usize::from(third == Some(b'@')),
+                payload_forms: 1,
+            }),
+            // `#\` with nothing after it is a truncated character literal, and
+            // is refused for the reason `classify_scheme` gives: the formatter
+            // appends a trailing newline, a truncated literal claims it as its
+            // character, and `format(format(x))` stops converging.
+            Some(b'\\') if third.is_none() => Some(ReaderMacro::UnsupportedDispatch { width: 1 }),
+            // `#\c`, `#%app`, `#:mode`, `#t`/`#f`/`#true`/`#false`, the number
+            // prefixes, and `#!lang`: all scan as plain atoms.
+            Some(
+                b'\\' | b'%' | b':' | b'!' | b't' | b'T' | b'f' | b'F' | b'e' | b'E' | b'i' | b'I'
+                | b'd' | b'D' | b'b' | b'B' | b'o' | b'O' | b'x' | b'X',
+            ) => None,
+            // `#&x` is a box around exactly one datum (`read-box`), and
+            // `#s(…)` a prefab struct whose description is one sequence
+            // (`read-struct`). `read-struct`'s `case` has no `#\S` clause, so
+            // an upper-case `#S(` really is "bad syntax" in Racket and falls
+            // through to the refusal below.
+            Some(b'&') => Some(ReaderMacro::MultiDatum {
+                width: 2,
+                payload_forms: 1,
+            }),
+            Some(b's') if opens_sequence(bytes, pos + 2) => Some(ReaderMacro::MultiDatum {
+                width: 2,
+                payload_forms: 1,
+            }),
+            // The here string's extent is a scan, not a width, so it is left
+            // to `here_string_extent` through the atom path. A `#<` without
+            // the second `<` is Racket's own "bad syntax `#<`".
+            Some(b'<') if third == Some(b'<') => None,
+            Some(b'h' | b'H') => racket_hash_dispatch_width(bytes, pos)
+                .map(|width| ReaderMacro::MultiDatum {
+                    width,
+                    payload_forms: 1,
+                })
+                .or(Some(ReaderMacro::UnsupportedDispatch { width: 1 })),
+            // `#rx"…"`, `#px"…"` and their byte-string spellings `#rx#"…"`,
+            // `#px#"…"`. `read-regexp` accepts nothing else after the `x` —
+            // "expected `\"` or `#`" — so the literal that follows is required
+            // rather than assumed, and `#re` (the start of `#reader`) falls
+            // through to the refusal below.
+            //
+            // The payload is an *ordinary* string literal: `read-regexp` calls
+            // the same `read-string` the `"` dispatch does, so `\"` closes
+            // nothing and `#rx"\"[a-z]\""` is one datum. Reading it raw would
+            // have ended the literal at the first escaped quote.
+            Some(b'r' | b'p') if third == Some(b'x') && opens_regexp_payload(bytes, pos + 3) => {
+                Some(ReaderMacro::MultiDatum {
+                    width: 3,
+                    payload_forms: 1,
+                })
+            }
+            // `#cs`/`#ci` (either case, both letters) set case sensitivity for
+            // exactly one following datum.
+            Some(b'c' | b'C') if matches!(third, Some(b'i' | b'I' | b's' | b'S')) => {
+                Some(ReaderMacro::MultiDatum {
+                    width: 3,
+                    payload_forms: 1,
+                })
+            }
+            // `#reader` extends the reader with an arbitrary module's grammar,
+            // `#~` is compiled code, and `#2d…` needs the `2d` readtable.
+            // None of the three has a fixed extent this reader could scan, so
+            // each stays the loud refusal it already was rather than becoming
+            // a guess about where the form ends.
             _ => Some(ReaderMacro::UnsupportedDispatch { width: 1 }),
         }
     }
@@ -1379,6 +1721,191 @@ fn is_nested_hy_string_start(bytes: &[u8], pos: usize) -> bool {
         return false;
     }
     pos == 0 || bytes.get(pos - 1).copied().is_some_and(is_hy_non_ident)
+}
+
+/// The three bytes that open a Racket here string.
+const HERE_STRING_OPEN: &[u8] = b"#<<";
+
+/// The hash-literal dispatch spellings `read-hash` accepts, longest first so
+/// `#hasheqv(` is not read as `#hasheq` followed by a stray `v`.
+///
+/// `read-hash` spells them out as a chain of `get-next!` calls, each of which
+/// takes a character and its upper-case alternate, so every letter is
+/// case-insensitive and `#HASH(` is as valid as `#hash(`.
+const RACKET_HASH_SPELLINGS: [&[u8]; 4] = [b"hasheqv", b"hashalw", b"hasheq", b"hash"];
+
+/// Whether a sequence a reader dispatch can take as its payload opens at `pos`.
+///
+/// All three brackets, because Racket's `allows_delimiter` admits all three and
+/// `read-struct`, `read-hash` and `read-vector` each accept `(`, `[` and `{`.
+fn opens_sequence(bytes: &[u8], pos: usize) -> bool {
+    matches!(bytes.get(pos), Some(b'(' | b'[' | b'{'))
+}
+
+/// Whether a `#rx`/`#px` payload starts at `pos`: a string, or a byte string.
+fn opens_regexp_payload(bytes: &[u8], pos: usize) -> bool {
+    match bytes.get(pos) {
+        Some(b'"') => true,
+        Some(b'#') => bytes.get(pos + 1) == Some(&b'"'),
+        _ => false,
+    }
+}
+
+/// Width of a `#` dispatch that introduces a vector literal whose elements
+/// follow in a bracketed sequence: `#3(1 2 3)`, `#fx(1)`, `#fl6(0.0)`.
+///
+/// `read-dispatch` reaches these three ways — a digit run goes to
+/// `read-vector-or-graph`, and `#f` followed by `x` or `l` goes to
+/// `read-fixnum-or-flonum-vector`, which reads its own optional digit run.
+/// A bare `#(` has neither and is not this shape: it returns `None` so the
+/// caller's [`ReaderPrefix::HashLiteral`] arm keeps reading it as a prefix on
+/// a visible list, which is what it has always been.
+///
+/// The opener is required. Without it `#fx` is not a vector at all, and
+/// claiming it were would consume whatever followed as a payload.
+fn racket_vector_dispatch_width(bytes: &[u8], pos: usize) -> Option<usize> {
+    let mut cursor = pos + 1;
+    if bytes.get(cursor) == Some(&b'f') && matches!(bytes.get(cursor + 1), Some(b'x' | b'l')) {
+        cursor += 2;
+    }
+    while matches!(bytes.get(cursor), Some(byte) if byte.is_ascii_digit()) {
+        cursor += 1;
+    }
+    if cursor == pos + 1 {
+        return None;
+    }
+    opens_sequence(bytes, cursor).then_some(cursor - pos)
+}
+
+/// Width of the `#hash…` dispatch introducing a hash-table literal, covering
+/// the dispatch alone and never the opening bracket.
+///
+/// The bracket is where the `MultiDatum` payload starts and `skip_form`
+/// consumes it, so the two together become one opaque reader-form node
+/// spanning the whole literal — the same shape, and the same known limitation,
+/// as `clojure_namespaced_map_width`: a rule looking for keys sees nothing
+/// inside a `#hash(…)`. Representing the dispatch as a [`ReaderPrefix`] is what
+/// would fix that, and it is blocked on the same thing — `ReaderPrefix` carries
+/// a `&'static str` spelling and `#hash`, `#hasheq`, `#hasheqv` and `#hashalw`
+/// are four.
+///
+/// Requiring the bracket to touch the dispatch is faithful here, unlike in
+/// Clojure: `read-hash`'s loop reads the next character with
+/// `read-char/special` and has no whitespace case at all, so `#hash (…)` is
+/// its own "bad syntax" error.
+fn racket_hash_dispatch_width(bytes: &[u8], pos: usize) -> Option<usize> {
+    RACKET_HASH_SPELLINGS.iter().find_map(|spelling| {
+        let end = pos + 1 + spelling.len();
+        if !bytes.get(pos + 1..end)?.eq_ignore_ascii_case(spelling) {
+            return None;
+        }
+        opens_sequence(bytes, end).then_some(end - pos)
+    })
+}
+
+/// How far the Racket here string whose `#<<` sits at `pos` reaches.
+///
+/// See [`DialectReaderPolicy::here_string_extent`] for why this matches
+/// `read-here-string`'s state machine, and for what the terminator line may
+/// and may not contain.
+fn here_string_extent_at(bytes: &[u8], pos: usize) -> HereStringExtent {
+    let tag_start = pos + HERE_STRING_OPEN.len();
+    let Some(tag_len) = bytes.get(tag_start..).and_then(newline_offset) else {
+        // "found end-of-file after `#<<` and before a newline".
+        return HereStringExtent::Unterminated;
+    };
+    let tag = &bytes[tag_start..tag_start + tag_len];
+    // The loop is seeded with `(cdr full-terminator)`, so the first content
+    // byte is already a candidate terminator start.
+    let mut cursor = tag_start + tag_len + 1;
+    loop {
+        if bytes.get(cursor..cursor + tag.len()) == Some(tag) {
+            let after = cursor + tag.len();
+            match bytes.get(after) {
+                None => return HereStringExtent::Closed { width: after - pos },
+                Some(b'\n') => {
+                    return HereStringExtent::Closed {
+                        width: after + 1 - pos,
+                    };
+                }
+                Some(_) => {}
+            }
+        }
+        // Only a newline restarts the match, so the next candidate is the byte
+        // after the next newline.
+        let Some(offset) = bytes.get(cursor..).and_then(newline_offset) else {
+            // "found end-of-file before terminating `~a`".
+            return HereStringExtent::Unterminated;
+        };
+        cursor += offset + 1;
+    }
+}
+
+/// Width of the Racket Unix line comment at `pos`, if one starts there.
+///
+/// `#!` plus a space or a `/`, then everything to the end of the line — or to
+/// the end of a later line, because `skip-unix-line-comment!` continues when
+/// the byte before the newline is a `\`:
+///
+/// ```racket
+/// (let loop ([backslash? #f])
+///   (define c (read-char/special in config))
+///   (cond
+///    [(eof-object? c) (void)]
+///    [(not (char? c)) (loop #f)]
+///    [(char=? c #\newline) (when backslash? (loop #f))]
+///    [(char=? c #\\) (loop #t)]
+///    [else (loop #f)]))
+/// ```
+///
+/// The width stops *before* the newline that ends it, which is what the caller
+/// wants: `skip_trivia` records the comment and then advances to the newline
+/// itself, so a width that included it would swallow the line break.
+///
+/// `#!racket` and `#!r6rs` are deliberately not comments. Without a space or a
+/// `/` the reader takes `#!` to `read-lang`, which reads a language name, so
+/// leaving them to the atom scanner keeps the existing reading rather than
+/// hiding a directive inside trivia.
+///
+/// ### Why the token-start test is load-bearing
+///
+/// `line_comment_width` is called from `is_atom_boundary` for *every byte of
+/// every atom*, not only where a datum may start, and `#` and `!` are ordinary
+/// symbol constituents in Racket. Without this test the symbol
+/// `read-extension-#!` — followed by a space, as it is at every one of its call
+/// sites in Racket's own reader — split at its `#` and turned the rest of the
+/// line into a comment, so `read/main.rkt` and `read/language.rkt` stopped
+/// parsing. The whitespace skipper Racket runs this from only ever sees a
+/// position where a datum may begin, and a token cannot contain whitespace or
+/// a delimiter, so "preceded by whitespace, a delimiter, or nothing" is exactly
+/// that position and admits no token interior.
+fn racket_unix_line_comment_width(bytes: &[u8], pos: usize) -> Option<usize> {
+    if bytes.get(pos + 1) != Some(&b'!') || !matches!(bytes.get(pos + 2), Some(b' ' | b'/')) {
+        return None;
+    }
+    let at_token_start = pos == 0
+        || bytes.get(pos - 1).is_some_and(|byte| {
+            byte.is_ascii_whitespace() || DialectReaderPolicy::is_raw_delimiter(*byte)
+        });
+    if !at_token_start {
+        return None;
+    }
+    let mut cursor = pos + 3;
+    loop {
+        let Some(offset) = bytes.get(cursor..).and_then(newline_offset) else {
+            return Some(bytes.len() - pos);
+        };
+        let newline = cursor + offset;
+        if bytes.get(newline - 1) != Some(&b'\\') {
+            return Some(newline - pos);
+        }
+        cursor = newline + 1;
+    }
+}
+
+/// How many bytes precede the first newline in `bytes`, if there is one.
+fn newline_offset(bytes: &[u8]) -> Option<usize> {
+    bytes.iter().position(|byte| *byte == b'\n')
 }
 
 /// How many consecutive backticks start at `pos`.

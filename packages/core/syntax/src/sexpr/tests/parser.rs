@@ -3062,3 +3062,483 @@ fn emacs_lisp_radix_integers_survive_a_format_round_trip() {
     let again = SyntaxTree::parse_with_dialect(&formatted, Dialect::EmacsLisp).expect("valid");
     assert_eq!(formatter.format(&again), formatted);
 }
+
+// ---------------------------------------------------------------------------
+// Racket's `#`-dispatch table (`racket/src/expander/read/main.rkt`).
+//
+// Racket shared `classify_scheme` until 1777 of 4492 real `.rkt` files (39.6%)
+// over `racket/racket` plus `racket/typed-racket` were measured failing to
+// parse, every one an `UnsupportedReaderDispatch { dispatch: "#" }`.
+// ---------------------------------------------------------------------------
+
+/// `#%app` is a *symbol*, not a dispatch.
+///
+/// `read-dispatch` sends `%` to `read-symbol-or-number` with
+/// `#:extra-prefix dispatch-c`, which seeds the accumulator with the `#`. So
+/// the fix belongs in the atom scanner, and the reader table's job is only to
+/// stay out of its way.
+#[test]
+fn racket_hash_percent_is_an_identifier_not_a_dispatch() {
+    for (input, expected) in [
+        ("(#%app f x)", "#%app"),
+        ("(#%plain-lambda () 1)", "#%plain-lambda"),
+        ("('#%kernel)", "#%kernel"),
+        ("(#%)", "#%"),
+    ] {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::Racket)
+            .unwrap_or_else(|error| panic!("{input}: {error}"));
+        let form = &tree.root_view().children[0];
+        let head = &form.children[0];
+        assert_eq!(
+            head.span.slice(input).trim_start_matches('\''),
+            expected,
+            "{input}"
+        );
+    }
+}
+
+/// `#'x` is `(syntax x)` and takes exactly one following form, so `x` stays a
+/// visible child rather than disappearing into an opaque span.
+#[test]
+fn racket_syntax_quote_is_a_prefix_on_one_form() {
+    for (input, prefixed) in [
+        ("(f #'x)", "#'x"),
+        ("(f #'(a b))", "#'(a b)"),
+        ("(f #'#'x)", "#'#'x"),
+    ] {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::Racket)
+            .unwrap_or_else(|error| panic!("{input}: {error}"));
+        let form = &tree.root_view().children[0];
+        assert_eq!(form.children.len(), 2, "{input}");
+        assert_eq!(form.children[1].span.slice(input), prefixed, "{input}");
+        assert!(
+            form.children[1]
+                .reader_prefixes
+                .contains(&ReaderPrefix::Function),
+            "{input}"
+        );
+    }
+    let tree = SyntaxTree::parse_with_dialect("#'(a b)", Dialect::Racket).expect("valid");
+    assert_eq!(tree.root_view().children[0].children.len(), 2);
+}
+
+/// `` #` ``, `#,` and `#,@` each take exactly one following form. `#,@` is
+/// three bytes, not two: `read-dispatch`'s `#\,` arm peeks for an `@` and
+/// consumes it before delegating to `read-quote`.
+#[test]
+fn racket_quasisyntax_family_spans_its_dispatch_and_one_form() {
+    for (input, expected) in [
+        ("(f #`x)", "#`x"),
+        ("(f #`(a b))", "#`(a b)"),
+        ("(f #,x)", "#,x"),
+        ("(f #,@x)", "#,@x"),
+        ("(f #,@(a b))", "#,@(a b)"),
+        ("(f #`(a #,b))", "#`(a #,b)"),
+    ] {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::Racket)
+            .unwrap_or_else(|error| panic!("{input}: {error}"));
+        let form = &tree.root_view().children[0];
+        assert_eq!(form.children.len(), 2, "{input}");
+        assert_eq!(form.children[1].span.slice(input), expected, "{input}");
+    }
+}
+
+/// A `#rx`/`#px` payload is an *ordinary* string literal — `read-regexp` calls
+/// the same `read-string` the `"` dispatch does — so `\"` escapes rather than
+/// closes, and `#rx#"…"` is the byte-regexp spelling. `#rx` with no literal
+/// after it is Racket's own "expected `\"` or `#`" error.
+#[test]
+fn racket_regexp_literal_is_one_span() {
+    for (input, expected) in [
+        (r#"(f #rx"[a-z]+")"#, r#"#rx"[a-z]+""#),
+        (r#"(f #rx"\"quoted\"")"#, r#"#rx"\"quoted\"""#),
+        (r#"(f #px"^\\d+$")"#, r#"#px"^\\d+$""#),
+        (r#"(f #rx#"bytes")"#, r#"#rx#"bytes""#),
+        (r#"(f #px#"bytes")"#, r#"#px#"bytes""#),
+    ] {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::Racket)
+            .unwrap_or_else(|error| panic!("{input}: {error}"));
+        let form = &tree.root_view().children[0];
+        assert_eq!(form.children.len(), 2, "{input}");
+        assert_eq!(form.children[1].span.slice(input), expected, "{input}");
+    }
+    for input in ["(f #rx x)", "(f #rxy)", "(f #reader m)"] {
+        assert!(
+            SyntaxTree::parse_with_dialect(input, Dialect::Racket).is_err(),
+            "{input} should be refused"
+        );
+    }
+}
+
+/// `#"…"` is `read-string` in `'|byte string|` mode: the same lexical extent
+/// as a string, so the `#` is a prefix on the literal that follows.
+#[test]
+fn racket_byte_string_is_one_span() {
+    for (input, expected) in [
+        (r#"(f #"abc")"#, r#"#"abc""#),
+        (r#"(f #"a\"b")"#, r#"#"a\"b""#),
+        (r#"(f #"a)b")"#, r#"#"a)b""#),
+    ] {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::Racket)
+            .unwrap_or_else(|error| panic!("{input}: {error}"));
+        let form = &tree.root_view().children[0];
+        assert_eq!(form.children.len(), 2, "{input}");
+        assert_eq!(form.children[1].span.slice(input), expected, "{input}");
+        assert!(
+            form.children[1]
+                .reader_prefixes
+                .contains(&ReaderPrefix::HashLiteral),
+            "{input}"
+        );
+    }
+}
+
+/// Vectors, sized vectors, fixnum/flonum vectors, prefab structs and boxes.
+///
+/// `#(…)` keeps its elements visible through `HashLiteral`; the spellings that
+/// carry a payload in the dispatch itself (`#3`, `#fl6`, `#s`, `#&`) become one
+/// opaque reader form, because `ReaderPrefix` has no spelling for them.
+#[test]
+fn racket_vector_struct_and_box_dispatches() {
+    for (input, expected, children) in [
+        ("(f #(1 2))", "#(1 2)", 2usize),
+        ("(f #[1 2])", "#[1 2]", 2),
+        ("(f #{1 2})", "#{1 2}", 2),
+        ("(f #3(0))", "#3(0)", 0),
+        ("(f #fl6(0.0))", "#fl6(0.0)", 0),
+        ("(f #fx(1))", "#fx(1)", 0),
+        ("(f #s(pt 1 2))", "#s(pt 1 2)", 0),
+        ("(f #&x)", "#&x", 0),
+        ("(f #&(a b))", "#&(a b)", 0),
+    ] {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::Racket)
+            .unwrap_or_else(|error| panic!("{input}: {error}"));
+        let form = &tree.root_view().children[0];
+        assert_eq!(form.children.len(), 2, "{input}");
+        assert_eq!(form.children[1].span.slice(input), expected, "{input}");
+        assert_eq!(form.children[1].children.len(), children, "{input}");
+    }
+}
+
+/// `read-hash` chains case-insensitive `get-next!` calls and then requires an
+/// opener with no whitespace before it, so `#hash (…)` is its own "bad syntax"
+/// error and `#HASH(` is as valid as `#hash(`. The longest spelling has to win:
+/// `#hasheqv(` is not `#hasheq` followed by a stray `v`.
+#[test]
+fn racket_hash_table_literal_dispatch() {
+    for (input, expected) in [
+        ("(f #hash((a . 1)))", "#hash((a . 1))"),
+        ("(f #hasheq((a . 1)))", "#hasheq((a . 1))"),
+        ("(f #hasheqv((a . 1)))", "#hasheqv((a . 1))"),
+        ("(f #hashalw((a . 1)))", "#hashalw((a . 1))"),
+        ("(f #HASH((a . 1)))", "#HASH((a . 1))"),
+        ("(f #hash[(a . 1)])", "#hash[(a . 1)]"),
+        ("(f #hash())", "#hash()"),
+    ] {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::Racket)
+            .unwrap_or_else(|error| panic!("{input}: {error}"));
+        let form = &tree.root_view().children[0];
+        assert_eq!(form.children.len(), 2, "{input}");
+        assert_eq!(form.children[1].span.slice(input), expected, "{input}");
+    }
+    for input in ["(f #hash ((a . 1)))", "(f #hashx((a . 1)))", "(f #h)"] {
+        assert!(
+            SyntaxTree::parse_with_dialect(input, Dialect::Racket).is_err(),
+            "{input} should be refused"
+        );
+    }
+}
+
+/// A here string is one atom spanning `#<<`, its tag, the content, the
+/// terminator line and the newline after it.
+///
+/// The terminator is the whole rest of the opening line and must sit alone on
+/// its own line: `read-here-string` fails the match on leading whitespace and
+/// falls out of the `(char=? c #\newline)` test on trailing whitespace, so both
+/// spellings stay ordinary content. A tag matched at the very first content
+/// byte is the empty string, and a tag matched at EOF with no newline after it
+/// still terminates — the EOF branch is `(unless (null? terminator) ...)`.
+#[test]
+fn racket_here_string_extent_matches_read_here_string() {
+    use crate::sexpr::reader_policy::HereStringExtent;
+
+    let policy = DialectReaderPolicy::new(Dialect::Racket);
+    for (input, expected) in [
+        // Ordinary.
+        ("#<<END\nbody\nEND\n", Some(16usize)),
+        // The terminator may match at the very first content byte.
+        ("#<<END\nEND\n", Some(11)),
+        // No newline after the terminator: EOF ends it.
+        ("#<<END\nbody\nEND", Some(15)),
+        // An empty tag terminates on the first empty line.
+        ("#<<\n\n", Some(5)),
+        // A tag may contain spaces, and then only that exact line ends it.
+        ("#<<E ND\nx\nE ND\n", Some(15)),
+        // Leading whitespace on the terminator line is content.
+        ("#<<END\nx\n  END\nEND\n", Some(19)),
+        // Trailing whitespace on the terminator line is content.
+        ("#<<END\nx\nEND \nEND\n", Some(18)),
+        // A prefix of the tag is content.
+        ("#<<END\nEN\nEND\n", Some(14)),
+    ] {
+        assert_eq!(
+            policy.here_string_extent(input.as_bytes(), 0),
+            expected.map(|width| HereStringExtent::Closed { width }),
+            "{input:?}"
+        );
+    }
+    for input in [
+        // The tag never reappears.
+        "#<<END\nbody\n",
+        // Only as a prefix of a longer line.
+        "#<<END\nENDING\n",
+        // EOF before the newline that ends the opening line.
+        "#<<END",
+        "#<<",
+    ] {
+        assert_eq!(
+            policy.here_string_extent(input.as_bytes(), 0),
+            Some(HereStringExtent::Unterminated),
+            "{input:?}"
+        );
+    }
+    // No other dialect has the form.
+    for dialect in [Dialect::Scheme, Dialect::CommonLisp, Dialect::Clojure] {
+        assert_eq!(
+            DialectReaderPolicy::new(dialect).here_string_extent(b"#<<END\nx\nEND\n", 0),
+            None,
+            "{dialect:?}"
+        );
+    }
+}
+
+/// A here string is one node, so delimiters inside its content cannot unbalance
+/// the enclosing list, and an unterminated one fails loudly rather than
+/// swallowing the rest of the file.
+#[test]
+fn racket_here_string_is_one_atom_inside_a_list() {
+    let input = "(list #<<END\n)))) not code (\nEND\n)";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::Racket).expect("valid");
+    let form = &tree.root_view().children[0];
+    assert_eq!(form.children.len(), 2);
+    assert_eq!(
+        form.children[1].span.slice(input),
+        "#<<END\n)))) not code (\nEND\n"
+    );
+    assert!(form.children[1].children.is_empty());
+
+    for input in ["(list #<<END\nbody\n)", "(list #<<END)", "#; #<<END\nx\n"] {
+        assert!(
+            SyntaxTree::parse_with_dialect(input, Dialect::Racket).is_err(),
+            "{input} should be refused"
+        );
+    }
+    // A `#;` discards a complete here string through the same scanner.
+    let input = "#; #<<END\nx\nEND\nkept";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::Racket).expect("valid");
+    assert_eq!(tree.root_view().children.len(), 1);
+}
+
+/// Forms Racket's reader has no fixed extent for stay loud refusals rather than
+/// becoming a guess about where the form ends.
+///
+/// `#S(` is included deliberately: `read-struct` is reached from a `case` with
+/// a `#\s` clause and no `#\S` clause, so an upper-case struct really is "bad
+/// syntax" in Racket even though Common Lisp accepts it.
+#[test]
+fn racket_refuses_what_its_reader_has_no_dispatch_for() {
+    for input in [
+        "(f #reader m x)",
+        "(f #~compiled)",
+        "#2dmatch\nx",
+        "(f #S(pt 1))",
+        "(f #<x)",
+        "(f #u8(1 2))",
+        "(f #)",
+        "#\\",
+    ] {
+        assert!(
+            SyntaxTree::parse_with_dialect(input, Dialect::Racket).is_err(),
+            "{input} should be refused"
+        );
+    }
+}
+
+/// The forms Racket's own table keeps: `#lang` stays trivia, `#:kw` and the
+/// booleans and number prefixes stay atoms, `#\c` stays a character literal,
+/// `#|…|#` stays a block comment and `#;` still discards.
+#[test]
+fn racket_keeps_the_forms_it_already_read() {
+    for (input, children) in [
+        ("#lang racket/base\n(f x)", 2usize),
+        ("(f #:mode 1)", 3),
+        ("(f #t #f #true #false)", 5),
+        ("(f #x1f #o17 #b101 #e1.0 #i1 #d9)", 7),
+        ("(f #\\a #\\space #\\( #\\))", 5),
+        ("(f #| block |# x)", 2),
+        ("(f #;discarded kept)", 2),
+    ] {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::Racket)
+            .unwrap_or_else(|error| panic!("{input}: {error}"));
+        let root = tree.root_view();
+        let form = root.children.last().expect("at least one form");
+        assert_eq!(form.children.len(), children, "{input}");
+    }
+}
+
+/// `#!` plus a space or a `/` is a Unix line comment, skipped in
+/// `read-char/skip-whitespace-and-comments` beside `;` and `#|`.
+///
+/// Being in the whitespace skipper rather than in `read-dispatch` has two
+/// consequences the Emacs Lisp and Hy shebang arms do not share: it is not
+/// restricted to offset 0, and `skip-unix-line-comment!` continues onto the
+/// next line when the byte before the newline is a `\`. Without a space or a
+/// `/` after the `!` there is no comment at all — `#!racket` goes to
+/// `read-lang` — so it stays an atom.
+#[test]
+fn racket_shebang_is_a_line_comment() {
+    for (input, forms) in [
+        ("#!/bin/sh\n(a b)\n", 1usize),
+        ("#! /usr/bin/env racket\n(a b)\n", 1),
+        // The `\` continuation swallows the next line too.
+        ("#! /bin/sh \\\n(not code)\n(a b)\n", 1),
+        ("#! /bin/sh \\\n(x) \\\n(y)\n(a b)\n", 1),
+        // Not restricted to offset 0, and not restricted to top level.
+        ("(a\n#! /bin/sh\nb)\n", 1),
+        ("(a b)\n#!/bin/sh\n", 1),
+        // No space and no slash: not a comment.
+        ("#!racket\n(a b)\n", 2),
+        ("(f #!eof)\n", 1),
+        // At end of input with no newline to end it.
+        ("(a b)\n#! /bin/sh", 1),
+        // `#` and `!` are ordinary symbol constituents, so a `#!` *inside* a
+        // token is not a comment however the token continues. Racket's own
+        // reader is full of `(read-extension-#! x)`, and splitting it stopped
+        // `read/main.rkt` and `read/language.rkt` parsing at all.
+        ("(read-extension-#! x)\n", 1),
+        ("(f a#!/b c)\n", 1),
+    ] {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::Racket)
+            .unwrap_or_else(|error| panic!("{input:?}: {error}"));
+        assert_eq!(tree.root_view().children.len(), forms, "{input:?}");
+    }
+    // The comment keeps every later byte offset unchanged.
+    let input = "#!/bin/sh\n(a b)\n";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::Racket).expect("valid");
+    assert_eq!(tree.root_view().children[0].span.slice(input), "(a b)");
+    // A `#!` inside a token keeps the whole token.
+    let input = "(read-extension-#! x)\n";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::Racket).expect("valid");
+    let form = &tree.root_view().children[0];
+    assert_eq!(form.children.len(), 2);
+    assert_eq!(form.children[0].span.slice(input), "read-extension-#!");
+    // Scheme keeps its own reading: `#!` there is `#!eof`/`#!fold-case`.
+    let input = "#!/bin/sh\n(a b)\n";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::Scheme).expect("valid");
+    assert_eq!(tree.root_view().children.len(), 2);
+}
+
+/// `"` is in `char-delimiter?`, so it ends the token before it.
+///
+/// `(format"~a" x)` is a symbol and a string with no space between them, and
+/// Racket's own benchmark suite writes it that way. Reading it as one token
+/// made the atom swallow the opening quote, stop at the space inside the
+/// literal, and turn the rest of the string into sibling atoms — which
+/// `edit format` then re-emitted with a line break inside string data.
+#[test]
+fn racket_string_terminates_the_token_before_it() {
+    let input = r#"(format"~a ~a" x)"#;
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::Racket).expect("valid");
+    let form = &tree.root_view().children[0];
+    assert_eq!(form.children.len(), 3);
+    assert_eq!(form.children[0].span.slice(input), "format");
+    assert_eq!(form.children[1].span.slice(input), r#""~a ~a""#);
+    // A `#\"` character literal still takes the quote as its payload.
+    let input = r#"(f #\" x)"#;
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::Racket).expect("valid");
+    assert_eq!(tree.root_view().children[0].children.len(), 3);
+    // The `#`-prefixed literals keep their own scanners.
+    for (input, expected) in [
+        (r#"(f #"b")"#, r#"#"b""#),
+        (r#"(f #rx"a")"#, r#"#rx"a""#),
+        (r#"(f #rx#"a")"#, r#"#rx#"a""#),
+    ] {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::Racket)
+            .unwrap_or_else(|error| panic!("{input}: {error}"));
+        let form = &tree.root_view().children[0];
+        assert_eq!(form.children.len(), 2, "{input}");
+        assert_eq!(form.children[1].span.slice(input), expected, "{input}");
+    }
+    // Nine other dialects keep the reading they had. Hy is the reason the rule
+    // cannot be unconditional: there `r"a"` really is a prefixed literal.
+    for dialect in [
+        Dialect::Scheme,
+        Dialect::CommonLisp,
+        Dialect::EmacsLisp,
+        Dialect::Clojure,
+        Dialect::Lfe,
+        Dialect::Carp,
+        Dialect::Janet,
+        Dialect::Fennel,
+        Dialect::Unknown,
+    ] {
+        assert!(
+            !DialectReaderPolicy::new(dialect).is_atom_boundary(b"a\"b", 1),
+            "{dialect:?}"
+        );
+    }
+    assert!(!DialectReaderPolicy::new(Dialect::Hy).is_atom_boundary(b"r\"b", 1));
+    assert!(DialectReaderPolicy::new(Dialect::Racket).is_atom_boundary(b"a\"b", 1));
+}
+
+/// Splitting Racket out of `classify_scheme` must leave Scheme byte-identical.
+///
+/// Every form Racket gained above is still exactly as Scheme read it before —
+/// refused where it was refused, read where it was read. `#'`, `` #` ``, `#,`
+/// and `#,@` are R6RS lexical syntax that Guile, Chez and Chicken all accept,
+/// so this pins a *known gap* rather than an intended reading; closing it is a
+/// change to Scheme's reader needing its own Scheme corpus audit.
+#[test]
+fn scheme_reader_is_unchanged_by_the_racket_split() {
+    for input in [
+        "(f #'x)",
+        "(f #`x)",
+        "(f #,x)",
+        "(f #\"bytes\")",
+        "(f #rx\"a\")",
+        "(f #px\"a\")",
+        "(f #hash((a . 1)))",
+        "(f #s(pt 1))",
+        "(f #&x)",
+        "(f #{1})",
+        // `#[` is a vector in Racket but not in Scheme: `classify_scheme`'s
+        // dispatch table admits `#(` alone.
+        "(f #[1 2])",
+        "(f #3(0))",
+        "#<<END\nx\nEND\n",
+    ] {
+        assert!(
+            SyntaxTree::parse_with_dialect(input, Dialect::Scheme).is_err(),
+            "{input} should still be refused for Scheme"
+        );
+    }
+    // `#u8(…)` is R7RS and stays; Racket's own `read-dispatch` has no `#\u`
+    // clause, so it is refused there (pinned above) and kept here.
+    let input = "(f #u8(1 2))";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::Scheme).expect("valid");
+    assert_eq!(tree.root_view().children[0].children.len(), 2);
+    // `#(` keeps its Scheme reading, and `#;`, `#\` and `#!` too.
+    for (input, children) in [
+        ("(f #(1 2))", 2usize),
+        ("(f #;discarded kept)", 2),
+        ("(f #\\a #!eof)", 3),
+    ] {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::Scheme)
+            .unwrap_or_else(|error| panic!("{input}: {error}"));
+        assert_eq!(
+            tree.root_view().children[0].children.len(),
+            children,
+            "{input}"
+        );
+    }
+}

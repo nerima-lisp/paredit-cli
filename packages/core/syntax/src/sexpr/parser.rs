@@ -3,7 +3,8 @@ use thiserror::Error;
 use crate::dialect::Dialect;
 
 use super::reader_policy::{
-    BarQuoting, DialectReaderPolicy, HyStringExtent, LongStringExtent, ReaderMacro,
+    BarQuoting, DialectReaderPolicy, HereStringExtent, HyStringExtent, LongStringExtent,
+    ReaderMacro,
 };
 use super::tree::{Comment, Node, NodeKind, ReaderPrefix, ReaderPrefixes, SyntaxTree};
 use super::types::{ByteOffset, ByteSpan, Delimiter, NodeId};
@@ -507,6 +508,51 @@ impl<'a> Parser<'a> {
             && self.bytes.get(pos + 1) == Some(&b'[')
     }
 
+    fn atom_here_string_with_prefixes(
+        &mut self,
+        prefixes: Vec<PrefixToken>,
+    ) -> std::result::Result<(), ParseError> {
+        let start = self.pos;
+        let width = self.here_string_width(start.get())?;
+        self.advance_by(width);
+        self.push_atom(prefixes, start, self.pos);
+        Ok(())
+    }
+
+    /// Byte width of the Racket here string at `start`, `#<<` and terminator
+    /// line included.
+    ///
+    /// Unterminated is refused rather than read to EOF, for the same reason
+    /// the Janet long string and the Hy string are: an atom that swallows the
+    /// rest of the file is silent corruption. Racket refuses both spellings of
+    /// it too — "found end-of-file after `#<<` and before a newline" when the
+    /// opening line never ends, and "found end-of-file before terminating"
+    /// when the tag never reappears — so this reuses the error the `"..."`
+    /// path already raises for the same shape of mistake rather than inventing
+    /// a variant.
+    fn here_string_width(&self, start: usize) -> std::result::Result<usize, ParseError> {
+        match self.policy.here_string_extent(self.bytes, start) {
+            Some(HereStringExtent::Closed { width }) => Ok(width),
+            Some(HereStringExtent::Unterminated) | None => {
+                Err(ParseError::UnterminatedString(start))
+            }
+        }
+    }
+
+    /// Whether a Racket here string starts at the cursor.
+    ///
+    /// The dialect test is hoisted above the byte reads and the whole function
+    /// is `#[inline]`, exactly as [`Self::at_hy_string`] is and for the same
+    /// measured reason: this is called once per form from `form`'s match and
+    /// again from the discarded-form scanner, so for the nine dialects without
+    /// here strings it has to collapse to one comparison against a
+    /// loop-invariant field rather than three bounds-checked byte reads.
+    #[inline]
+    fn at_racket_here_string(&self) -> bool {
+        self.policy.has_here_strings()
+            && self.bytes.get(self.pos.get()..self.pos.get() + 3) == Some(b"#<<")
+    }
+
     fn atom_with_prefixes(
         &mut self,
         prefixes: Vec<PrefixToken>,
@@ -769,6 +815,7 @@ impl<'a> Parser<'a> {
             b'`' if self.policy.has_long_strings() => {
                 self.atom_long_string_with_prefixes(prefixes)?;
             }
+            _ if self.at_racket_here_string() => self.atom_here_string_with_prefixes(prefixes)?,
             _ if self.at_hy_string() => self.atom_hy_string_with_prefixes(prefixes)?,
             _ => self.atom_with_prefixes(prefixes)?,
         }
@@ -966,6 +1013,15 @@ impl<'a> Parser<'a> {
                         // the same `hy_string_extent`, which is what keeps the
                         // recording and scanning readers from disagreeing
                         // about where the literal ends.
+                        // `#;` is Racket's datum comment, so `#; #<<END…END`
+                        // reaches here. Both paths call the same
+                        // `here_string_extent`, which is what keeps the
+                        // recording and scanning readers from disagreeing
+                        // about where the literal ends.
+                        _ if self.at_racket_here_string() => {
+                            let width = self.here_string_width(self.pos.get())?;
+                            self.advance_by(width);
+                        }
                         _ if self.at_hy_string() => {
                             let width = self.hy_string_width(self.pos.get())?;
                             self.advance_by(width);
