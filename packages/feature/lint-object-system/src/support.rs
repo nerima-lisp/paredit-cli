@@ -59,14 +59,14 @@ pub struct FormSite {
 /// the engine handed a rule and is treated by every caller as "do not report".
 #[must_use]
 pub fn locate(tree: &SyntaxTree, span: ByteSpan) -> Option<FormSite> {
-    let source = tree.source();
     let mut parent: Option<SexprPath> = None;
     let mut state = QuoteState::EVALUATED;
     let mut top_level_index = 0usize;
     let mut descended = 0usize;
 
     loop {
-        let (index, child_path, child_span) = child_containing(tree, parent.as_ref(), span)?;
+        let (index, child_path, child_span, prefixes) =
+            child_containing(tree, parent.as_ref(), span)?;
         if descended == 0 {
             top_level_index = index;
         }
@@ -75,7 +75,7 @@ pub fn locate(tree: &SyntaxTree, span: ByteSpan) -> Option<FormSite> {
         if let Some(parent_path) = &parent {
             state = spelled_quote_step(tree, parent_path, index, state);
         }
-        state = state.after_prefixes_in(source, child_span);
+        state = state.after_prefixes(prefixes);
 
         if child_span == span {
             return Some(FormSite {
@@ -103,7 +103,7 @@ pub fn locate(tree: &SyntaxTree, span: ByteSpan) -> Option<FormSite> {
 pub fn is_write_position(tree: &SyntaxTree, span: ByteSpan) -> Option<bool> {
     let mut parent: Option<SexprPath> = None;
     loop {
-        let (index, child_path, child_span) = child_containing(tree, parent.as_ref(), span)?;
+        let (index, child_path, child_span, _) = child_containing(tree, parent.as_ref(), span)?;
         if child_span == span {
             let Some(parent_path) = &parent else {
                 // A top-level form has no operator above it to write it.
@@ -155,11 +155,11 @@ fn writes_operand(head: &str, index: usize) -> bool {
 ///
 /// Siblings are in source order, so a child starting past the target ends the
 /// search: the remaining ones cannot contain it either.
-fn child_containing(
-    tree: &SyntaxTree,
+fn child_containing<'tree>(
+    tree: &'tree SyntaxTree,
     parent: Option<&SexprPath>,
     span: ByteSpan,
-) -> Option<(usize, SexprPath, ByteSpan)> {
+) -> Option<(usize, SexprPath, ByteSpan, &'tree [ReaderPrefix])> {
     let mut index = 0usize;
     loop {
         let child = parent.map_or_else(|| SexprPath::root_child(index), |path| path.child(index));
@@ -171,7 +171,7 @@ fn child_containing(
         if child_span.start().get() <= span.start().get()
             && span.end().get() <= child_span.end().get()
         {
-            return Some((index, child, child_span));
+            return Some((index, child, child_span, selection.reader_prefixes()));
         }
         index += 1;
     }
@@ -223,40 +223,34 @@ impl QuoteState {
         self
     }
 
-    /// The state inside the node at `span`, given the state outside it and the
-    /// node's own reader prefixes — read off the source, because a
-    /// [`Selection`] does not carry them.
+    /// The state inside a node, given the state outside it and the node's own
+    /// reader prefixes.
     ///
     /// `#'` is deliberately neutral: `#'foo` is a function designator, not
     /// data, and the form under it is still code.
-    fn after_prefixes_in(mut self, source: &str, span: ByteSpan) -> Self {
-        let mut rest = source
-            .get(span.start().get()..span.end().get())
-            .unwrap_or_default();
-        loop {
-            rest = rest.trim_start();
-            let width = match rest.as_bytes() {
-                [b'#', b'\'', ..] => 2,
-                [b',', b'@', ..] => {
-                    self = self.unquoted();
-                    2
-                }
-                [b',', ..] => {
-                    self = self.unquoted();
-                    1
-                }
-                [b'\'', ..] => {
-                    self = self.quoted();
-                    1
-                }
-                [b'`', ..] => {
-                    self = self.quasiquoted();
-                    1
-                }
-                _ => return self,
+    ///
+    /// These are the prefixes the dialect's own reader produced, which is why
+    /// this takes them rather than re-lexing the node's source text. Scanning
+    /// the bytes for `'`, `` ` ``, `,` and `,@` describes Common Lisp and Emacs
+    /// Lisp and no other dialect this tool reads: a comma is whitespace in
+    /// Clojure and Carp, an ordinary symbol character in Hy, and the unquote is
+    /// `%` in Carp and `~` in Hy. Every rule in this package is
+    /// [`RuleDialectScope::COMMON_LISP_ONLY`], so the byte scan this replaces
+    /// never produced a wrong finding — but it was correct only by a fact
+    /// declared in another file, and this is correct by construction.
+    ///
+    /// [`RuleDialectScope::COMMON_LISP_ONLY`]:
+    ///     paredit_core_lint_engine::policy::RuleDialectScope::COMMON_LISP_ONLY
+    fn after_prefixes(mut self, prefixes: &[ReaderPrefix]) -> Self {
+        for prefix in prefixes {
+            self = match prefix {
+                ReaderPrefix::Quote => self.quoted(),
+                ReaderPrefix::Quasiquote => self.quasiquoted(),
+                ReaderPrefix::Unquote | ReaderPrefix::UnquoteSplicing => self.unquoted(),
+                _ => self,
             };
-            rest = &rest[width..];
         }
+        self
     }
 }
 
@@ -305,12 +299,11 @@ pub struct TopLevelForm<'a> {
 /// Reads only each form's head and span — no subtree is materialized — so
 /// correlating definitions costs a scan of the top level, not of the file.
 pub fn top_level_forms(tree: &SyntaxTree) -> impl Iterator<Item = TopLevelForm<'_>> {
-    let source = tree.source();
     (0..tree.root_children().len()).filter_map(move |index| {
         let selection = tree.select_path(&SexprPath::root_child(index)).ok()?;
         let span = selection.span();
         if QuoteState::EVALUATED
-            .after_prefixes_in(source, span)
+            .after_prefixes(selection.reader_prefixes())
             .is_data()
         {
             return None;

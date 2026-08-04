@@ -35,7 +35,7 @@
 //! spelling heap-allocates once per sibling scanned.
 
 use paredit_core_syntax::sexpr::{
-    ByteSpan, ExpressionView, Path as SexprPath, Selection, SyntaxTree,
+    ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, Selection, SyntaxTree,
 };
 use paredit_core_syntax::view_query::{
     atom_text, is_paren_list, list_head, symbol_is, unqualified,
@@ -83,43 +83,40 @@ impl QuoteState {
         self.hard || self.quasi > 0
     }
 
-    /// The state inside the node at `span`, given the state outside it and the
-    /// node's own reader prefixes, read off the source because a [`Selection`]
-    /// does not carry them.
+    /// The state inside a node, given the state outside it and the node's own
+    /// reader prefixes.
     ///
     /// `#'` is deliberately neutral: `#'foo` is a function designator, not
     /// data, and the form under it is still code. So are `#+`/`#-`, which in
     /// this tree are not prefixes at all — a Common Lisp reader conditional
     /// folds into a *single atom* carrying its own `#+sbcl` text, so there is
     /// no prefix here to misread.
-    fn after_prefixes_in(mut self, source: &str, span: ByteSpan) -> Self {
-        let mut rest = source
-            .get(span.start().get()..span.end().get())
-            .unwrap_or_default();
-        loop {
-            rest = rest.trim_start();
-            let width = match rest.as_bytes() {
-                [b'#', b'\'', ..] => 2,
-                [b',', b'@', ..] => {
+    ///
+    /// These are the prefixes the dialect's own reader produced, not a re-lex
+    /// of the source text. An earlier version of this scanned the bytes at the
+    /// node's span for `'`, `` ` ``, `,` and `,@` directly, which is right for
+    /// Common Lisp and Emacs Lisp and wrong everywhere else: a comma is
+    /// whitespace in Clojure and Carp, an ordinary symbol character in Hy, and
+    /// the unquote is spelled `%` in Carp and `~` in Hy. Every rule in this
+    /// package is [`RuleDialectScope::COMMON_LISP_ONLY`], so that never became
+    /// a wrong finding — but it left the correctness of this function resting
+    /// on a fact declared in a different file, which is not a property worth
+    /// keeping.
+    ///
+    /// [`RuleDialectScope::COMMON_LISP_ONLY`]:
+    ///     paredit_core_lint_engine::policy::RuleDialectScope::COMMON_LISP_ONLY
+    fn after_prefixes(mut self, prefixes: &[ReaderPrefix]) -> Self {
+        for prefix in prefixes {
+            match prefix {
+                ReaderPrefix::Quote => self.hard = true,
+                ReaderPrefix::Quasiquote => self.quasi += 1,
+                ReaderPrefix::Unquote | ReaderPrefix::UnquoteSplicing => {
                     self.quasi = self.quasi.saturating_sub(1);
-                    2
                 }
-                [b',', ..] => {
-                    self.quasi = self.quasi.saturating_sub(1);
-                    1
-                }
-                [b'\'', ..] => {
-                    self.hard = true;
-                    1
-                }
-                [b'`', ..] => {
-                    self.quasi += 1;
-                    1
-                }
-                _ => return self,
-            };
-            rest = &rest[width..];
+                _ => {}
+            }
         }
+        self
     }
 }
 
@@ -157,16 +154,22 @@ fn spelled_quote_step(
 /// The root case reads [`SyntaxTree::root_child_span`], which is a slice index
 /// and a field read; the `select_path` spelling would allocate an
 /// [`SexprPath`]'s `Vec` per sibling scanned.
-fn child_containing(
-    tree: &SyntaxTree,
+fn child_containing<'tree>(
+    tree: &'tree SyntaxTree,
     parent: Option<&SexprPath>,
     span: ByteSpan,
-) -> Option<(usize, SexprPath, ByteSpan)> {
+) -> Option<(usize, SexprPath, ByteSpan, &'tree [ReaderPrefix])> {
     let mut index = 0usize;
     loop {
-        let child_span = match parent {
-            None => tree.root_child_span(index)?,
-            Some(path) => tree.select_path(&path.child(index)).ok()?.span(),
+        let (child_span, prefixes) = match parent {
+            None => (
+                tree.root_child_span(index)?,
+                tree.root_child_reader_prefixes(index)?,
+            ),
+            Some(path) => {
+                let selection = tree.select_path(&path.child(index)).ok()?;
+                (selection.span(), selection.reader_prefixes())
+            }
         };
         if child_span.start().get() > span.start().get() {
             return None;
@@ -174,7 +177,7 @@ fn child_containing(
         if span.end().get() <= child_span.end().get() {
             let child =
                 parent.map_or_else(|| SexprPath::root_child(index), |path| path.child(index));
-            return Some((index, child, child_span));
+            return Some((index, child, child_span, prefixes));
         }
         index += 1;
     }
@@ -193,21 +196,21 @@ fn child_containing(
 /// turns a 30ns rule into a 400µs one.
 #[must_use]
 pub fn locate(tree: &SyntaxTree, span: ByteSpan) -> Option<FormSite> {
-    let source = tree.source();
     let mut parent: Option<SexprPath> = None;
     let mut state = QuoteState::EVALUATED;
     let mut top_level_index = 0usize;
     let mut descended = 0usize;
 
     loop {
-        let (index, child_path, child_span) = child_containing(tree, parent.as_ref(), span)?;
+        let (index, child_path, child_span, prefixes) =
+            child_containing(tree, parent.as_ref(), span)?;
         if descended == 0 {
             top_level_index = index;
         }
         if let Some(parent_path) = &parent {
             state = spelled_quote_step(tree, parent_path, index, state);
         }
-        state = state.after_prefixes_in(source, child_span);
+        state = state.after_prefixes(prefixes);
 
         if child_span == span {
             return Some(FormSite {
@@ -235,7 +238,7 @@ pub fn locate(tree: &SyntaxTree, span: ByteSpan) -> Option<FormSite> {
 pub fn view_at_span(tree: &SyntaxTree, span: ByteSpan) -> Option<ExpressionView> {
     let mut parent: Option<SexprPath> = None;
     loop {
-        let (_, child_path, child_span) = child_containing(tree, parent.as_ref(), span)?;
+        let (_, child_path, child_span, _) = child_containing(tree, parent.as_ref(), span)?;
         if child_span == span {
             return Some(tree.select_path(&child_path).ok()?.view());
         }

@@ -652,6 +652,20 @@ impl SyntaxTree {
             .map(|node_id| self.node(*node_id).span)
     }
 
+    /// Returns the reader prefixes of the top-level form at `index`.
+    ///
+    /// The prefix counterpart of [`Self::root_child_span`], and here for the
+    /// same reason: a walk that scans the top level looking for the form
+    /// containing a span needs the prefixes of each candidate as well as its
+    /// extent, and `Path::root_child` would charge a heap allocation per
+    /// sibling for the privilege.
+    #[must_use]
+    pub fn root_child_reader_prefixes(&self, index: usize) -> Option<&[ReaderPrefix]> {
+        self.root_children()
+            .get(index)
+            .map(|node_id| self.node(*node_id).reader_prefixes())
+    }
+
     /// Returns an immutable tree view rooted at the virtual document node.
     #[must_use]
     pub fn root_view(&self) -> ExpressionView {
@@ -1131,6 +1145,24 @@ impl<'a> Selection<'a> {
     #[must_use]
     pub fn view(self) -> ExpressionView {
         self.tree.expression_view(self.node_id)
+    }
+
+    /// Returns the reader prefixes attached to the selected expression.
+    ///
+    /// [`Self::view`] carries the same list, but materializes the entire
+    /// subtree to hand it over. A walk that descends a path accumulating quote
+    /// context needs the prefixes at every level and the subtree at none of
+    /// them, so going through `view` would make such a walk quadratic in the
+    /// size of what it is descending past.
+    ///
+    /// These are the prefixes the *dialect's* reader produced. That is the
+    /// whole point of reading them here rather than re-lexing the source: a
+    /// comma is an unquote in Common Lisp and Emacs Lisp, plain whitespace in
+    /// Clojure and Carp, and an ordinary symbol character in Hy, and only the
+    /// reader knows which one it was looking at.
+    #[must_use]
+    pub fn reader_prefixes(self) -> &'a [ReaderPrefix] {
+        self.node().reader_prefixes()
     }
 
     /// Returns the zero-based path from the virtual root to this selection.
