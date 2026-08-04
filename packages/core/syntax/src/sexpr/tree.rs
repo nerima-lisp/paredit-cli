@@ -195,6 +195,22 @@ pub enum ReaderPrefix {
     Quote,
     Quasiquote,
     Unquote,
+    /// A splicing unquote: `,@` everywhere, and additionally Common Lisp's
+    /// `,.` (CLHS 2.4.6), which splices destructively.
+    ///
+    /// Both spellings land here because splicing is the whole of what a
+    /// *reader* can tell them apart by: whether the form may expand to more
+    /// than one element of the enclosing list. Whether the splice copies the
+    /// list or reuses its structure is decided when the expansion runs.
+    ///
+    /// One consequence is worth knowing before using this in a write path.
+    /// [`Self::as_source`] spells this `,@`, so a caller that *synthesises*
+    /// prefix text from the enum rather than copying the node's own source
+    /// span rewrites a `,.` into a `,@`. That direction is safe --- `,@` is
+    /// legal wherever `,.` was, and merely declines the destructive
+    /// optimisation --- but it is a rewrite, and a caller that must preserve
+    /// the author's spelling should use the prefix's span (see
+    /// `Node::reader_prefix_spans`) instead.
     UnquoteSplicing,
     Function,
     ReadEval,
