@@ -31,7 +31,9 @@ use paredit_core_lint_engine::LintResult;
 
 use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
-use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::sexpr::{
+    ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
+};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
 use serde_json::{Value, json};
 
@@ -51,6 +53,20 @@ fn identity_fold_operator(head: &str) -> Option<&'static str> {
 /// evaluated operand. Mirrors the guard used by the other progn/boolean lints.
 fn is_reader_conditional(view: &ExpressionView) -> bool {
     atom_text(view).is_some_and(|text| text.starts_with("#+") || text.starts_with("#-"))
+}
+
+/// A `,@`-spliced operand, which is the reader conditional's problem pointed
+/// the other way: `` `(or ,@predicates) `` has however many operands
+/// `predicates` turns out to hold at expansion time, which is zero or three
+/// just as easily as one. The parser sees one child and the arity premise reads
+/// as satisfied, but nothing in the source settles it.
+///
+/// It is also unwritable as a rewrite even when it really is one operand —
+/// `` `,@predicates `` is not a well-formed backquote expression and SBCL
+/// refuses to read it — so this removes findings whose fix had no valid output.
+fn is_spliced(view: &ExpressionView) -> bool {
+    view.reader_prefixes
+        .contains(&ReaderPrefix::UnquoteSplicing)
 }
 
 #[derive(Debug, Clone)]
@@ -119,6 +135,9 @@ pub fn examine_arithmetic(
     }
     let operand = &view.children[1];
     if is_reader_conditional(operand) {
+        return;
+    }
+    if is_spliced(operand) {
         return;
     }
     violations.push(SingleOperandArithmeticItem {

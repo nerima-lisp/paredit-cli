@@ -49,8 +49,14 @@ impl LintRule for Rule {
             let fix = {
                 // Rewrite `(nth N x)` as `(ordinal x)`, copying the list source.
 
+                // The fix region is `content_span`, not `span`: `span` starts at this
+                // form's *own* reader prefixes, so replacing it deletes them. A
+                // `` `(…) `` has to keep its backquote — without it the commas
+                // underneath are commas outside a backquote, and the file stops
+                // reading altogether. The two spans coincide on any form with no
+                // prefix, which is almost all code, so nothing else moves.
                 RuleFix::single(
-                    item.span,
+                    view.content_span,
                     format!("({} {})", item.ordinal, context_slice(item.list_span)),
                     format!(
                         "Use ({} …) instead of nth with a constant index",

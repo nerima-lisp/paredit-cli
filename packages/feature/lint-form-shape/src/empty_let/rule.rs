@@ -65,3 +65,51 @@ impl LintRule for Rule {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::support::run_rule_fixed;
+    use paredit_core_lint_engine::rule::RuleEntry;
+
+    static ENTRIES: [RuleEntry; 1] = [RuleEntry::new(&META, &RULE)];
+
+    /// The source each finding's fix produces, in report order.
+    fn fixed(source: &str) -> Vec<String> {
+        run_rule_fixed(&ENTRIES, source)
+            .into_iter()
+            .map(|(_, source)| source)
+            .collect()
+    }
+
+    #[allow(dead_code)]
+    fn count(source: &str) -> usize {
+        run_rule_fixed(&ENTRIES, source).len()
+    }
+
+    #[test]
+    fn still_fires_on_an_ordinary_unquoted_empty_let() {
+        assert_eq!(
+            fixed("(defun f () (let () (a) (b)))\n"),
+            vec!["(defun f () (progn (a) (b)))\n".to_owned()]
+        );
+    }
+
+    /// The measured defect: the rewritten region began at `view.span`, so the
+    /// `(progn` written over `(let ()` landed on top of the backquote too.
+    #[test]
+    fn a_quasiquoted_empty_let_keeps_its_backquote() {
+        assert_eq!(
+            fixed("(defmacro m (x) `(let () ,x))\n"),
+            vec!["(defmacro m (x) `(progn ,x))\n".to_owned()]
+        );
+    }
+
+    #[test]
+    fn still_fires_inside_a_quasiquote_template() {
+        assert_eq!(
+            fixed("(defmacro m (x) `(f (let () ,x)))\n"),
+            vec!["(defmacro m (x) `(f (progn ,x)))\n".to_owned()]
+        );
+    }
+}

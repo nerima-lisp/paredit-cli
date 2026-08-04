@@ -49,8 +49,14 @@ impl LintRule for Rule {
                 if item.always_runs {
                     // The body always runs: splice `(when t` / `(unless nil` down to
                     // `(progn`, keeping the body forms verbatim.
+                    //
+                    // The region starts at `content_span`, not `span`: `span` starts
+                    // at this form's *own* reader prefixes, so a region anchored
+                    // there swallows them and `` `(when t …) `` loses its
+                    // backquote. Only the opening `(when t` is being rewritten, so
+                    // the prefix must survive in front of the `(progn`.
                     RuleFix::single(
-                        ByteSpan::new(item.span.start(), item.splice_span.end()),
+                        ByteSpan::new(view.content_span.start(), item.splice_span.end()),
                         "(progn".to_owned(),
                         format!(
                             "Rewrite the always-true ({} {} …) as progn",
@@ -59,8 +65,12 @@ impl LintRule for Rule {
                     )
                 } else {
                     // The body never runs: the whole form is just nil.
+                    //
+                    // `content_span` for the same reason as above. `` `,(when nil
+                    // …) `` collapses to `` `,nil ``, not to a bare `nil` that has
+                    // lost the comma binding it to the template.
                     RuleFix::single(
-                        item.span,
+                        view.content_span,
                         "nil".to_owned(),
                         format!("Collapse the dead ({} {} …) to nil", item.head, item.test),
                     )
@@ -81,5 +91,66 @@ impl LintRule for Rule {
             sink.report_fixed(span, message, fix);
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::support::run_rule_fixed;
+    use paredit_core_lint_engine::rule::RuleEntry;
+
+    static ENTRIES: [RuleEntry; 1] = [RuleEntry::new(&META, &RULE)];
+
+    /// The source each finding's fix produces, in report order.
+    fn fixed(source: &str) -> Vec<String> {
+        run_rule_fixed(&ENTRIES, source)
+            .into_iter()
+            .map(|(_, source)| source)
+            .collect()
+    }
+
+    fn count(source: &str) -> usize {
+        run_rule_fixed(&ENTRIES, source).len()
+    }
+
+    #[test]
+    fn still_fires_on_an_ordinary_always_true_when() {
+        assert_eq!(
+            fixed("(when t (a) (b))\n"),
+            vec!["(progn (a) (b))\n".to_owned()]
+        );
+    }
+
+    /// The always-runs branch rewrites only the `(when t` opening, so the
+    /// region it replaces must begin *after* the form's prefix — otherwise the
+    /// `(progn` lands on top of the backquote.
+    #[test]
+    fn a_quasiquoted_always_true_when_keeps_its_backquote() {
+        assert_eq!(
+            fixed("(defmacro m (x) `(when t ,x))\n"),
+            vec!["(defmacro m (x) `(progn ,x))\n".to_owned()]
+        );
+    }
+
+    #[test]
+    fn a_quasiquoted_dead_when_keeps_its_backquote() {
+        assert_eq!(
+            fixed("(defmacro m (x) `(f (when nil ,x)))\n"),
+            vec!["(defmacro m (x) `(f nil))\n".to_owned()]
+        );
+    }
+
+    #[test]
+    fn a_quoted_always_true_when_keeps_its_quote() {
+        assert_eq!(
+            fixed("(defparameter *p* '(when t (a)))\n"),
+            vec!["(defparameter *p* '(progn (a)))\n".to_owned()]
+        );
+    }
+
+    #[test]
+    fn a_variable_test_is_left_alone() {
+        assert_eq!(count("(when c (a))\n"), 0);
     }
 }

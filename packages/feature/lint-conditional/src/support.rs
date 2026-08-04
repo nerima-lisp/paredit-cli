@@ -405,6 +405,58 @@ pub fn is_clause(view: &ExpressionView) -> bool {
     is_paren_list(view) && view.reader_prefixes.is_empty()
 }
 
+/// Runs one rule end to end through the real lint engine and returns, per
+/// finding, its message and the source that applying its fix produces.
+///
+/// A domain test cannot see the thing that actually broke these rules on real
+/// code, because the domain never applies a fix: a replacement region that
+/// starts one byte early deletes the form's reader prefix, and every assertion
+/// about spans and counts still passes. Only the spliced source shows it. So
+/// this returns the rewritten text, not just the finding.
+#[cfg(test)]
+#[must_use]
+pub fn run_rule_fixed(
+    entries: &'static [paredit_core_lint_engine::rule::RuleEntry],
+    source: &str,
+) -> Vec<(String, String)> {
+    use paredit_core_lint_engine::engine::{build_head_index, collect_lint_outcomes};
+    use paredit_core_lint_engine::policy::RuleSelection;
+    use paredit_core_lint_engine::rule::RuleCatalog;
+    use paredit_core_syntax::dialect::Dialect;
+
+    let catalog = RuleCatalog::new(entries);
+    let index = build_head_index(catalog);
+    let tree = SyntaxTree::parse_with_dialect(source, Dialect::CommonLisp).expect("parse");
+    collect_lint_outcomes(
+        catalog,
+        &index,
+        std::path::Path::new("app.lisp"),
+        Dialect::CommonLisp,
+        &tree,
+        source,
+        RuleSelection::All,
+    )
+    .expect("lint pass")
+    .into_iter()
+    .map(|outcome| {
+        let (finding, fix) = outcome.into_parts();
+        let mut fixed = source.to_owned();
+        if let Some(fix) = fix {
+            // Highest offset first, so an earlier edit's span stays valid.
+            let mut edits: Vec<_> = fix.replacements().collect();
+            edits.sort_by_key(|edit| std::cmp::Reverse(edit.span().start().get()));
+            for edit in edits {
+                fixed.replace_range(
+                    edit.span().start().get()..edit.span().end().get(),
+                    edit.text(),
+                );
+            }
+        }
+        (finding.message, fixed)
+    })
+    .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

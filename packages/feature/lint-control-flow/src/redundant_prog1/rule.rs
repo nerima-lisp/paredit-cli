@@ -49,8 +49,14 @@ impl LintRule for Rule {
             let fix = {
                 // (prog1 x) is x: replace the whole form with its single inner form.
 
+                // The fix region is `content_span`, not `span`: `span` starts at this
+                // form's *own* reader prefixes, so replacing it deletes them. A
+                // `` `(…) `` has to keep its backquote — without it the commas
+                // underneath are commas outside a backquote, and the file stops
+                // reading altogether. The two spans coincide on any form with no
+                // prefix, which is almost all code, so nothing else moves.
                 RuleFix::single(
-                    item.span,
+                    view.content_span,
                     context_slice(item.form_span),
                     "Drop the single-form prog1".to_owned(),
                 )
@@ -63,5 +69,53 @@ impl LintRule for Rule {
             );
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::support::run_rule_fixed;
+    use paredit_core_lint_engine::rule::RuleEntry;
+
+    static ENTRIES: [RuleEntry; 1] = [RuleEntry::new(&META, &RULE)];
+
+    /// The source each finding's fix produces, in report order.
+    fn fixed(source: &str) -> Vec<String> {
+        run_rule_fixed(&ENTRIES, source)
+            .into_iter()
+            .map(|(_, source)| source)
+            .collect()
+    }
+
+    #[allow(dead_code)]
+    fn count(source: &str) -> usize {
+        run_rule_fixed(&ENTRIES, source).len()
+    }
+
+    #[test]
+    fn still_fires_on_an_ordinary_unquoted_prog1() {
+        assert_eq!(
+            fixed("(defun f () (prog1 (g)))\n"),
+            vec!["(defun f () (g))\n".to_owned()]
+        );
+    }
+
+    /// The measured defect, at this rule's highest-rate shape: 17 of its 19
+    /// corpus fixes dropped a prefix.
+    #[test]
+    fn a_quasiquoted_prog1_keeps_its_backquote() {
+        assert_eq!(
+            fixed("(defmacro m (x) `(prog1 ,x))\n"),
+            vec!["(defmacro m (x) `,x)\n".to_owned()]
+        );
+    }
+
+    #[test]
+    fn still_fires_inside_a_quasiquote_template() {
+        assert_eq!(
+            fixed("(defmacro m (x) `(when c (prog1 ,x)))\n"),
+            vec!["(defmacro m (x) `(when c ,x))\n".to_owned()]
+        );
     }
 }

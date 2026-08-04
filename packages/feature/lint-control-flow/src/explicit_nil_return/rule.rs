@@ -60,7 +60,17 @@ impl LintRule for Rule {
                     None => format!("({})", context_slice(item.head_span)),
                 };
 
-                RuleFix::single(item.span, text, "Drop the explicit nil result".to_owned())
+                // The fix region is `content_span`, not `span`: `span` starts at this
+                // form's *own* reader prefixes, so replacing it deletes them. A
+                // `` `(…) `` has to keep its backquote — without it the commas
+                // underneath are commas outside a backquote, and the file stops
+                // reading altogether. The two spans coincide on any form with no
+                // prefix, which is almost all code, so nothing else moves.
+                RuleFix::single(
+                    view.content_span,
+                    text,
+                    "Drop the explicit nil result".to_owned(),
+                )
             };
             let operator = item.operator;
 
