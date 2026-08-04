@@ -1618,7 +1618,7 @@
               "properties": {
                 "category": "arity",
                 "fixable": false,
-                "severity": "error",
+                "severity": "warning",
                 "tags": []
               },
               "shortDescription": {
