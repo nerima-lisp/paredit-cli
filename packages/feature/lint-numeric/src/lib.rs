@@ -1142,9 +1142,16 @@ mod equality_arity_type_specifier_tests {
 
     /// A `case` clause head is a set of *object* keys, not a type, so the
     /// `typecase` anchor must not extend to it.
+    ///
+    /// The rule itself no longer reports this shape, but for an unrelated
+    /// reason: a clause key is not a *call*, which the key-and-binding guard
+    /// settles independently. The invariant this module is about — that the
+    /// *type* anchor stops at `typecase` — is therefore asserted directly
+    /// against the type predicate, in
+    /// `support::tests::a_case_clause_key_is_not_a_type_specifier_position`.
     #[test]
-    fn a_case_clause_head_is_not_a_type_position() {
-        assert!(reported("(case x ((eql 5) 1))"));
+    fn a_case_clause_head_is_not_reported_as_a_call() {
+        assert!(!reported("(case x ((eql 5) 1))"));
     }
 
     /// The compound specifiers nest, and the corpus writes the nesting far more
@@ -1222,5 +1229,182 @@ mod equality_arity_type_specifier_tests {
             fired("(progn (typecase y ((eql 5) 1)) (eq z))"),
             vec!["equality-arity"]
         );
+    }
+}
+
+/// `equality-arity`'s key- and binding-position model, driven through the
+/// *real* engine.
+///
+/// A `case`-family clause **key** and a variable-binding list are positions
+/// that name something rather than call it, so the written shape `(eql x)`
+/// there has no arity to be wrong about. CLHS 5.3 gives `case` the syntax
+/// `(case keyform {(keys form*)}*)`, so in `(case kind (eql x) …)` the `eql` is
+/// a symbol being compared against and the `x` is a *body form*;
+/// `(multiple-value-bind (equal certain) …)` binds two variables.
+///
+/// Measured over the same 5 556-file corpus (5 506 of them parsing as Common
+/// Lisp) the earlier guards were measured on, this accounts for **224** of the
+/// 631 findings that survive the hard-quote and type-specifier guards: 195
+/// `case`-family clause keys, 25 `multiple-value-bind` variable lists and 4
+/// `let` bindings. A 14-finding random sample of the 224 was adjudicated
+/// against its real source line by line and contained **no** genuine arity
+/// error.
+///
+/// Every suppression below is paired with a control proving the rule still
+/// fires on the same operator in a real call position, because buying a false
+/// negative is the standard way to "fix" a false positive. The sharpest of
+/// those controls is [`a_key_named_eql_still_reports_a_call_in_its_own_body`]:
+/// the clause *key* is silenced and the clause *body* is not, in one form.
+#[cfg(test)]
+mod equality_arity_key_and_binding_tests {
+    use std::path::Path;
+
+    use paredit_core_lint_engine::engine::{build_head_index, collect_lint_outcomes};
+    use paredit_core_lint_engine::policy::RuleSelection;
+    use paredit_core_lint_engine::rule::{RuleCatalog, RuleEntry};
+    use paredit_core_syntax::dialect::Dialect;
+    use paredit_core_syntax::sexpr::SyntaxTree;
+
+    static ENTRIES: [RuleEntry; 1] = [RuleEntry::new(
+        &crate::equality_arity::rule::META,
+        &crate::equality_arity::rule::RULE,
+    )];
+
+    /// How many `equality-arity` findings the real dispatch reports.
+    fn count(source: &str) -> usize {
+        let catalog = RuleCatalog::new(&ENTRIES);
+        let index = build_head_index(catalog);
+        let tree = SyntaxTree::parse_with_dialect(source, Dialect::CommonLisp).expect("parse");
+        collect_lint_outcomes(
+            catalog,
+            &index,
+            Path::new("t.lisp"),
+            Dialect::CommonLisp,
+            &tree,
+            source,
+            RuleSelection::All,
+        )
+        .expect("lint pass")
+        .len()
+    }
+
+    fn reported(source: &str) -> bool {
+        count(source) > 0
+    }
+
+    // -- the controls: genuine arity errors are still reported ---------------
+
+    /// The defect the rule is named for, in every shape the corpus work
+    /// touched. If any of these stops firing, the guard has bought a false
+    /// negative.
+    #[test]
+    fn a_genuine_arity_error_is_still_reported() {
+        for source in [
+            "(eq x)",
+            "(eql)",
+            "(equal a)",
+            "(equalp a b c)",
+            "(defun f (x) (eq x))",
+            "(defun f (x) (eql a b c))",
+            "(when (equal a) t)",
+            // A quasiquoted template becomes a real call, and stays reported.
+            // The candidate must not carry the quasiquote itself: `examine_call`
+            // declines a node with its *own* reader prefix, here and on `main`
+            // alike, so the template's inner form is the one under test.
+            "(defmacro m (v) `(list (eq ,v)))",
+        ] {
+            assert!(reported(source), "{source}");
+        }
+    }
+
+    /// `=` and `<` are variadic, so they are not this rule's business at all —
+    /// the control that the guard did not widen the rule's reach.
+    #[test]
+    fn a_variadic_numeric_comparison_is_still_not_reported() {
+        assert!(!reported("(= 1)"));
+        assert!(!reported("(< a b c)"));
+        assert!(!reported("(case k (= 1))"));
+    }
+
+    // -- case-family clause keys ---------------------------------------------
+
+    #[test]
+    fn a_case_family_clause_key_is_not_reported() {
+        for source in [
+            "(case kind (eql x) (equal y))",
+            "(ecase test (eq (f)) (equalp (g)))",
+            "(ccase test (eql (f)))",
+            // The key-list spelling, including a singleton list.
+            "(case std-fn ((eql char=) (f)) ((equal) (g)))",
+            // Zero-length and long bodies are still bodies, not arguments.
+            "(case k (eq))",
+            "(case k (eql a b c))",
+        ] {
+            assert!(!reported(source), "{source}");
+        }
+    }
+
+    /// **The boundary this change creates.** A clause *body* is ordinary code,
+    /// and a real misarity call there must still be reported.
+    #[test]
+    fn a_call_in_a_case_clause_body_is_still_reported() {
+        assert!(reported("(case kind (some-key (eq x)))"));
+        assert!(reported("(case kind ((a b) (eql x)))"));
+        assert!(reported("(case kind (otherwise (equal x)))"));
+        assert!(reported("(case kind (t (eq x)))"));
+        assert!(reported("(ecase kind (some-key (eq x)))"));
+    }
+
+    /// The sharpest form of that boundary: the key and the body name the same
+    /// operator, so exactly one of the two nodes may be reported.
+    #[test]
+    fn a_key_named_eql_still_reports_a_call_in_its_own_body() {
+        assert_eq!(count("(case kind (eql (eql x)))"), 1);
+        assert_eq!(count("(case kind ((eql equal) (eq x)))"), 1);
+    }
+
+    /// The `keyform` is child 1 of the `case` and *is* evaluated.
+    #[test]
+    fn a_misarity_case_keyform_is_still_reported() {
+        assert!(reported("(case (eql x) (a 1))"));
+    }
+
+    // -- binding positions ----------------------------------------------------
+
+    #[test]
+    fn a_variable_binding_list_is_not_reported() {
+        for source in [
+            "(multiple-value-bind (equal certain) (type= a b) certain)",
+            "(multiple-value-bind (equal less greater when-true when-false) (f) equal)",
+            "(destructuring-bind (eq a) form eq)",
+            "(dolist (equal items) equal)",
+            "(let (mark (eq (lambda-var-eq-constraints leaf))) eq)",
+            "(let* ((equal (f))) equal)",
+            "(defun f (equal x) x)",
+        ] {
+            assert!(!reported(source), "{source}");
+        }
+    }
+
+    /// A binding's initial value form, a `do` step form and a `do` end test are
+    /// all live code one level below the binding list.
+    #[test]
+    fn a_call_around_a_binding_list_is_still_reported() {
+        assert!(reported("(let ((a (eql x))) a)"));
+        assert!(reported("(do ((i 0 (eql i))) (done) x)"));
+        assert!(reported("(do ((i 0)) ((eql i)) x)"));
+        assert!(reported("(let ((a 1)) (eq a))"));
+        assert!(reported("(multiple-value-bind (a b) (f) (eq a))"));
+        assert!(reported("(flet ((g (x) (eql x))) (g 1))"));
+    }
+
+    /// A suppressed sibling must not silence a real finding in the same file.
+    #[test]
+    fn a_binding_list_does_not_suppress_its_neighbour() {
+        assert_eq!(
+            count("(multiple-value-bind (equal certain) (f) (eq certain))"),
+            1
+        );
+        assert_eq!(count("(case k (eql 1))\n(eq x)\n"), 1);
     }
 }

@@ -452,6 +452,171 @@ fn is_method_eql_specializer(
         .all(|child| atom_text(child).is_none_or(|text| !text.starts_with('&')))
 }
 
+// -- key and binding positions -------------------------------------------------
+
+/// The `case` family, whose clause heads are **key designators** rather than
+/// operators.
+///
+/// `typecase` is deliberately absent: its clause heads are *type specifiers*,
+/// which is a different question with a different answer.
+const CASE_HEADS: [&str; 3] = ["case", "ecase", "ccase"];
+
+/// Forms whose child at a fixed index is a variable list, a lambda list or a
+/// binding spec — a position that *names* variables and calls nothing.
+///
+/// Every entry is standard Common Lisp and every index is fixed by the CLHS
+/// syntax of the form, which is what makes the position decidable from the
+/// shape alone. `defmethod` is deliberately absent: its lambda-list index moves
+/// with its qualifiers, so it is not a fixed-index anchor at all.
+const VARIABLE_LIST_ANCHORS: [(&str, usize); 21] = [
+    // `(multiple-value-bind (a b) values-form …)` — a list of variable names.
+    ("multiple-value-bind", 1),
+    ("multiple-value-setq", 1),
+    ("destructuring-bind", 1),
+    ("with-slots", 1),
+    // `(dolist (x list) …)` — a `(variable form…)` binding spec.
+    ("dolist", 1),
+    ("dotimes", 1),
+    ("do-symbols", 1),
+    ("do-external-symbols", 1),
+    ("do-all-symbols", 1),
+    ("with-open-file", 1),
+    ("with-open-stream", 1),
+    ("with-input-from-string", 1),
+    ("with-output-to-string", 1),
+    // A lambda list at the index the form's syntax fixes it at.
+    ("lambda", 1),
+    ("defun", 2),
+    ("defmacro", 2),
+    ("defgeneric", 2),
+    ("deftype", 2),
+    ("define-compiler-macro", 2),
+    ("define-modify-macro", 2),
+    ("define-setf-expander", 2),
+];
+
+/// Forms whose child 1 is a **binding list**, each of whose own children binds
+/// one name.
+///
+/// The distinction from [`VARIABLE_LIST_ANCHORS`] is a level of nesting: here
+/// the candidate is one *binding*, so its parent is the binding list and its
+/// grandparent is the form.
+const BINDING_LIST_HEADS: [&str; 10] = [
+    "let",
+    "let*",
+    "prog",
+    "prog*",
+    "do",
+    "do*",
+    "symbol-macrolet",
+    "flet",
+    "labels",
+    "macrolet",
+];
+
+const fn is_case_head_index(index: usize) -> bool {
+    // Child 0 is the `case` operator and child 1 is the keyform — which *is*
+    // evaluated, so `(case (eql x) …)` stays reported. Only child 2 and later
+    // are clauses.
+    index >= 2
+}
+/// Whether the candidate occupies a `case`-family clause's **keys** position.
+///
+/// CLHS 5.3 gives `case` the syntax `(case keyform {(keys form*)}*)`, where
+/// `keys` is a designator for a list of keys and an atom stands for the
+/// singleton list containing it. So in `(case kind (eql x) …)` the `eql` is a
+/// *symbol being compared against* and `x` is a body form — there is no call
+/// there at all.
+///
+/// Two spellings, because the designator may be an atom or a list, and they sit
+/// at different depths.
+fn is_case_clause_key(
+    parent: &ExpressionView,
+    index: usize,
+    grand: Option<(&ExpressionView, usize)>,
+) -> bool {
+    // `(case keyform (KEY body*) …)`: the candidate *is* the clause, so the
+    // head this rule matched on is the clause's atom key designator.
+    if is_case_head_index(index)
+        && list_head(parent).is_some_and(|head| CASE_HEADS.iter().any(|name| symbol_is(head, name)))
+    {
+        return true;
+    }
+    // `(case keyform ((KEY …) body*) …)`: the candidate is the clause's key
+    // *list*, which is child 0 of the clause.
+    //
+    // Requiring index 0 is the whole boundary this guard creates: a clause's
+    // body forms are child 1 and later, and a genuine `(eql x)` there is
+    // ordinary code that stays reported.
+    index == 0
+        && grand.is_some_and(|(outer, clause_index)| {
+            is_case_head_index(clause_index)
+                && list_head(outer)
+                    .is_some_and(|head| CASE_HEADS.iter().any(|name| symbol_is(head, name)))
+        })
+}
+
+/// Whether the candidate occupies a variable-binding position rather than a
+/// call position.
+fn is_binding_position(
+    parent: &ExpressionView,
+    index: usize,
+    grand: Option<(&ExpressionView, usize)>,
+) -> bool {
+    // `(multiple-value-bind (equal certain) …)` binds variables named `equal`
+    // and `certain`; the list is not a call and its length is not an arity.
+    if let Some(head) = list_head(parent) {
+        if VARIABLE_LIST_ANCHORS
+            .iter()
+            .any(|(name, at)| *at == index && symbol_is(head, name))
+        {
+            return true;
+        }
+    }
+    // `(let ((eq …) …) …)`: the candidate is one binding, so its parent is the
+    // binding list — child 1 of the form — and the form is one level further
+    // up. An *initial value* form sits one level deeper still, so it keeps its
+    // own verdict: in `(let ((a (eql x))) …)` the `(eql x)` is live code.
+    grand.is_some_and(|(outer, binding_list_index)| {
+        binding_list_index == 1
+            && list_head(outer)
+                .is_some_and(|head| BINDING_LIST_HEADS.iter().any(|name| symbol_is(head, name)))
+    })
+}
+
+/// Whether the node at `target` sits in a position that names something rather
+/// than calling it: a `case`-family clause **key**, or a variable-binding list.
+///
+/// Both are positions where the written shape `(eql x)` has no arity at all —
+/// `eql` there is a symbol being matched or a variable being bound — so an
+/// arity rule has nothing to say about them. Unlike the type-specifier
+/// question, this one is not restricted to one operator or one argument count:
+/// `(multiple-value-bind (equal less-or-equal greater-or-equal when-true
+/// when-false) …)` is a five-variable binding list that this rule otherwise
+/// reports as a four-argument `equal` call.
+///
+/// The verdict needs the candidate's *ancestors*, which no head-matched node
+/// carries, so this descends from the root exactly as [`quote_state_at`] does,
+/// and — like every other guard here — is asked only once a finding already
+/// exists, so ordinary code never reaches [`SyntaxTree::root_view`].
+///
+/// Deliberately anchored on **standard Common Lisp** only, for the same reason
+/// the quote guard is: teaching a general Common Lisp linter one
+/// implementation's binding macros would silence a user macro that merely
+/// shares a name.
+#[must_use]
+pub fn is_key_or_binding_position_at(tree: &SyntaxTree, target: ByteSpan) -> bool {
+    let root = tree.root_view();
+    let Some(chain) = ancestors_of(&root, target) else {
+        return false;
+    };
+    let Some(&(parent, index)) = chain.last() else {
+        return false;
+    };
+    let grand = (chain.len() >= 2).then(|| chain[chain.len() - 2]);
+    is_case_clause_key(parent, index, grand) || is_binding_position(parent, index, grand)
+}
+
 /// Which floating-point format a numeric token reads as.
 ///
 /// The distinction is the exponent marker, per CLHS 2.3.1: `e`/`E` (and no
@@ -756,6 +921,165 @@ mod tests {
     #[test]
     fn a_hard_quote_nested_in_a_quasiquote_is_hard_quoted() {
         assert!(hard_quoted_at_first_head("`(a ,'(eq x \"s\"))", "eq"));
+    }
+
+    // -- key and binding positions -------------------------------------------
+
+    /// The span of the `occurrence`-th node headed `head`, through the
+    /// *unfiltered* walk, so a node nested inside another match is reachable.
+    fn nth_head_span(parsed: &SyntaxTree, head: &str, occurrence: usize) -> ByteSpan {
+        let mut spans = Vec::new();
+        for_each_subview(&parsed.root_view(), |view| {
+            if list_head(view).is_some_and(|found| found.eq_ignore_ascii_case(head)) {
+                spans.push(view.span);
+            }
+        });
+        spans[occurrence]
+    }
+
+    fn key_or_binding(source: &str, head: &str) -> bool {
+        let parsed = tree(source);
+        is_key_or_binding_position_at(&parsed, nth_head_span(&parsed, head, 0))
+    }
+
+    fn key_or_binding_nth(source: &str, head: &str, occurrence: usize) -> bool {
+        let parsed = tree(source);
+        is_key_or_binding_position_at(&parsed, nth_head_span(&parsed, head, occurrence))
+    }
+
+    /// A `case` clause key is a set of *object* keys, not a type, so the
+    /// `typecase` anchor must not extend to it.
+    ///
+    /// The rule declines this shape through [`is_key_or_binding_position_at`]
+    /// instead, so this asserts the type predicate specifically — otherwise the
+    /// key guard would mask a regression in the type guard.
+    #[test]
+    fn a_case_clause_key_is_not_a_type_specifier_position() {
+        let parsed = tree("(case x ((eql 5) 1))");
+        assert!(!is_eql_type_specifier_at(
+            &parsed,
+            nth_head_span(&parsed, "eql", 0)
+        ));
+    }
+
+    /// CLHS 5.3: each `case` clause is `(keys form*)`, and an atom `keys`
+    /// stands for the singleton list containing it. So the `eql` here is a
+    /// symbol being compared against, not an operator.
+    #[test]
+    fn a_case_clause_with_an_atom_key_is_a_key_position() {
+        assert!(key_or_binding("(case kind (eql x))", "eql"));
+        assert!(key_or_binding("(ecase kind (eq x))", "eq"));
+        assert!(key_or_binding("(ccase kind (equalp x))", "equalp"));
+        // The operator's spelling is not part of the question.
+        assert!(key_or_binding("(CASE kind (EQL x))", "eql"));
+    }
+
+    /// The list spelling of the same designator, which sits one level deeper.
+    #[test]
+    fn a_case_clause_key_list_is_a_key_position() {
+        assert!(key_or_binding("(case kind ((eql equal) x))", "eql"));
+        assert!(key_or_binding("(ecase std-fn ((equal) x))", "equal"));
+    }
+
+    /// **The boundary this guard creates.** A clause's *body* is child 1 and
+    /// later, and a genuine misarity call there is exactly what the rule is
+    /// for. Only the key — child 0, or the clause itself — is silenced.
+    #[test]
+    fn a_case_clause_body_is_not_a_key_position() {
+        // A body form under an ordinary atom key.
+        assert!(!key_or_binding("(case kind (some-key (eq x)))", "eq"));
+        // A body form under a key *list*.
+        assert!(!key_or_binding("(case kind ((a b) (eq x)))", "eq"));
+        // …and under the `otherwise` and `t` clauses.
+        assert!(!key_or_binding("(case kind (otherwise (eq x)))", "eq"));
+        assert!(!key_or_binding("(case kind (t (eq x)))", "eq"));
+    }
+
+    /// The sharpest form of the boundary: the same operator as key and as body
+    /// in one clause. The outer node is the clause, the inner one is code.
+    #[test]
+    fn a_key_named_eql_does_not_silence_an_eql_call_in_its_own_body() {
+        let source = "(case kind (eql (eql x)))";
+        assert!(key_or_binding_nth(source, "eql", 0), "the clause is a key");
+        assert!(
+            !key_or_binding_nth(source, "eql", 1),
+            "the body call is code"
+        );
+    }
+
+    /// The `keyform` is child 1 and *is* evaluated, so it is a real call.
+    #[test]
+    fn the_case_keyform_is_not_a_key_position() {
+        assert!(!key_or_binding("(case (eql x) (a b))", "eql"));
+    }
+
+    /// `typecase` clause heads are *type specifiers*, a separate question with
+    /// a separate answer. This guard must not claim them.
+    #[test]
+    fn a_typecase_clause_head_is_not_claimed_by_this_guard() {
+        assert!(!key_or_binding("(typecase x ((eql 5) y))", "eql"));
+        assert!(!key_or_binding("(etypecase x ((eql 5) y))", "eql"));
+    }
+
+    /// A variable list is not a call and its length is not an arity.
+    #[test]
+    fn a_variable_list_is_a_binding_position() {
+        assert!(key_or_binding(
+            "(multiple-value-bind (equal certain) (type= a b) certain)",
+            "equal"
+        ));
+        // Five variables, which the rule otherwise reports as four arguments.
+        assert!(key_or_binding(
+            "(multiple-value-bind (equal less greater when-true when-false) (f) equal)",
+            "equal"
+        ));
+        assert!(key_or_binding("(destructuring-bind (eq a) form eq)", "eq"));
+        assert!(key_or_binding("(dolist (equal items) equal)", "equal"));
+        assert!(key_or_binding("(defun f (equal x) x)", "equal"));
+        assert!(key_or_binding("(lambda (equal x) x)", "equal"));
+    }
+
+    /// The shape SBCL's `constraint.lisp` writes: a `let` binding a variable
+    /// literally named `eq`.
+    #[test]
+    fn a_let_binding_is_a_binding_position() {
+        assert!(key_or_binding(
+            "(let (mark (eq (lambda-var-eq-constraints leaf))) eq)",
+            "eq"
+        ));
+        assert!(key_or_binding("(let* ((equal (f))) equal)", "equal"));
+        assert!(key_or_binding("(do ((eql 0)) (done) x)", "eql"));
+    }
+
+    /// A binding's *initial value* form is one level deeper than the binding,
+    /// so it keeps its own verdict — it is live code.
+    #[test]
+    fn a_binding_initial_value_form_is_not_a_binding_position() {
+        assert!(!key_or_binding("(let ((a (eql x))) a)", "eql"));
+        assert!(!key_or_binding("(let* ((a (eq x))) a)", "eq"));
+        // …and so is a `do` step form and a `do` end test.
+        assert!(!key_or_binding("(do ((i 0 (eql i))) (done) x)", "eql"));
+        assert!(!key_or_binding("(do ((i 0)) ((eql i)) x)", "eql"));
+    }
+
+    /// A form's *body* is not its binding list.
+    #[test]
+    fn a_body_form_is_not_a_binding_position() {
+        assert!(!key_or_binding("(let ((a 1)) (eq a))", "eq"));
+        assert!(!key_or_binding(
+            "(multiple-value-bind (a b) (f) (eq a))",
+            "eq"
+        ));
+        assert!(!key_or_binding("(flet ((g (x) (eql x))) (g 1))", "eql"));
+        assert!(!key_or_binding("(defun f (x) (eq x))", "eq"));
+    }
+
+    /// An ordinary call is neither, however deeply nested.
+    #[test]
+    fn an_ordinary_call_is_neither() {
+        assert!(!key_or_binding("(eq x)", "eq"));
+        assert!(!key_or_binding("(when (eql a) t)", "eql"));
+        assert!(!key_or_binding("(list (equal a))", "equal"));
     }
 
     // -- float classification -----------------------------------------------
