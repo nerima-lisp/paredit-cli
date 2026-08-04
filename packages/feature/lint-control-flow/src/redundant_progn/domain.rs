@@ -21,7 +21,9 @@ use paredit_core_lint_engine::LintResult;
 
 use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
-use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::sexpr::{
+    ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
+};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
 use serde_json::{Value, json};
 
@@ -78,6 +80,18 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
     atom_text(view).is_some_and(|text| text.starts_with("#+") || text.starts_with("#-"))
 }
 
+/// A `,@`-spliced body form, which is the same problem as a reader conditional
+/// in the other direction: `` `(progn ,@forms) `` wraps however many forms
+/// `forms` turns out to hold, which is zero or two just as easily as one.
+///
+/// It is also unwritable as a rewrite even when it *is* one form —
+/// `` `,@forms `` is not a well-formed backquote expression and SBCL refuses to
+/// read it — so this exemption removes a finding whose fix had no valid output.
+fn is_spliced(view: &ExpressionView) -> bool {
+    view.reader_prefixes
+        .contains(&ReaderPrefix::UnquoteSplicing)
+}
+
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_progn(
@@ -104,12 +118,15 @@ pub fn examine_progn(
             inner_span: None,
         }),
         // (progn X) — a single body form; the progn is a no-op wrapper. A lone
-        // reader conditional is exempt (its evaluated arity is build-dependent).
-        [only] if !is_reader_conditional(only) => violations.push(RedundantPrognItem {
-            span: view.span,
-            body_form_count,
-            inner_span: Some(only.span),
-        }),
+        // reader conditional is exempt (its evaluated arity is build-dependent),
+        // and so is a lone `,@` splice (its arity is expansion-dependent).
+        [only] if !is_reader_conditional(only) && !is_spliced(only) => {
+            violations.push(RedundantPrognItem {
+                span: view.span,
+                body_form_count,
+                inner_span: Some(only.span),
+            });
+        }
         _ => {}
     }
 }
