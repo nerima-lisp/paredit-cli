@@ -1032,6 +1032,50 @@ impl DialectReaderPolicy {
                 payload_forms: 2,
             });
         }
+        // `,.` is CLHS 2.4.6's *destructive* splicing unquote, and it is two
+        // bytes wide. Falling through to `classify_quote_prefix` made it a
+        // one-byte `,` on whatever the atom scanner found next, and `.` is not
+        // an atom boundary, so the two shapes broke in two different ways:
+        //
+        // | source           | before                          | after            |
+        // |------------------|---------------------------------|------------------|
+        // | `` `(p ,.body) ``| `Unquote` on the atom `.body`   | `UnquoteSplicing` on `body` |
+        // | `` `(p ,.(f x))``| `Unquote` on the atom `.`, then `(f x)` as a **separate sibling** | `UnquoteSplicing` on `(f x)` |
+        //
+        // The second row is the damaging one. `(in ,name ,.(copy-list forms))`
+        // -- from `iterate.lisp`, which spells nine of its splices this way --
+        // read as a four-element list, so every path index past the comma
+        // named a different form than the source has, `inspect find-symbol .`
+        // reported a symbol the file does not contain, and `edit format` wrote
+        // the split back out as `,. (copy-list forms)`.
+        //
+        // Two bytes unconditionally, with no lookahead past the `.`, is what
+        // SBCL does. `,.5` is a splice of the integer 5, *not* an unquote of
+        // 0.5 -- `` `(a ,.5) `` evaluates to the dotted list `(A . 5)` -- and
+        // `,..5` is a splice of 0.5. So this widens the token by exactly one
+        // byte in every case and never has to decide between two readings.
+        //
+        // `UnquoteSplicing` rather than a variant of its own, and Common Lisp
+        // rather than `classify_quote_prefix`:
+        //
+        // * Splicing is the only distinction a *reader* can make here. `,@`
+        //   splices a copy and `,.` may reuse the list structure, but that is
+        //   what happens when the expansion runs, not what the reader sees.
+        //   Every consumer of this enum asks either "does this leave the
+        //   quasiquote?" (`Unquote | UnquoteSplicing`, unchanged by this) or
+        //   "may this expand to more than one form?" (`UnquoteSplicing`, which
+        //   `,.` must now answer yes to). A third variant would answer the
+        //   first question wrongly in every lint package that spells it as a
+        //   two-arm match, and none of them can see a variant that did not
+        //   exist when they were written.
+        // * Emacs Lisp must keep the old reading, and `classify_quote_prefix`
+        //   serves it. `(read "`(a ,.x)")` returns `(\, .x)` -- an unquote of
+        //   the symbol `.x` -- and `(read "`(a ,.(f y))")` is
+        //   `invalid-read-syntax "."`. Scheme, Racket, LFE and Fennel have no
+        //   `,.` at all and are left exactly as they were.
+        if byte == b',' && next == Some(b'.') {
+            return prefix(ReaderPrefix::UnquoteSplicing, 2);
+        }
         if let Some(prefix) = classify_quote_prefix(byte, next) {
             return Some(prefix);
         }

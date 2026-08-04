@@ -359,6 +359,140 @@ fn parses_common_lisp_reader_prefixes() {
     );
 }
 
+/// `,.` is one two-byte splicing prefix in Common Lisp, not `,` on a token
+/// that happens to start with a dot.
+///
+/// Verified against SBCL, which is the only oracle that settles it: reading
+/// and evaluating `` `(a ,.(list 1 2)) `` yields `(A 1 2)`, so `,.` splices
+/// exactly as `,@` does. The `(f y)` row is the one that used to lose
+/// structure — `.` is not an atom boundary, so the prefix took the lone `.`
+/// as its datum and the list after it became a *sibling* of the form it
+/// belongs to.
+#[test]
+fn common_lisp_comma_dot_is_a_two_byte_splicing_prefix() {
+    struct Case {
+        input: &'static str,
+        /// Each child of the quasiquoted list: its content text, and whether
+        /// it is the spliced one.
+        children: &'static [(&'static str, bool)],
+    }
+
+    let cases = [
+        Case {
+            input: "`(p ,.body)",
+            children: &[("p", false), ("body", true)],
+        },
+        Case {
+            input: "`(p ,.(f y))",
+            children: &[("p", false), ("(f y)", true)],
+        },
+        Case {
+            input: "`(p ,.body q)",
+            children: &[("p", false), ("body", true), ("q", false)],
+        },
+    ];
+
+    for case in cases {
+        let input = case.input;
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("valid");
+        let quasiquoted = tree.root_view().children[0].clone();
+        assert_eq!(
+            quasiquoted.reader_prefixes,
+            vec![ReaderPrefix::Quasiquote],
+            "{input}"
+        );
+
+        assert_eq!(quasiquoted.children.len(), case.children.len(), "{input}");
+        for (child, (text, spliced)) in quasiquoted.children.iter().zip(case.children) {
+            assert_eq!(child.content_span.slice(input), *text, "{input}");
+            let expected = if *spliced {
+                vec![ReaderPrefix::UnquoteSplicing]
+            } else {
+                vec![]
+            };
+            assert_eq!(child.reader_prefixes, expected, "{input} / {text}");
+        }
+    }
+}
+
+/// SBCL takes the two bytes unconditionally, with no lookahead past the `.`,
+/// so `,.5` is a splice of the integer 5 and *not* an unquote of 0.5.
+///
+/// `` `(a ,.5) `` evaluates to the dotted list `(A . 5)` in SBCL, and
+/// `` `(a ,..5) `` to `(A . 0.5)`. Pinned because the tempting "a digit after
+/// the dot means it was a float all along" special case is wrong, and would
+/// reintroduce exactly the token split this fix removes.
+#[test]
+fn common_lisp_comma_dot_takes_two_bytes_even_before_a_digit() {
+    for (input, spliced) in [("`(a ,.5)", "5"), ("`(a ,..5)", ".5")] {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("valid");
+        let quasiquoted = tree.root_view().children[0].clone();
+        assert_eq!(quasiquoted.children.len(), 2, "{input}");
+        assert_eq!(
+            quasiquoted.children[1].reader_prefixes,
+            vec![ReaderPrefix::UnquoteSplicing],
+            "{input}"
+        );
+        assert_eq!(
+            quasiquoted.children[1].content_span.slice(input),
+            spliced,
+            "{input}"
+        );
+    }
+}
+
+/// Which dialects read `,.` as a splice, and which read `,` on a dotted token.
+///
+/// Common Lisp is alone, and the two others that could plausibly share the
+/// reading are pinned here because they must *not*. Emacs Lisp was checked
+/// against a running Emacs 30.2: `(read "`(a ,.x)")` returns `(\, .x)`, an
+/// unquote of the symbol `.x`, and `(read "`(a ,.(f y))")` signals
+/// `invalid-read-syntax "."`. Scheme, Racket, LFE and Fennel have no `,.`
+/// form in their grammars at all.
+///
+/// If one of these fires, the dialect has been given a `,.` reading
+/// deliberately — move it to the Common Lisp list and record which reader
+/// said so. Do not delete the assertion: the point of the list is that a
+/// change to the shared `classify_quote_prefix` cannot reach one dialect
+/// without reaching the rest.
+#[test]
+fn only_common_lisp_reads_comma_dot_as_a_splice() {
+    let splicing = [Dialect::CommonLisp];
+    let plain_unquote = [
+        Dialect::EmacsLisp,
+        Dialect::Scheme,
+        Dialect::Racket,
+        Dialect::Lfe,
+        Dialect::Fennel,
+    ];
+
+    for dialect in splicing {
+        let tree = SyntaxTree::parse_with_dialect("`(p ,.body)", dialect).expect("valid");
+        let child = tree.root_view().children[0].children[1].clone();
+        assert_eq!(
+            child.reader_prefixes,
+            vec![ReaderPrefix::UnquoteSplicing],
+            "{dialect:?}"
+        );
+        assert_eq!(child.content_span.slice("`(p ,.body)"), "body");
+    }
+
+    for dialect in plain_unquote {
+        let tree = SyntaxTree::parse_with_dialect("`(p ,.body)", dialect).expect("valid");
+        let child = tree.root_view().children[0].children[1].clone();
+        assert_eq!(
+            child.reader_prefixes,
+            vec![ReaderPrefix::Unquote],
+            "{dialect:?}"
+        );
+        assert_eq!(
+            child.content_span.slice("`(p ,.body)"),
+            ".body",
+            "{dialect:?}"
+        );
+    }
+}
+
 #[test]
 fn preserves_stacked_quasiquote_and_unquote_prefix_order() {
     let tree = SyntaxTree::parse("``(list ,quoted ,,evaluated)").expect("valid");
