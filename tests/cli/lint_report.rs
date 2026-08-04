@@ -1118,8 +1118,14 @@ fn cli_lint_list_rules_marks_fixability() {
     // These two are also why `fixable_rules_match_the_fix_engine` grew a
     // *Racket* fixture: they declare `[Dialect::Racket]` alone, which the
     // Scheme fixture added for the same failure in PR #88 does not reach.
+    // This branch moves it the other way, by 1, to 105: `leftover-print-debug`
+    // drops to `Fixability::ReportOnly`. It is untagged, so the default preset
+    // admits it and both totals move together -- the same coupling
+    // `carp-deprecated-thread-macro` demonstrated upward. Note that demoting to
+    // `Pedantic` would not have been a substitute: `fix apply --rule` bypasses
+    // presets entirely, so the deletion would have survived the tag.
     assert_eq!(
-        fixable_count, 106,
+        fixable_count, 105,
         "the fixable rules the default preset admits"
     );
 
