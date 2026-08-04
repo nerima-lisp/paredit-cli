@@ -698,6 +698,7 @@ dependencies = [
  "paredit-feature-lint-hy-lfe-idiom",
  "paredit-feature-lint-introspection",
  "paredit-feature-lint-iteration-flow",
+ "paredit-feature-lint-lfe-carp-depth",
  "paredit-feature-lint-loop-facility",
  "paredit-feature-lint-macro-authoring",
  "paredit-feature-lint-numeric",
@@ -1244,6 +1245,14 @@ dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
  "serde_json",
+]
+
+[[package]]
+name = "paredit-feature-lint-lfe-carp-depth"
+version = "1.4.0"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
 ]
 
 [[package]]

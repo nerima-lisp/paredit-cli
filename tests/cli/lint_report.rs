@@ -317,7 +317,11 @@ fn cli_lint_list_rules_prints_the_catalog_without_files() {
         // same 16: neither is tagged, so this is a plain +2. Note the divisor
         // has now held at 16 for eight consecutive batches — it moves only
         // when a batch ships something tagged `pedantic`.
-        .stdout(predicate::str::contains("\"rule_count\": 333"))
+        // + both of this branch's `lint-lfe-carp-depth` rules = 335, the
+        // whole suite's 351 less the same 16. Neither is tagged, so a plain
+        // +2 again -- and note both are LFE-scoped, which the divisor, being
+        // about presets rather than dialects, does not distinguish.
+        .stdout(predicate::str::contains("\"rule_count\": 335"))
         .stdout(predicate::str::contains("\"self-assignment\""))
         .stdout(predicate::str::contains(
             "a setq/setf/psetq/psetf that assigns a place to itself",
@@ -1029,7 +1033,15 @@ fn cli_lint_list_rules_marks_severity() {
     // signalled at all. Neither is `pedantic`, so again both subtractions
     // move together: the suite's warning total rises by 1 to 248, and 248
     // less the still-16 `pedantic` rules = 232.
-    assert_eq!(warnings, 232);
+    //
+    // + 1 of this branch's 2 `lint-lfe-carp-depth` rules.
+    // `lfe-clause-after-catch-all` is a `Severity::Warning` (the Erlang
+    // compiler warns); `lfe-illegal-guard-call` is a `Severity::Error`,
+    // because an illegal guard expression is a compile error, verified
+    // against lfec. Neither is `pedantic`, so both subtractions move
+    // together once more: the suite rises by 1 to 249, less the still-16
+    // `pedantic` rules = 233.
+    assert_eq!(warnings, 233);
 }
 
 #[test]
