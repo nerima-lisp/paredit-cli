@@ -338,7 +338,30 @@ const _: () = assert!(RULE_COUNT == 358);
 // is the only head modelled, so narrowing is deleting the dialect. Gating the
 // fix to Common Lisp was not available either -- it was the stratum measured
 // worst, at 14 of 14.
-const _: () = assert!(fixable_count() == 105);
+//
+// And down by 1 again, to 104: `leftover-inspect-call`, the sibling of the rule
+// above, gives up `Fixability::Fixable` for the same reason and a worse
+// measurement. Over 6,078 SHA-256-unique files, `--fix` deleted **8,496,293
+// bytes** and cut 818 files below half their original size -- 99.4% of all
+// bytes deleted by the whole catalogue, and every single >50% shrinkage.
+// `cl-asciiquarium`'s `render-test.lisp` went 156 lines to 28 on this rule
+// alone. An adjudicated sample of 172, stratified over head-family and span
+// size, was **172 false positives, 100%** -- worse than the 97.0% measured for
+// `leftover-print-debug`, and every finding carried a fix where that rule's
+// carried one 28% of the time, which is why the damage is so much larger.
+//
+// Population-wide, 2,378 of 2,388 findings and **100.0% of deleted bytes** are
+// `(describe "suite name" ...)`, the BDD test-suite macro: the fix deletes
+// entire test suites. `OperatorScope::symbol_span_is_locally_bound` cannot see
+// it, because it resolves a *lexical* binding table while every CL BDD
+// framework rebinds `describe` at *package* level.
+//
+// A correction to the note above, measured at this revision: `fix apply --rule`
+// does **not** bypass presets, it intersects with them -- `--preset minimal`
+// leaves the file untouched. But `pedantic` and `all` both still delete, so a
+// tag would only move the deletion behind flags users routinely pass. Only
+// `ReportOnly` withholds it at every preset.
+const _: () = assert!(fixable_count() == 104);
 // 164 (through PR #82) + 31 of this branch's 37 rules. The other 6 are
 // `Severity::Error`: `when-unless-implicit-nil-misused` and the five
 // `lint-safety` rules that report an exploitable defect rather than a risk —

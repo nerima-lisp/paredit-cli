@@ -3372,7 +3372,7 @@
               "id": "leftover-inspect-call",
               "properties": {
                 "category": "suspicious",
-                "fixable": true,
+                "fixable": false,
                 "severity": "warning",
                 "tags": []
               },

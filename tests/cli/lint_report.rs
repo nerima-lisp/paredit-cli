@@ -1124,8 +1124,21 @@ fn cli_lint_list_rules_marks_fixability() {
     // `carp-deprecated-thread-macro` demonstrated upward. Note that demoting to
     // `Pedantic` would not have been a substitute: `fix apply --rule` bypasses
     // presets entirely, so the deletion would have survived the tag.
+    //
+    // And by 1 again, to 104: `leftover-inspect-call` follows its sibling to
+    // `ReportOnly`, also untagged, so again both totals move together. It is
+    // the worse of the two -- 8,496,293 bytes deleted over 6,078 files, 818 of
+    // them cut below half, and an adjudicated sample of 172 that was 172 false
+    // positives.
+    //
+    // Correcting the sentence above, which was measured wrong: `fix apply
+    // --rule` does *not* bypass presets, it **intersects** with them. `--preset
+    // minimal` leaves the file untouched. The conclusion still holds for a
+    // different reason -- `pedantic` and `all` both still delete, so a tag only
+    // hides the deletion behind flags users routinely pass, and only
+    // `ReportOnly` withholds it at every preset.
     assert_eq!(
-        fixable_count, 105,
+        fixable_count, 104,
         "the fixable rules the default preset admits"
     );
 
