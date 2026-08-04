@@ -7,6 +7,7 @@
 use paredit_core_lint_engine::LintResult;
 
 use crate::equality_arity::domain::examine_call;
+use crate::support::is_eql_type_specifier_at;
 use crate::support::is_hard_quoted_at;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
 use paredit_core_lint_engine::model::{
@@ -62,6 +63,23 @@ impl LintRule for Rule {
                 continue;
             }
             let span = item.span;
+            // `(eql object)` with exactly one argument is a CLHS 4.2.3 compound
+            // *type specifier*, and in a type position one argument is not a
+            // defect but the only legal spelling: `(defmethod g ((x (eql 7))) …)`
+            // and `(typecase x ((eql 5) …))` are not one-argument calls.
+            //
+            // Narrowed to `eql`-at-one-argument on purpose, because that is
+            // exactly what CLHS makes a specifier. `eq`, `equal` and `equalp`
+            // name no type at all and `(eql a b c)` names none either, so no
+            // other misarity shape can be silenced by this. The ancestor walk
+            // runs only once a finding exists, so ordinary code never reaches
+            // `root_view()`.
+            if item.argument_count == 1
+                && item.operator.eq_ignore_ascii_case("eql")
+                && is_eql_type_specifier_at(context.tree(), span)
+            {
+                continue;
+            }
 
             sink.report(
                 span,
