@@ -7,6 +7,7 @@
 use paredit_core_lint_engine::LintResult;
 
 use crate::sign_comparison::domain::examine_comparison;
+use crate::support::is_hard_quoted_at;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
 use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
@@ -49,6 +50,19 @@ impl LintRule for Rule {
         let mut items = Vec::new();
         examine_comparison(view, &mut comparison_form_count, &mut items);
         for item in items {
+            // This rule is `Fixable`, so a finding inside hard-quoted data is
+            // not merely noise: applying the fix rewrites a *data literal*.
+            // Measured over 28 827 parsed Common Lisp files, 64 of this rule's
+            // 36 761 fixes sat under a `'`, and they are ACL2 `:hints '(:cases
+            // ((< 0 a) …))` proof terms and `(defconst *<-tests* '(("Less…" (<
+            // 0 1)) …))` expectation tables — rewriting `(< 0 a)` to `(plusp
+            // a)` there edits the user's data, not their code. Asked only once
+            // a finding exists, so a file with no findings never pays for it.
+            // A quasiquoted `` `(< ,x 0) `` is a template that becomes real
+            // code, so `hard` alone is read and never `is_data`.
+            if is_hard_quoted_at(context.tree(), item.span) {
+                continue;
+            }
             let span = item.span;
             let fix = {
                 // Rewrite the whole form as `(predicate X)`, copying X's source.
