@@ -75,8 +75,8 @@ impl QuoteState {
     /// turns code into data. Common Lisp reader conditionals are not prefixes
     /// in this tree at all — `#+sbcl (form)` folds into a *single atom* whose
     /// text includes the `#+sbcl` — so there is nothing here to misread.
-    fn after_prefixes(mut self, view: &ExpressionView) -> Self {
-        for prefix in &view.reader_prefixes {
+    fn after_prefixes(mut self, prefixes: &[ReaderPrefix]) -> Self {
+        for prefix in prefixes {
             match prefix {
                 ReaderPrefix::Quote => self.hard = true,
                 ReaderPrefix::Quasiquote => self.quasi += 1,
@@ -92,46 +92,6 @@ impl QuoteState {
     const fn quoted(mut self) -> Self {
         self.hard = true;
         self
-    }
-
-    /// The state inside the node at `span`, read off the **source text** rather
-    /// than off a materialized [`ExpressionView`].
-    ///
-    /// This is the spelling the root descents use, and the reason they do not
-    /// call [`SyntaxTree::root_view`]. See [`locate`].
-    ///
-    /// `#'` is deliberately neutral: `#'foo` is a function designator, not
-    /// data. `#+`/`#-` are not prefixes here at all — a Common Lisp reader
-    /// conditional folds into a *single atom* carrying its own `#+sbcl` text —
-    /// so there is nothing to misread.
-    fn after_prefixes_in(mut self, source: &str, span: ByteSpan) -> Self {
-        let mut rest = source
-            .get(span.start().get()..span.end().get())
-            .unwrap_or_default();
-        loop {
-            rest = rest.trim_start();
-            let width = match rest.as_bytes() {
-                [b'#', b'\'', ..] => 2,
-                [b',', b'@', ..] => {
-                    self.quasi = self.quasi.saturating_sub(1);
-                    2
-                }
-                [b',', ..] => {
-                    self.quasi = self.quasi.saturating_sub(1);
-                    1
-                }
-                [b'\'', ..] => {
-                    self.hard = true;
-                    1
-                }
-                [b'`', ..] => {
-                    self.quasi += 1;
-                    1
-                }
-                _ => return self,
-            };
-            rest = &rest[width..];
-        }
     }
 }
 
@@ -169,16 +129,22 @@ fn spelled_quote_step(
 /// The root case reads [`SyntaxTree::root_child_span`], which is a slice index
 /// and a field read; the `select_path` spelling would allocate an
 /// [`SexprPath`]'s `Vec` per sibling scanned.
-fn child_containing(
-    tree: &SyntaxTree,
+fn child_containing<'tree>(
+    tree: &'tree SyntaxTree,
     parent: Option<&SexprPath>,
     span: ByteSpan,
-) -> Option<(usize, SexprPath, ByteSpan)> {
+) -> Option<(usize, SexprPath, ByteSpan, &'tree [ReaderPrefix])> {
     let mut index = 0usize;
     loop {
-        let child_span = match parent {
-            None => tree.root_child_span(index)?,
-            Some(path) => tree.select_path(&path.child(index)).ok()?.span(),
+        let (child_span, prefixes) = match parent {
+            None => (
+                tree.root_child_span(index)?,
+                tree.root_child_reader_prefixes(index)?,
+            ),
+            Some(path) => {
+                let selection = tree.select_path(&path.child(index)).ok()?;
+                (selection.span(), selection.reader_prefixes())
+            }
         };
         if child_span.start().get() > span.start().get() {
             return None;
@@ -186,7 +152,7 @@ fn child_containing(
         if span.end().get() <= child_span.end().get() {
             let child =
                 parent.map_or_else(|| SexprPath::root_child(index), |path| path.child(index));
-            return Some((index, child, child_span));
+            return Some((index, child, child_span, prefixes));
         }
         index += 1;
     }
@@ -242,17 +208,17 @@ fn descend_to(
     target: ByteSpan,
     mut visit: impl FnMut(&SexprPath, usize, ByteSpan),
 ) -> Option<QuoteState> {
-    let source = tree.source();
     let mut parent: Option<SexprPath> = None;
     let mut state = QuoteState::EVALUATED;
 
     loop {
-        let (index, child_path, child_span) = child_containing(tree, parent.as_ref(), target)?;
+        let (index, child_path, child_span, prefixes) =
+            child_containing(tree, parent.as_ref(), target)?;
         if let Some(parent_path) = &parent {
             state = spelled_quote_step(tree, parent_path, index, state);
             visit(parent_path, index, child_span);
         }
-        state = state.after_prefixes_in(source, child_span);
+        state = state.after_prefixes(prefixes);
         if child_span == target {
             return Some(state);
         }
@@ -276,7 +242,7 @@ pub fn for_each_evaluated_subview(root: &ExpressionView, mut visit: impl FnMut(&
     // key list or a type specifier, and so is data".
     let mut stack = vec![(root, QuoteState::EVALUATED, false)];
     while let Some((view, outer, clause)) = stack.pop() {
-        let state = outer.after_prefixes(view);
+        let state = outer.after_prefixes(&view.reader_prefixes);
         if !state.is_data() {
             visit(view);
         }
