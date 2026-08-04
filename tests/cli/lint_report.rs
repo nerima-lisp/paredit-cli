@@ -321,7 +321,12 @@ fn cli_lint_list_rules_prints_the_catalog_without_files() {
         // whole suite's 351 less the same 16. Neither is tagged, so a plain
         // +2 again -- and note both are LFE-scoped, which the divisor, being
         // about presets rather than dialects, does not distinguish.
-        .stdout(predicate::str::contains("\"rule_count\": 335"))
+        // + this branch's single `lint-hy-depth` rule = 336, the whole
+        // suite's 352 less the same 16. This one leaves the *warning* count
+        // alone -- `hy-unreachable-except-clause` is a `Severity::Error` --
+        // so it is the mirror of the usual case: this total moves and the
+        // warning total does not.
+        .stdout(predicate::str::contains("\"rule_count\": 336"))
         .stdout(predicate::str::contains("\"self-assignment\""))
         .stdout(predicate::str::contains(
             "a setq/setf/psetq/psetf that assigns a place to itself",

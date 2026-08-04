@@ -1344,6 +1344,12 @@
     {
       "category": "conditions",
       "count": 0,
+      "description": "an except clause whose exception type an earlier clause in the same try already catches",
+      "rule": "hy-unreachable-except-clause"
+    },
+    {
+      "category": "conditions",
+      "count": 0,
       "description": "a define-condition with an empty () supertype list, which defaults to condition, not error",
       "rule": "define-condition-empty-superclass-list"
     },

@@ -253,7 +253,7 @@ use super::rule::RuleEntry;
 // in function to `&rest`" with no must-be-last rule.
 //
 // The two that ship are the two SBCL says nothing about at all.
-pub const RULE_COUNT: usize = 351;
+pub const RULE_COUNT: usize = 352;
 
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
@@ -1087,6 +1087,10 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(
         &paredit_feature_lint_lfe_carp_depth::dead_clause::rule::META,
         &paredit_feature_lint_lfe_carp_depth::dead_clause::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_hy_depth::unreachable_except_clause::rule::META,
+        &paredit_feature_lint_hy_depth::unreachable_except_clause::rule::RULE,
     ),
     RuleEntry::new(
         &paredit_feature_lint_condition_system::define_condition_empty_superclass_list::rule::META,
