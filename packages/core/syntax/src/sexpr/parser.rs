@@ -607,7 +607,47 @@ impl<'a> Parser<'a> {
     /// that follows is a separate token. Elsewhere the name may be several
     /// characters (`#\space`, `?\C-x`, `\newline`) and the caller must keep
     /// scanning to the next boundary.
+    ///
+    /// ### Why the Emacs Lisp model widens rather than terminates
+    ///
+    /// [`DialectReaderPolicy::exact_character_literal_width`] knows exactly
+    /// where an Emacs Lisp literal ends, so ending the token there would be
+    /// faithful to `read_char_literal`, which refuses `?ab`. It is deliberately
+    /// not done. The token is advanced *past* the literal and then scanned to
+    /// the next boundary as usual, which makes the new extent a superset of the
+    /// old one for every input: the model never consumes fewer bytes than the
+    /// `?`-plus-one-character prefix it replaces, and the same boundary scan
+    /// runs afterwards either way.
+    ///
+    /// That monotonicity is the safety property. An atom that used to be one
+    /// token cannot become two, so no re-emission can insert a separator into
+    /// something that had none — which is the exact shape of the corruption
+    /// this whole path is being fixed for.
+    ///
+    /// It also keeps a construct that has nothing to do with Emacs: `--query`
+    /// and `defrule :pattern` spell a metavariable `?name`, and their patterns
+    /// are read with the *target* dialect's reader. Terminating at the literal
+    /// split the built-in `elisp-cl-lib` recipe's `(incf ?args...)` into `?a`
+    /// and `rgs...`, and the recipe silently stopped matching anything.
     fn consume_character_literal(&mut self) -> bool {
+        let mut modelled = false;
+        // A run, not a single literal. Emacs ends a literal wherever its
+        // grammar does and starts the next one immediately: `(?a?b)` reads as
+        // `(97 98)` with no separator. Consuming only the first left the
+        // second to the boundary scan, which is the path that loses a
+        // whitespace payload — differential fuzz against Emacs found
+        // `?\v?\s-<TAB>` re-emitted as `?\v?\s-`, the same defect one glue
+        // character to the right.
+        while let Some(width) = self
+            .policy
+            .exact_character_literal_width(self.bytes, self.pos.get())
+        {
+            self.advance_by(width);
+            modelled = true;
+        }
+        if modelled {
+            return false;
+        }
         let Some(prefix_width) = self
             .policy
             .character_literal_prefix_width(self.bytes, self.pos.get())
