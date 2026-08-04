@@ -241,7 +241,7 @@ pub const PEDANTIC_RULES: [&str; tagged_count(RuleTag::Pedantic)] = {
 // no command-oriented list.
 // 345 + 2 (`lint-macro-authoring`). Five of seven proposals died, four because
 // SBCL already rejects the shape at `defmacro` processing time.
-const _: () = assert!(RULE_COUNT == 351);
+const _: () = assert!(RULE_COUNT == 352);
 // Unchanged at 99: every one of this branch's 37 rules is
 // `Fixability::ReportOnly`. Each one reports a judgment the tool cannot make
 // on the author's behalf — whether an annotation or the parameter list under it

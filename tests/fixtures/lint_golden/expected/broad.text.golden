@@ -198,6 +198,7 @@ rule	condition-type-datum-with-string-initarg	0
 rule	unwind-protect-cleanup-signals	0
 rule	lfe-illegal-guard-call	0
 rule	lfe-clause-after-catch-all	0
+rule	hy-unreachable-except-clause	0
 rule	define-condition-empty-superclass-list	0
 rule	define-condition-missing-report-for-error-type	0
 rule	handler-bind-handler-returns-bare-value	0
