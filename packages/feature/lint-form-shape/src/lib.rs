@@ -47,6 +47,8 @@ pub mod support;
 
 #[cfg(test)]
 mod quote_guard_tests;
+#[cfg(test)]
+mod reader_prefix_fix_tests;
 pub mod the_arity;
 pub mod typep_predicate;
 pub mod values_list_of_list;
