@@ -100,7 +100,7 @@ const fn span_contains(outer: ByteSpan, inner: ByteSpan) -> bool {
     outer.start().get() <= inner.start().get() && inner.end().get() <= outer.end().get()
 }
 
-/// Whether the node at `target` is unevaluated data rather than code.
+/// The reader-quote state in force at `target`.
 ///
 /// Descends from the root through the one child at each level whose span
 /// contains `target`, so the cost is the node's depth, not the file's size.
@@ -113,8 +113,7 @@ const fn span_contains(outer: ByteSpan, inner: ByteSpan) -> bool {
 /// The root's own span is never consulted. A file with one top-level form has a
 /// root whose span equals that form's, and comparing them would call every such
 /// form evaluated before looking at its prefixes at all.
-#[must_use]
-pub fn is_unevaluated_at(tree: &SyntaxTree, target: ByteSpan) -> bool {
+fn quote_state_at(tree: &SyntaxTree, target: ByteSpan) -> QuoteState {
     let root = tree.root_view();
     let mut view: &ExpressionView = &root;
     let mut state = QuoteState::EVALUATED;
@@ -129,7 +128,7 @@ pub fn is_unevaluated_at(tree: &SyntaxTree, target: ByteSpan) -> bool {
             .iter()
             .find(|child| span_contains(child.span, target))
         else {
-            return state.is_data();
+            return state;
         };
         state = state.after_prefixes(child);
         if quoting {
@@ -137,9 +136,49 @@ pub fn is_unevaluated_at(tree: &SyntaxTree, target: ByteSpan) -> bool {
         }
         view = child;
         if view.span == target {
-            return state.is_data();
+            return state;
         }
     }
+}
+
+/// Whether the node at `target` is unevaluated data rather than code — under
+/// *either* kind of quote.
+///
+/// The right question for the float-precision rules: `` `(+ 3.14 1.0d0) `` with
+/// no unquote is a template whose numbers are never computed with, so reporting
+/// it would be reporting a list of symbols.
+#[must_use]
+pub fn is_unevaluated_at(tree: &SyntaxTree, target: ByteSpan) -> bool {
+    quote_state_at(tree, target).is_data()
+}
+
+/// Whether the node at `target` is inside a **hard** `'` quote, ignoring
+/// quasiquote entirely.
+///
+/// This is the guard the `eq`/`eql` family wants, and it is deliberately weaker
+/// than [`is_unevaluated_at`].
+///
+/// A `'(…)` list is data in the strongest sense: `'((eq function "f_eq") …)` is
+/// a table of three-element rows, and nothing in it is ever a call. Every
+/// `eql-string-comparison` finding measured over 5 388 Quicklisp and SBCL files
+/// was exactly that shape — a HyperSpec index table and an opcode alist — and
+/// every one of them was a false positive.
+///
+/// A `` `(…) `` template is the opposite case. Most quasiquoted `eq` forms in
+/// SBCL's own sources are macro bodies that really do become code — `` `(eq
+/// ,val 0) `` in `hashset.lisp`, and the same shape in `srctran.lisp` and
+/// `ir1tran-lambda.lisp` — so suppressing those would trade this rule's false
+/// positives for false *negatives* on genuine defects. A macro that expands to
+/// `(eq x "s")` has the bug the rule is named for, and the expansion is where it
+/// will bite.
+///
+/// Hence `hard` alone rather than [`QuoteState::is_data`]. The two-counter state
+/// is what makes the distinction expressible at all: a single depth counter
+/// cannot tell `'(a ,(eq x "s"))` — still data, the comma is a literal comma —
+/// from `` `(a ,(eq x "s")) ``, which is code.
+#[must_use]
+pub fn is_hard_quoted_at(tree: &SyntaxTree, target: ByteSpan) -> bool {
+    quote_state_at(tree, target).hard
 }
 
 /// Which floating-point format a numeric token reads as.
@@ -389,6 +428,63 @@ mod tests {
             "'(a (b (c (+ 3.14 1.0d0))))",
             "+"
         ));
+    }
+
+    // -- the hard-quote-only guard the eq/eql family uses --------------------
+
+    fn hard_quoted_at_first_head(source: &str, head: &str) -> bool {
+        let parsed = tree(source);
+        let mut span = None;
+        for_each_subview(&parsed.root_view(), |view| {
+            if span.is_none() && list_head(view).is_some_and(|found| found == head) {
+                span = Some(view.span);
+            }
+        });
+        is_hard_quoted_at(&parsed, span.expect("the head must occur in the source"))
+    }
+
+    /// The three shapes where the two guards agree that the node is data.
+    #[test]
+    fn a_hard_quote_is_hard_quoted_in_every_spelling() {
+        assert!(hard_quoted_at_first_head("'(eq x \"s\")", "eq"));
+        assert!(hard_quoted_at_first_head("(quote (eq x \"s\"))", "eq"));
+        assert!(hard_quoted_at_first_head("'(a (b (eq x \"s\")))", "eq"));
+    }
+
+    /// The shape a single depth counter gets wrong: a comma inside a hard quote
+    /// is a literal comma, so the node stays hard-quoted.
+    #[test]
+    fn a_comma_inside_a_hard_quote_stays_hard_quoted() {
+        assert!(hard_quoted_at_first_head("'(a ,(eq x \"s\"))", "eq"));
+    }
+
+    #[test]
+    fn plain_code_is_not_hard_quoted() {
+        assert!(!hard_quoted_at_first_head(
+            "(defun f (x) (eq x \"s\"))",
+            "eq"
+        ));
+    }
+
+    /// **The divergence.** A quasiquoted template is `is_unevaluated_at` data
+    /// but is *not* hard-quoted, because `` `(eq ,val 0) `` becomes code. This
+    /// is the assertion that fails if someone "simplifies" the eq family back
+    /// onto `is_unevaluated_at`, and the false negatives that would follow are
+    /// genuine defects in SBCL-shaped macro bodies.
+    #[test]
+    fn a_quasiquote_is_unevaluated_but_is_not_hard_quoted() {
+        for source in ["`(eq x \"s\")", "`(a ,(eq x \"s\"))", "``(eq x \"s\")"] {
+            assert!(!hard_quoted_at_first_head(source, "eq"), "{source}");
+        }
+        // The other guard disagrees on the template without an unquote, which
+        // is exactly why the eq family may not reuse it.
+        assert!(unevaluated_at_first_head("`(eq x \"s\")", "eq"));
+    }
+
+    /// A hard quote *inside* a quasiquote is still hard.
+    #[test]
+    fn a_hard_quote_nested_in_a_quasiquote_is_hard_quoted() {
+        assert!(hard_quoted_at_first_head("`(a ,'(eq x \"s\"))", "eq"));
     }
 
     // -- float classification -----------------------------------------------
