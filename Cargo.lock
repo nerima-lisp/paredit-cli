@@ -692,6 +692,7 @@ dependencies = [
  "paredit-feature-lint-documentation",
  "paredit-feature-lint-elisp-depth",
  "paredit-feature-lint-elisp-idiom",
+ "paredit-feature-lint-fennel-janet-depth",
  "paredit-feature-lint-fennel-janet-idiom",
  "paredit-feature-lint-form-shape",
  "paredit-feature-lint-generic-dispatch",
@@ -1180,6 +1181,14 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-elisp-idiom"
+version = "1.4.0"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
+]
+
+[[package]]
+name = "paredit-feature-lint-fennel-janet-depth"
 version = "1.4.0"
 dependencies = [
  "paredit-core-lint-engine",

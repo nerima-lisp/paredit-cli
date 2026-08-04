@@ -253,7 +253,7 @@ use super::rule::RuleEntry;
 // in function to `&rest`" with no must-be-last rule.
 //
 // The two that ship are the two SBCL says nothing about at all.
-pub const RULE_COUNT: usize = 352;
+pub const RULE_COUNT: usize = 357;
 
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
@@ -1091,6 +1091,26 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(
         &paredit_feature_lint_hy_depth::unreachable_except_clause::rule::META,
         &paredit_feature_lint_hy_depth::unreachable_except_clause::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_fennel_janet_depth::fennel_bad_unpack::rule::META,
+        &paredit_feature_lint_fennel_janet_depth::fennel_bad_unpack::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_fennel_janet_depth::fennel_nested_associative_operator::rule::META,
+        &paredit_feature_lint_fennel_janet_depth::fennel_nested_associative_operator::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_fennel_janet_depth::fennel_redundant_do::rule::META,
+        &paredit_feature_lint_fennel_janet_depth::fennel_redundant_do::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_fennel_janet_depth::janet_dead_branch_on_constant_condition::rule::META,
+        &paredit_feature_lint_fennel_janet_depth::janet_dead_branch_on_constant_condition::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_fennel_janet_depth::janet_unreachable_match_clause::rule::META,
+        &paredit_feature_lint_fennel_janet_depth::janet_unreachable_match_clause::rule::RULE,
     ),
     RuleEntry::new(
         &paredit_feature_lint_condition_system::define_condition_empty_superclass_list::rule::META,

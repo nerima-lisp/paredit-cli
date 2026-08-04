@@ -8584,6 +8584,86 @@
               }
             },
             {
+              "fullDescription": {
+                "text": "Fennel's operators compile to Lua's binary operators, not to variadic function calls, and Lua truncates a multiple-value expression to a single value everywhere except the final argument of a real call. So `(+ 1 (table.unpack [2 3 4]))` compiles to `(1 + table.unpack({2, 3, 4}))` and evaluates to 3, not 10 — the 3 and the 4 are discarded with no error. `fennel-ls` ships this as `bad-unpack`."
+              },
+              "id": "fennel-bad-unpack",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "Fennel's operators compile to Lua's binary operators, not to variadic function calls, and Lua truncates a multiple-value expression to a single value everywhere except the final argument of a real call. So `(+ 1 (table.unpack [2 3 4]))` compiles to `(1 + table.unpack({2, 3, 4}))` and evaluates to 3, not 10 — the 3 and the 4 are discarded with no error. `fennel-ls` ships this as `bad-unpack`.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "an `unpack` call in the last argument of a Fennel operator, which drops every value but the first"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "These five operators are variadic and exactly associative, so `(and foo (and bar baz))` and `(and foo bar baz)` compute the same value by the same short-circuit order. The nested spelling is usually left over from an edit that added a term. `fennel-ls` ships this as `nested-associative-operator`."
+              },
+              "id": "fennel-nested-associative-operator",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "These five operators are variadic and exactly associative, so `(and foo (and bar baz))` and `(and foo bar baz)` compute the same value by the same short-circuit order. The nested spelling is usually left over from an edit that added a term. `fennel-ls` ships this as `nested-associative-operator`.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a Fennel `and`/`or`/`..`/`band`/`bor` call nested directly inside a call to itself"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "`fn`, `let`, `when`, `each`, `for`, `while` and friends already evaluate every form in their body in order, so wrapping the last one in `do` adds a level of nesting and no meaning. `fennel-ls` ships this as `redundant-do`."
+              },
+              "id": "fennel-redundant-do",
+              "properties": {
+                "category": "dead-code",
+                "fixable": false,
+                "rationale": "`fn`, `let`, `when`, `each`, `for`, `while` and friends already evaluate every form in their body in order, so wrapping the last one in `do` adds a level of nesting and no meaning. `fennel-ls` ships this as `redundant-do`.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a `(do …)` in the tail of a Fennel form that already sequences its body"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Janet's compiler folds a constant condition and compiles the losing branch into a throwaway scope, reporting `dead code, consider removing …` at its strict lint level (`compile.c`, `janetc_throwaway`). Strict lints are off unless asked for, so the warning normally reaches nobody. In Janet only `nil` and `false` are false, so `0`, `\"\"` and `:kw` are all truthy tests."
+              },
+              "id": "janet-dead-branch-on-constant-condition",
+              "properties": {
+                "category": "dead-code",
+                "fixable": false,
+                "rationale": "Janet's compiler folds a constant condition and compiles the losing branch into a throwaway scope, reporting `dead code, consider removing …` at its strict lint level (`compile.c`, `janetc_throwaway`). Strict lints are off unless asked for, so the warning normally reaches nobody. In Janet only `nil` and `false` are false, so `0`, `\"\"` and `:kw` are all truthy tests.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a Janet `if`/`if-not`/`when`/`unless` whose test is a literal, so one branch never runs"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Janet's `match` documents that \"a pattern that is a symbol will match anything\", and `_` is the same with no binding. Every clause after such a pattern is dead: `(match 99 x :first 99 :second)` evaluates to `:first` even though the later clause matches the subject exactly. The usual cause is a default clause that drifted upwards, or a pattern renamed into a bare symbol by accident."
+              },
+              "id": "janet-unreachable-match-clause",
+              "properties": {
+                "category": "dead-code",
+                "fixable": false,
+                "rationale": "Janet's `match` documents that \"a pattern that is a symbol will match anything\", and `_` is the same with no binding. Every clause after such a pattern is dead: `(match 99 x :first 99 :second)` evaluates to `:first` even though the later clause matches the subject exactly. The usual cause is a default clause that drifted upwards, or a pattern renamed into a bare symbol by accident.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a Janet `match` clause written after a catch-all pattern, which can never be reached"
+              }
+            },
+            {
               "id": "define-condition-empty-superclass-list",
               "properties": {
                 "category": "conditions",
