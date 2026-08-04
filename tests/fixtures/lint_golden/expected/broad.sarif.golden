@@ -8568,6 +8568,22 @@
               }
             },
             {
+              "fullDescription": {
+                "text": "Python runs the first `except` handler whose type the raised exception is an instance of, and Hy's `try` compiles to exactly that. A clause naming a supertype — or naming the same type twice, or a bare `(except [] …)` — therefore shadows every later clause it covers, which then never runs for any input. `pylint` reports the same two shapes as `E0701` and `W0705`."
+              },
+              "id": "hy-unreachable-except-clause",
+              "properties": {
+                "category": "conditions",
+                "fixable": false,
+                "rationale": "Python runs the first `except` handler whose type the raised exception is an instance of, and Hy's `try` compiles to exactly that. A clause naming a supertype — or naming the same type twice, or a bare `(except [] …)` — therefore shadows every later clause it covers, which then never runs for any input. `pylint` reports the same two shapes as `E0701` and `W0705`.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "an except clause whose exception type an earlier clause in the same try already catches"
+              }
+            },
+            {
               "id": "define-condition-empty-superclass-list",
               "properties": {
                 "category": "conditions",

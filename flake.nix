@@ -394,8 +394,15 @@
           # A fuzz corpus is the same argument at its strongest: a seed's whole
           # value is its exact bytes, and a crasher artifact that a formatter
           # rewrote has stopped reproducing the crash it was saved for.
+          # Both spellings are needed: these globs are matched against the
+          # path from the repository root, so `tests/fixtures/*` covers the
+          # root suite and nothing else. A feature package's own fixtures live
+          # at `packages/feature/<name>/tests/fixtures/`, and the argument for
+          # excluding them is the same one -- more so, since a lint package's
+          # `dangerous.*` fixture exists precisely to be read as written.
           excludes = [
             "tests/fixtures/*"
+            "**/tests/fixtures/*"
             "fuzz/corpus/*"
             "fuzz/artifacts/*"
           ];

@@ -695,6 +695,7 @@ dependencies = [
  "paredit-feature-lint-fennel-janet-idiom",
  "paredit-feature-lint-form-shape",
  "paredit-feature-lint-generic-dispatch",
+ "paredit-feature-lint-hy-depth",
  "paredit-feature-lint-hy-lfe-idiom",
  "paredit-feature-lint-introspection",
  "paredit-feature-lint-iteration-flow",
@@ -1211,6 +1212,14 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-generic-dispatch"
+version = "1.4.0"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
+]
+
+[[package]]
+name = "paredit-feature-lint-hy-depth"
 version = "1.4.0"
 dependencies = [
  "paredit-core-lint-engine",
