@@ -7,6 +7,7 @@
 use paredit_core_lint_engine::LintResult;
 
 use crate::constant_when_test::domain::examine_when;
+use crate::support::is_hard_quoted_at;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
 use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
@@ -36,7 +37,7 @@ impl LintRule for Rule {
 
     fn check(
         &self,
-        _context: &RuleContext<'_>,
+        context: &RuleContext<'_>,
         view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
     ) -> LintResult<()> {
@@ -45,6 +46,20 @@ impl LintRule for Rule {
         examine_when(view, &mut when_form_count, &mut items);
         for item in items {
             let span = item.span;
+            // A hard-quoted form is a literal list, not code: rewriting its
+            // contents edits the program's data rather than its behaviour.
+            // `'(or x)` is a two-element list and `'x` is a symbol, so the
+            // "fix" changes what the datum *is*.
+            //
+            // The verdict is the `hard` counter alone. A `` `(…) `` template's
+            // contents really are emitted as code, so suppressing there would
+            // go quiet on the macro bodies this rule exists to read.
+            //
+            // Asked only here, once a finding already exists — never per
+            // visited node — so a file with no findings never pays for it.
+            if is_hard_quoted_at(context.tree(), span) {
+                continue;
+            }
             let fix = {
                 if item.always_runs {
                     // The body always runs: splice `(when t` / `(unless nil` down to
@@ -141,12 +156,25 @@ mod tests {
         );
     }
 
+    /// A hard-quoted `(when t (a))` is a three-element list, not a `when`
+    /// form. Rewriting it to `(progn (a))` changes what `*p*` *holds* — the
+    /// old behaviour, which this rule shipped with and which the guard now
+    /// refuses outright rather than merely spelling differently.
     #[test]
-    fn a_quoted_always_true_when_keeps_its_quote() {
-        assert_eq!(
-            fixed("(defparameter *p* '(when t (a)))\n"),
-            vec!["(defparameter *p* '(progn (a)))\n".to_owned()]
-        );
+    fn a_hard_quoted_always_true_when_is_not_a_finding_at_all() {
+        assert_eq!(count("(defparameter *p* '(when t (a)))\n"), 0);
+    }
+
+    /// The same list one level deeper, where the `when` carries no reader
+    /// prefix of its own and only an ancestor quotes it.
+    #[test]
+    fn a_when_inside_a_quoted_ancestor_is_not_a_finding() {
+        assert_eq!(count("(defparameter *p* '(f (when t (a))))\n"), 0);
+    }
+
+    #[test]
+    fn a_long_hand_quoted_when_is_not_a_finding() {
+        assert_eq!(count("(defparameter *p* (quote (when t (a))))\n"), 0);
     }
 
     #[test]
