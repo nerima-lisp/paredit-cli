@@ -3697,6 +3697,22 @@
               }
             },
             {
+              "fullDescription": {
+                "text": "A destructive sequence function may reuse its argument's storage to build the result, so only the **return value** names the finished sequence. Discarding it leaves the variable pointing into the middle of the old structure: SBCL 2.6.0 leaves `xs` as `(4 5)` after a discarded `(sort xs #'<)` on `(5 4 3 2 1)`. The heads here are the ones SBCL does *not* warn about — it already reports `nreverse`, `delete` and nine others."
+              },
+              "id": "discarded-destructive-sequence-result",
+              "properties": {
+                "category": "dead-code",
+                "fixable": false,
+                "rationale": "A destructive sequence function may reuse its argument's storage to build the result, so only the **return value** names the finished sequence. Discarding it leaves the variable pointing into the middle of the old structure: SBCL 2.6.0 leaves `xs` as `(4 5)` after a discarded `(sort xs #'<)` on `(5 4 3 2 1)`. The heads here are the ones SBCL does *not* warn about — it already reports `nreverse`, `delete` and nine others.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a destructive sequence call whose result is discarded, on a variable the body then reads"
+              }
+            },
+            {
               "id": "define-condition-empty-superclass-list",
               "properties": {
                 "category": "conditions",

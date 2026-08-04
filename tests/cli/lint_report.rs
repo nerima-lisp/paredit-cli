@@ -330,7 +330,9 @@ fn cli_lint_list_rules_prints_the_catalog_without_files() {
         // whole suite's 357 less the same 16. None is tagged, so the rise is
         // the full count again -- and all five are `Severity::Warning`, which
         // makes this the batch where both totals move by the same 5.
-        .stdout(predicate::str::contains("\"rule_count\": 341"))
+        // + this branch's single `lint-destructive-sequence` rule = 342, the
+        // whole suite's 358 less the same 16.
+        .stdout(predicate::str::contains("\"rule_count\": 342"))
         .stdout(predicate::str::contains("\"self-assignment\""))
         .stdout(predicate::str::contains(
             "a setq/setf/psetq/psetf that assigns a place to itself",
@@ -1055,7 +1057,10 @@ fn cli_lint_list_rules_marks_severity() {
     // one is a `Severity::Warning` and none is `pedantic`, so the suite's
     // warning total and this preset-filtered count rise together by 5, to
     // 254 and 238 respectively.
-    assert_eq!(warnings, 238);
+    //
+    // + this branch's 1 = 239. `discarded-destructive-sequence-result` is a
+    // `Severity::Warning` and untagged, so both totals rise by 1 again.
+    assert_eq!(warnings, 239);
 }
 
 #[test]
