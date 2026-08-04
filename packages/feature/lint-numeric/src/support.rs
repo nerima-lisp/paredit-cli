@@ -41,7 +41,7 @@
 //! [`RuleContext`]: paredit_core_lint_engine::engine::RuleContext
 
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, ReaderPrefix, SyntaxTree};
-use paredit_core_syntax::view_query::{list_head, symbol_is};
+use paredit_core_syntax::view_query::{atom_text, is_paren_list, list_head, symbol_is};
 
 /// How much of the surrounding reader syntax says "this is data".
 ///
@@ -179,6 +179,277 @@ pub fn is_unevaluated_at(tree: &SyntaxTree, target: ByteSpan) -> bool {
 #[must_use]
 pub fn is_hard_quoted_at(tree: &SyntaxTree, target: ByteSpan) -> bool {
     quote_state_at(tree, target).hard
+}
+
+// -- type-specifier position ---------------------------------------------------
+
+/// The compound type specifiers that *contain* another type specifier, per
+/// CLHS 4.2.3.
+///
+/// Climbing through these is what lets one anchor cover the shapes the corpus
+/// actually writes: `(typecase x ((cons (eql :begin-file)) …))` puts the `eql`
+/// two levels below the clause head, and `(declare (type (or function (eql 0))
+/// f))` puts it two levels below the `type` declaration.
+///
+/// `and`, `or` and `not` are also perfectly ordinary macros, which is exactly
+/// why climbing alone can never be the whole test — `(when (or (eql x) y) …)`
+/// climbs to a `when`, which anchors nothing, and stays reported.
+///
+/// `member` and `satisfies` are deliberately absent: their arguments are objects
+/// and a predicate name, not nested type specifiers.
+const TYPE_SPECIFIER_COMBINATORS: [&str; 11] = [
+    "and",
+    "or",
+    "not",
+    "cons",
+    "values",
+    "array",
+    "simple-array",
+    "vector",
+    "simple-vector",
+    "function",
+    "complex",
+];
+
+/// Forms whose argument at a fixed index is an **unevaluated** type specifier,
+/// paired with the index that argument occupies.
+///
+/// Being unevaluated is the whole criterion, and it is what keeps `typep`,
+/// `subtypep` and `coerce` off this list even though each is spelled with a
+/// type. Those three are *functions*, so their type argument is an ordinary
+/// evaluated form: `(typep x '(eql 5))` is a quoted specifier — a question this
+/// module does not answer — but `(typep x (eql 5))` really is a one-argument
+/// call to `eql`, and anchoring on the head would turn a true positive into
+/// silence. `the`, `check-type` and the rest below are special operators or
+/// macros that never evaluate the specifier at all.
+const TYPE_ARGUMENT_ANCHORS: [(&str, usize); 2] = [("the", 1), ("check-type", 2)];
+
+/// The `typecase` family, whose every clause is headed by a type specifier.
+const TYPECASE_HEADS: [&str; 3] = ["typecase", "etypecase", "ctypecase"];
+
+/// The declaration forms that carry a `(type SPEC var…)` / `(ftype SPEC name…)`
+/// declaration specifier.
+const DECLARATION_HEADS: [&str; 3] = ["declare", "declaim", "proclaim"];
+
+/// The generic-function definers whose specialized lambda list may carry an
+/// `(eql object)` specializer.
+///
+/// `:method` is the same geometry with the head replaced, as it appears inside
+/// `defgeneric`.
+const METHOD_HEADS: [&str; 2] = ["defmethod", ":method"];
+
+/// The chain of `(parent, index-of-the-child-descended-into)` steps from the
+/// root down to `target`, or `None` when no node has exactly that span.
+///
+/// Descends through the single child at each level whose span contains the
+/// target, so the cost is the node's depth rather than the file's size — the
+/// same descent [`quote_state_at`] makes.
+fn ancestors_of(root: &ExpressionView, target: ByteSpan) -> Option<Vec<(&ExpressionView, usize)>> {
+    let mut view = root;
+    let mut chain: Vec<(&ExpressionView, usize)> = Vec::new();
+    loop {
+        let (index, child) = view
+            .children
+            .iter()
+            .enumerate()
+            .find(|(_, child)| span_contains(child.span, target))?;
+        chain.push((view, index));
+        if child.span == target {
+            return Some(chain);
+        }
+        view = child;
+    }
+}
+
+/// The lambda-list index of a `defmethod`-shaped form.
+///
+/// `(defmethod name qualifier* specialized-lambda-list . body)`: the qualifiers
+/// are atoms, so the lambda list is the first *list* child past the name. The
+/// search starts past the name rather than at it because `(setf documentation)`
+/// is a perfectly ordinary method name and is itself a list.
+fn method_lambda_list_index(view: &ExpressionView, name_index: usize) -> Option<usize> {
+    view.children
+        .iter()
+        .enumerate()
+        .skip(name_index + 1)
+        .find(|(_, child)| is_paren_list(child))
+        .map(|(index, _)| index)
+}
+
+/// Whether `(parent, index)` is a position that holds a type specifier.
+///
+/// Split out from [`is_eql_type_specifier_at`] so each anchor is one readable
+/// clause; `grand` is the step above, which several anchors need because the
+/// position alone does not settle them.
+fn is_type_specifier_position(
+    parent: &ExpressionView,
+    index: usize,
+    grand: Option<(&ExpressionView, usize)>,
+) -> bool {
+    // `(typep x SPEC)`, `(the SPEC form)`, `(check-type place SPEC)`, …
+    if let Some(head) = list_head(parent) {
+        if TYPE_ARGUMENT_ANCHORS
+            .iter()
+            .any(|(name, at)| *at == index && symbol_is(head, name))
+        {
+            return true;
+        }
+        // `(declare (type SPEC var…))` / `(declaim (ftype SPEC name…))`. The
+        // `type` head is not enough on its own — a function may be named
+        // `type` — so the enclosing declaration form has to agree.
+        if index >= 1 && (symbol_is(head, "type") || symbol_is(head, "ftype")) {
+            let inside_declaration = grand.is_some_and(|(outer, _)| {
+                list_head(outer).is_some_and(|outer_head| {
+                    DECLARATION_HEADS
+                        .iter()
+                        .any(|name| symbol_is(outer_head, name))
+                })
+            });
+            if inside_declaration {
+                return true;
+            }
+        }
+    }
+
+    // A slot option: `(slot-name … :type SPEC …)`, as `defclass`, `defstruct`
+    // and `define-primitive-object` all spell it. A keyword can never be an
+    // operator, so the token before the candidate settles this locally.
+    if index >= 1 {
+        let preceded_by_type_keyword = parent
+            .children
+            .get(index - 1)
+            .and_then(atom_text)
+            .is_some_and(|text| text.eq_ignore_ascii_case(":type"));
+        if preceded_by_type_keyword {
+            return true;
+        }
+    }
+
+    // A `typecase`/`etypecase`/`ctypecase` clause head: the candidate is child 0
+    // of a clause, and the clause is child 2-or-later of the `typecase`.
+    if index == 0 {
+        let in_typecase_clause = grand.is_some_and(|(outer, clause_index)| {
+            clause_index >= 2
+                && list_head(outer).is_some_and(|outer_head| {
+                    TYPECASE_HEADS
+                        .iter()
+                        .any(|name| symbol_is(outer_head, name))
+                })
+        });
+        if in_typecase_clause {
+            return true;
+        }
+    }
+
+    false
+}
+
+/// Whether the one-argument `(eql object)` at `target` is a CLHS 4.2.3 compound
+/// **type specifier** rather than a call.
+///
+/// `(eql object)` is the one shape where a written arity of one is not merely
+/// legal but required, and it is legal exactly where a type specifier is: as a
+/// `defmethod` `eql` specializer, a `typecase` clause head, a `declare (type …)`
+/// specifier, a `defclass`/`defstruct` slot `:type`, and inside the compound
+/// specifiers that nest others. `(defmethod g ((x (eql 7))) …)` is not a
+/// one-argument call to `eql` and never was.
+///
+/// The verdict needs the candidate's *ancestors*, which no head-matched node
+/// carries, so this descends from the root exactly as [`quote_state_at`] does.
+/// The two questions are independent and both are asked only once a finding
+/// already exists, so ordinary code never reaches [`SyntaxTree::root_view`].
+///
+/// Deliberately anchored on **standard Common Lisp** only. SBCL's compiler
+/// spells type specifiers in its own macros too — `defknown`, `deftransform`,
+/// `(:constant …)` in `define-vop`, `constant-arg` — and those stay reported
+/// rather than teach a general Common Lisp linter one implementation's
+/// internals, which would silence a user macro that merely shares a name.
+///
+/// A quote is *not* consulted: `'(cons (eql or) …)` is a separate question with
+/// a separate answer, and conflating the two would make each harder to read.
+#[must_use]
+pub fn is_eql_type_specifier_at(tree: &SyntaxTree, target: ByteSpan) -> bool {
+    let root = tree.root_view();
+    let Some(chain) = ancestors_of(&root, target) else {
+        return false;
+    };
+
+    // Climb past the compound specifiers that nest another specifier. Index 0
+    // is the combinator's own head, so only a later child is a nested spec.
+    let mut depth = chain.len();
+    // A combinator's own head is child 0 and is an atom, so a nested specifier
+    // is always a later child; `list_head` already declines a parent whose
+    // child 0 is the candidate itself.
+    while depth >= 1 {
+        let (parent, _) = chain[depth - 1];
+        let climbs = list_head(parent).is_some_and(|head| {
+            TYPE_SPECIFIER_COMBINATORS
+                .iter()
+                .any(|name| symbol_is(head, name))
+        });
+        if !climbs {
+            break;
+        }
+        depth -= 1;
+    }
+    if depth == 0 {
+        return false;
+    }
+
+    let (parent, index) = chain[depth - 1];
+    let grand = (depth >= 2).then(|| chain[depth - 2]);
+    if is_type_specifier_position(parent, index, grand) {
+        return true;
+    }
+    is_method_eql_specializer(&chain, depth, parent, index, grand)
+}
+
+/// Whether the candidate is a `defmethod` `eql` specializer.
+///
+/// The shape is `(defmethod name qualifier* (… (parameter (eql object)) …) …)`:
+/// the candidate is the second element of a two-element parameter, that
+/// parameter sits in the method's own lambda list, and — the part that a shape
+/// check alone gets wrong — it sits in the lambda list's **required** section.
+fn is_method_eql_specializer(
+    chain: &[(&ExpressionView, usize)],
+    depth: usize,
+    parent: &ExpressionView,
+    index: usize,
+    grand: Option<(&ExpressionView, usize)>,
+) -> bool {
+    if index != 1 || parent.children.len() != 2 || !is_paren_list(parent) {
+        return false;
+    }
+    let Some((lambda_list, parameter_index)) = grand else {
+        return false;
+    };
+    let Some((definer, lambda_list_index)) = (depth >= 3).then(|| chain[depth - 3]) else {
+        return false;
+    };
+    let Some(head) = list_head(definer) else {
+        return false;
+    };
+    if !METHOD_HEADS.iter().any(|name| symbol_is(head, name)) {
+        return false;
+    }
+    // `(:method …)` has no name of its own, so its lambda list may start one
+    // child earlier than `defmethod`'s.
+    let name_index = if symbol_is(head, ":method") { 0 } else { 1 };
+    if !is_paren_list(lambda_list)
+        || method_lambda_list_index(definer, name_index) != Some(lambda_list_index)
+    {
+        return false;
+    }
+    // Only a *required* parameter may be specialized. Past a lambda-list
+    // keyword the very same `(name form)` shape is an `&optional`/`&key`
+    // parameter with a **default value form**, and that form is live code:
+    // `(defmethod g (a &key (k (eql y))) …)` really does call `eql` with one
+    // argument, which is the defect this rule is named for.
+    lambda_list
+        .children
+        .iter()
+        .take(parameter_index)
+        .all(|child| atom_text(child).is_none_or(|text| !text.starts_with('&')))
 }
 
 /// Which floating-point format a numeric token reads as.

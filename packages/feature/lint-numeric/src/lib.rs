@@ -915,3 +915,312 @@ mod arity_and_shorthand_quote_tests {
         );
     }
 }
+
+/// `equality-arity`'s type-specifier model, driven through the *real* engine.
+///
+/// CLHS 4.2.3 makes `(eql object)` a compound **type specifier**, so in a type
+/// position one written argument is not a defect but the only legal spelling.
+/// Measured over the same 5 506-file Common Lisp corpus the quote guard was
+/// measured on, this rule reported 1 307 findings outside a hard quote, and
+/// **679** of them were a one-argument `eql` sitting in an unevaluated type
+/// position — a `defmethod` specializer, a `typecase` clause head, a
+/// `declare`/`declaim` `type` specifier, a slot `:type`, a `the`, or a
+/// `check-type`. Adjudicating 120 of the 1 307 individually found *no* genuine
+/// arity error among them at all.
+///
+/// Every suppression below is paired with a control proving the rule still fires
+/// on the same operator in a real call position, because buying a false negative
+/// is the standard way to "fix" a false positive. The guard is deliberately
+/// narrowed to `eql`-with-exactly-one-argument: `eq`, `equal` and `equalp` name
+/// no type, and `(eql a b c)` names none either, so no other misarity shape can
+/// reach it.
+#[cfg(test)]
+mod equality_arity_type_specifier_tests {
+    use std::path::Path;
+
+    use paredit_core_lint_engine::engine::{build_head_index, collect_lint_outcomes};
+    use paredit_core_lint_engine::policy::RuleSelection;
+    use paredit_core_lint_engine::rule::{RuleCatalog, RuleEntry};
+    use paredit_core_syntax::dialect::Dialect;
+    use paredit_core_syntax::sexpr::SyntaxTree;
+
+    static ENTRIES: [RuleEntry; 1] = [RuleEntry::new(
+        &crate::equality_arity::rule::META,
+        &crate::equality_arity::rule::RULE,
+    )];
+
+    fn fired(source: &str) -> Vec<&'static str> {
+        let catalog = RuleCatalog::new(&ENTRIES);
+        let index = build_head_index(catalog);
+        let tree = SyntaxTree::parse_with_dialect(source, Dialect::CommonLisp).expect("parse");
+        collect_lint_outcomes(
+            catalog,
+            &index,
+            Path::new("t.lisp"),
+            Dialect::CommonLisp,
+            &tree,
+            source,
+            RuleSelection::All,
+        )
+        .expect("lint pass")
+        .into_iter()
+        .map(|outcome| outcome.into_parts().0.rule)
+        .collect()
+    }
+
+    fn reported(source: &str) -> bool {
+        !fired(source).is_empty()
+    }
+
+    // -- controls: a genuine arity error in call position stays reported -----
+
+    /// The shapes the rule exists for. Each is a real defect, and none of them
+    /// is a type specifier, so the guard must not reach any of them.
+    #[test]
+    fn a_genuine_misarity_call_is_still_reported() {
+        assert!(reported("(defun f (x) (eq x))"));
+        assert!(reported("(defun f (x) (eql x))"));
+        assert!(reported("(defun f () (eql))"));
+        assert!(reported("(defun f (a b c) (eql a b c))"));
+        assert!(reported("(defun f (a) (equal a))"));
+        assert!(reported("(defun f (a b c d) (equalp a b c d))"));
+    }
+
+    /// A body form is a call, however deeply the body nests.
+    #[test]
+    fn a_misarity_call_in_a_progn_body_is_still_reported() {
+        assert!(reported("(defun f (x) (progn (eql x)))"));
+        assert!(reported("(progn (eq x))"));
+    }
+
+    /// A quasiquoted template really does become code, so it stays reported —
+    /// the same asymmetry the hard-quote guard is built around.
+    #[test]
+    fn a_quasiquoted_template_stays_reported() {
+        assert!(reported("(defmacro m (v) `(when ,v (eql ,v)))"));
+    }
+
+    /// `typep`, `subtypep` and `coerce` are *functions*: their type argument is
+    /// an ordinary evaluated form, so an unquoted `(eql x)` there is a real
+    /// one-argument call and anchoring on those heads would be a false negative.
+    #[test]
+    fn an_evaluated_type_argument_is_a_call_and_stays_reported() {
+        assert!(reported("(defun f (x y) (typep x (eql y)))"));
+        assert!(reported("(defun f (y) (subtypep (eql y) 'integer))"));
+        assert!(reported("(defun f (x y) (coerce x (eql y)))"));
+    }
+
+    /// `and`/`or`/`not` are ordinary macros as well as type combinators, so
+    /// climbing through one must not on its own suppress anything.
+    #[test]
+    fn a_misarity_call_under_a_bare_and_or_not_stays_reported() {
+        assert!(reported("(defun f (x y) (when (or (eql x) y) 1))"));
+        assert!(reported("(defun f (x) (and (not (eql x)) 1))"));
+        assert!(reported("(defun f (x) (cons (eql x) nil))"));
+    }
+
+    /// A `defmethod` *body* is code, and so is an ordinary unspecialized
+    /// parameter list; only the specializer is a type.
+    #[test]
+    fn a_misarity_call_in_a_defmethod_body_stays_reported() {
+        assert!(reported("(defmethod g ((x integer)) (eql x))"));
+    }
+
+    /// The two-element shape alone is not enough: `(f (eql x))` is a call to `f`
+    /// with a bad argument, not a specializer.
+    #[test]
+    fn a_two_element_list_outside_a_lambda_list_stays_reported() {
+        assert!(reported("(defun f (x) (list (g (eql x))))"));
+    }
+
+    /// A specialized required parameter is exactly `(var specializer)`. Anything
+    /// else is a malformed lambda list, and half-written code is precisely when
+    /// a linter is read, so the malformed shape must not be granted the
+    /// specializer's exemption.
+    #[test]
+    fn a_malformed_specialized_parameter_stays_reported() {
+        assert!(reported("(defmethod g ((x (eql 1) extra)) x)"));
+        assert!(reported("(defmethod g (((eql 1) x)) x)"));
+    }
+
+    /// Only a *required* parameter may be specialized. Past a lambda-list
+    /// keyword the identical `(name form)` shape is an `&optional`/`&key`
+    /// parameter whose second element is a **default value form** — live code,
+    /// and a real one-argument call to `eql`.
+    #[test]
+    fn an_optional_or_key_parameter_default_is_code_and_stays_reported() {
+        assert!(reported("(defmethod g (a &key (k (eql y))) k)"));
+        assert!(reported("(defmethod g (a &optional (o (eql y))) o)"));
+        assert!(reported("(defmethod g ((a integer) &key (k (eql y))) k)"));
+    }
+
+    /// The definer's head is load-bearing: an arbitrary macro whose arguments
+    /// happen to nest a two-element list is not a generic function.
+    #[test]
+    fn the_specializer_shape_under_a_non_method_definer_stays_reported() {
+        assert!(reported("(my-macro name (a (b (eql 1))))"));
+    }
+
+    /// The lambda list is the one the *method* dispatches on. The same shape in
+    /// the body is an ordinary call.
+    #[test]
+    fn the_specializer_shape_in_a_method_body_stays_reported() {
+        assert!(reported("(defmethod g ((x integer)) (foo (a (eql 1))))"));
+    }
+
+    /// A `typecase` keyform is code even when it is itself a list, so the clause
+    /// anchor must start at the first clause and not at the keyform.
+    #[test]
+    fn a_list_shaped_typecase_keyform_stays_reported() {
+        assert!(reported("(typecase ((eql x) 1) (integer 2))"));
+    }
+
+    /// Only `eql` names a type. The guard must be unreachable for the other
+    /// three predicates even in a genuine type position.
+    #[test]
+    fn a_non_eql_predicate_in_a_specializer_shape_stays_reported() {
+        assert!(reported("(defmethod g ((x (eq 7))) x)"));
+        assert!(reported("(defmethod g ((x (equal 7))) x)"));
+    }
+
+    /// `(eql a b)` is a *valid* two-argument call and `(eql a b c)` is a defect;
+    /// neither is a type specifier, so the specializer shape must not hide the
+    /// three-argument one.
+    #[test]
+    fn a_multi_argument_eql_in_a_specializer_shape_stays_reported() {
+        assert!(reported("(defmethod g ((x (eql 1 2 3))) x)"));
+    }
+
+    // -- the suppressions ----------------------------------------------------
+
+    /// `(defmethod g ((x (eql 7))) …)`: CLHS's `eql` specializer, and the single
+    /// largest false-positive shape in the corpus.
+    #[test]
+    fn a_defmethod_eql_specializer_is_a_type_and_is_not_reported() {
+        assert!(!reported("(defmethod g ((x (eql 7))) x)"));
+        assert!(!reported("(defmethod g ((x (eql :key)) y) (list x y))"));
+    }
+
+    /// The qualifier shifts the lambda list one child right, and a `(setf …)`
+    /// method name is itself a list — the two shapes a fixed index gets wrong.
+    #[test]
+    fn a_qualified_or_setf_named_method_specializer_is_still_found() {
+        assert!(!reported("(defmethod g :around ((x (eql 7))) x)"));
+        assert!(!reported("(defmethod (setf g) (v (x (eql 7))) v)"));
+        assert!(!reported("(defmethod g :before ((a t) (x (eql 'k))) x)"));
+    }
+
+    /// `(:method …)` inside `defgeneric` is a `defmethod` with the head
+    /// replaced, and its lambda list starts one child earlier.
+    #[test]
+    fn a_defgeneric_method_clause_specializer_is_not_reported() {
+        assert!(!reported("(defgeneric g (x) (:method ((x (eql :a))) x))"));
+    }
+
+    /// The reader upcases and a package prefix does not change which operator is
+    /// named, so both spellings have to be recognized.
+    #[test]
+    fn a_shouted_or_package_qualified_definer_is_still_recognized() {
+        assert!(!reported("(DEFMETHOD G ((X (EQL 7))) X)"));
+        assert!(!reported("(cl:defmethod g ((x (eql 7))) x)"));
+    }
+
+    /// A `typecase` clause is headed by a type specifier, not a call.
+    #[test]
+    fn a_typecase_clause_head_is_a_type_and_is_not_reported() {
+        assert!(!reported("(typecase x ((eql 5) 1) (t 2))"));
+        assert!(!reported("(etypecase x ((eql 5) 1))"));
+        assert!(!reported("(ctypecase x ((eql 5) 1))"));
+    }
+
+    /// The `typecase` *keyform* is an ordinary evaluated form, so a bad call
+    /// there is still a defect — the clause heads are the only type positions.
+    #[test]
+    fn the_typecase_keyform_is_code_and_stays_reported() {
+        assert!(reported("(typecase (eql x) (integer 1))"));
+    }
+
+    /// A `case` clause head is a set of *object* keys, not a type, so the
+    /// `typecase` anchor must not extend to it.
+    #[test]
+    fn a_case_clause_head_is_not_a_type_position() {
+        assert!(reported("(case x ((eql 5) 1))"));
+    }
+
+    /// The compound specifiers nest, and the corpus writes the nesting far more
+    /// often than the bare form: `((cons (eql :begin-file)) …)` is SBCL's own.
+    #[test]
+    fn a_nested_compound_type_specifier_is_reached_through_its_combinators() {
+        assert!(!reported("(typecase x ((cons (eql :begin-file)) 1))"));
+        assert!(!reported("(etypecase x ((or null (eql t)) 1))"));
+        assert!(!reported(
+            "(typecase x ((or function (cons (eql function))) 1))"
+        ));
+        assert!(!reported("(typecase x ((and integer (not (eql 0))) 1))"));
+    }
+
+    /// `(declare (type SPEC var))` and its `declaim`/`proclaim` siblings.
+    #[test]
+    fn a_type_declaration_specifier_is_not_reported() {
+        assert!(!reported("(defun f (x) (declare (type (eql 0) x)) x)"));
+        assert!(!reported(
+            "(defun f (x) (declare (type (or function (eql 0)) x)) x)"
+        ));
+        assert!(!reported("(declaim (type (or list (eql t)) *v*))"));
+    }
+
+    /// A function may legitimately be named `type`, so the declaration head has
+    /// to agree before the `(type …)` shape means anything.
+    #[test]
+    fn a_bare_type_call_outside_a_declaration_stays_reported() {
+        assert!(reported("(defun f (x) (type (eql x)))"));
+    }
+
+    /// `the` and `check-type` are the two standard forms that take a specifier
+    /// without evaluating it.
+    #[test]
+    fn an_unevaluated_specifier_argument_is_not_reported() {
+        assert!(!reported("(defun f (x) (the (eql 1) x))"));
+        assert!(!reported(
+            "(defun f (x) (check-type x (or (eql 2) (eql 4))))"
+        ));
+    }
+
+    /// `the`'s *second* argument is the value form, which is code.
+    #[test]
+    fn the_value_form_of_a_the_is_code_and_stays_reported() {
+        assert!(reported("(defun f (x) (the integer (eql x)))"));
+    }
+
+    /// A slot `:type`, as `defclass`, `defstruct` and `define-primitive-object`
+    /// all spell it.
+    #[test]
+    fn a_slot_type_option_is_not_reported() {
+        assert!(!reported(
+            "(defclass c () ((s :type (or (eql :ok) (eql :fail)))))"
+        ));
+        assert!(!reported("(defstruct s (a nil :type (or list (eql 0))))"));
+    }
+
+    /// A specializer written inside a macro template is still a specializer, and
+    /// the corpus writes exactly this to generate methods.
+    #[test]
+    fn a_specializer_inside_a_quasiquoted_template_is_not_reported() {
+        assert!(!reported(
+            "(defmacro m (name) `(defmethod g ((k (eql ',name))) k))"
+        ));
+    }
+
+    /// Suppressing one form must not silence a real defect beside it.
+    #[test]
+    fn a_type_position_does_not_suppress_its_neighbour() {
+        assert_eq!(
+            fired("(defmethod g ((x (eql 7))) (eql x))"),
+            vec!["equality-arity"]
+        );
+        assert_eq!(
+            fired("(progn (typecase y ((eql 5) 1)) (eq z))"),
+            vec!["equality-arity"]
+        );
+    }
+}
