@@ -1348,6 +1348,36 @@
       "rule": "hy-unreachable-except-clause"
     },
     {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an `unpack` call in the last argument of a Fennel operator, which drops every value but the first",
+      "rule": "fennel-bad-unpack"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a Fennel `and`/`or`/`..`/`band`/`bor` call nested directly inside a call to itself",
+      "rule": "fennel-nested-associative-operator"
+    },
+    {
+      "category": "dead-code",
+      "count": 0,
+      "description": "a `(do …)` in the tail of a Fennel form that already sequences its body",
+      "rule": "fennel-redundant-do"
+    },
+    {
+      "category": "dead-code",
+      "count": 0,
+      "description": "a Janet `if`/`if-not`/`when`/`unless` whose test is a literal, so one branch never runs",
+      "rule": "janet-dead-branch-on-constant-condition"
+    },
+    {
+      "category": "dead-code",
+      "count": 0,
+      "description": "a Janet `match` clause written after a catch-all pattern, which can never be reached",
+      "rule": "janet-unreachable-match-clause"
+    },
+    {
       "category": "conditions",
       "count": 0,
       "description": "a define-condition with an empty () supertype list, which defaults to condition, not error",

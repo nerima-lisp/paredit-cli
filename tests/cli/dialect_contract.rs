@@ -538,18 +538,21 @@ fn scope_tier_reports_actually_see_the_definitions_they_claim_to() {
 #[test]
 fn common_lisp_finds_what_the_silent_dialects_miss() {
     // The claim behind `silent` is that the rule exists and simply has no
-    // dialect to apply to, so the same shape must be found in Common Lisp.
+    // dialect to apply to, so a shape Common Lisp reports must go unreported
+    // in a dialect the status table calls silent.
+    //
+    // The Fennel fixture used to be the direct translation of the Common Lisp
+    // one, `(fn add [a b] (let [s (+ a b)] (do s)))`. That stopped being a
+    // silent shape: `fennel-redundant-do` now reports it, and correctly, since
+    // `let` takes an implicit `do` body. The Common Lisp side is unchanged and
+    // the Fennel side is now the same function without the redundant wrapper.
     let root = fresh_temp_dir("dialect-contract-silence");
     fs::write(
         root.join("a.lisp"),
         "(defun add (a b) (let ((s (+ a b))) (progn s)))\n",
     )
     .expect("write fixture");
-    fs::write(
-        root.join("a.fnl"),
-        "(fn add [a b] (let [s (+ a b)] (do s)))\n",
-    )
-    .expect("write fixture");
+    fs::write(root.join("a.fnl"), "(fn add [a b] (let [s (+ a b)] s))\n").expect("write fixture");
 
     let findings = |name: &str| -> u64 {
         let output = paredit()
@@ -573,7 +576,8 @@ fn common_lisp_finds_what_the_silent_dialects_miss() {
     assert_eq!(
         findings("a.fnl"),
         0,
-        "Fennel has no rules, which is what `silent` records"
+        "the redundant-progn rule is Common Lisp-scoped, which is what \
+         `silent` records"
     );
     let _ = fs::remove_dir_all(&root);
 }

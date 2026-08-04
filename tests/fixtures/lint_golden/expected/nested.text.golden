@@ -199,6 +199,11 @@ rule	unwind-protect-cleanup-signals	0
 rule	lfe-illegal-guard-call	0
 rule	lfe-clause-after-catch-all	0
 rule	hy-unreachable-except-clause	0
+rule	fennel-bad-unpack	0
+rule	fennel-nested-associative-operator	0
+rule	fennel-redundant-do	0
+rule	janet-dead-branch-on-constant-condition	0
+rule	janet-unreachable-match-clause	0
 rule	define-condition-empty-superclass-list	0
 rule	define-condition-missing-report-for-error-type	0
 rule	handler-bind-handler-returns-bare-value	0

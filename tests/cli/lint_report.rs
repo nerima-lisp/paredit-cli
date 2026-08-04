@@ -326,7 +326,11 @@ fn cli_lint_list_rules_prints_the_catalog_without_files() {
         // alone -- `hy-unreachable-except-clause` is a `Severity::Error` --
         // so it is the mirror of the usual case: this total moves and the
         // warning total does not.
-        .stdout(predicate::str::contains("\"rule_count\": 336"))
+        // + all 5 of this branch's `lint-fennel-janet-depth` rules = 341, the
+        // whole suite's 357 less the same 16. None is tagged, so the rise is
+        // the full count again -- and all five are `Severity::Warning`, which
+        // makes this the batch where both totals move by the same 5.
+        .stdout(predicate::str::contains("\"rule_count\": 341"))
         .stdout(predicate::str::contains("\"self-assignment\""))
         .stdout(predicate::str::contains(
             "a setq/setf/psetq/psetf that assigns a place to itself",
@@ -1046,7 +1050,12 @@ fn cli_lint_list_rules_marks_severity() {
     // against lfec. Neither is `pedantic`, so both subtractions move
     // together once more: the suite rises by 1 to 249, less the still-16
     // `pedantic` rules = 233.
-    assert_eq!(warnings, 233);
+    //
+    // + all 5 of this branch's `lint-fennel-janet-depth` rules = 238. Every
+    // one is a `Severity::Warning` and none is `pedantic`, so the suite's
+    // warning total and this preset-filtered count rise together by 5, to
+    // 254 and 238 respectively.
+    assert_eq!(warnings, 238);
 }
 
 #[test]
