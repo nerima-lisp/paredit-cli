@@ -15,6 +15,9 @@ pub mod modify_macro_arity;
 pub mod negated_step_delta;
 pub mod nil_comparison;
 pub mod one_step_arithmetic;
+
+#[cfg(test)]
+mod quote_guard_tests;
 pub mod redundant_divisor;
 pub mod redundant_precision_coercion;
 pub mod self_comparison;

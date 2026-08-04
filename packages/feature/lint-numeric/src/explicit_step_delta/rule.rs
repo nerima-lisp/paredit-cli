@@ -7,6 +7,7 @@
 use paredit_core_lint_engine::LintResult;
 
 use crate::explicit_step_delta::domain::examine_step;
+use crate::support::is_hard_quoted_at;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
 use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
@@ -46,12 +47,31 @@ impl LintRule for Rule {
         let mut items = Vec::new();
         examine_step(view, &mut step_form_count, &mut items);
         for item in items {
+            // This rule is `Fixable`, so a finding inside hard-quoted data is
+            // not merely noise: applying the fix rewrites a *data literal*.
+            // **Preventive**: over 28 827 parsed Common Lisp files all 4 of
+            // this rule's hard-quoted findings were `(eval '(defun … (incf x
+            // 1) …))` in one antique ACL2 file, where the quoted text is handed
+            // straight back to the evaluator and so really is code. The guard
+            // costs those 4 and prevented none there; it is here because a
+            // `'(incf x 1)` held as data is the shape `nil-comparison` and
+            // `sign-comparison` were measured making 121 times over, and this
+            // rule would corrupt it just as silently.
+            if is_hard_quoted_at(context.tree(), item.span) {
+                continue;
+            }
             let span = item.span;
             let fix = {
                 // Drop the redundant delta: (incf place 1) -> (incf place).
 
+                // The fix region is `content_span`, not `span`: `span` starts at this
+                // form's *own* reader prefixes, so replacing it deletes them. A
+                // `` `(…) `` has to keep its backquote — without it the commas
+                // underneath are commas outside a backquote, and the file stops
+                // reading altogether. The two spans coincide on any form with no
+                // prefix, which is almost all code, so nothing else moves.
                 RuleFix::single(
-                    item.span,
+                    view.content_span,
                     format!(
                         "({} {})",
                         context_slice(item.head_span),

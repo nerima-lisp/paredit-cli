@@ -40,7 +40,7 @@
 //!
 //! [`RuleContext`]: paredit_core_lint_engine::engine::RuleContext
 
-use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, ReaderPrefix, SyntaxTree};
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path, ReaderPrefix, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, is_paren_list, list_head, symbol_is};
 
 /// How much of the surrounding reader syntax says "this is data".
@@ -100,34 +100,88 @@ const fn span_contains(outer: ByteSpan, inner: ByteSpan) -> bool {
     outer.start().get() <= inner.start().get() && inner.end().get() <= outer.end().get()
 }
 
+/// The one child of `view` whose span covers `target`, found without reading
+/// the others.
+///
+/// A node's children are in document order and do not overlap, so the only
+/// child that can contain `target` is the last one beginning at or before it —
+/// which a binary search finds in `log₂ k` comparisons instead of `k`.
+fn child_containing(view: &ExpressionView, target: ByteSpan) -> Option<&ExpressionView> {
+    let after = view
+        .children
+        .partition_point(|child| child.span.start().get() <= target.start().get());
+    let child = view.children.get(after.checked_sub(1)?)?;
+    span_contains(child.span, target).then_some(child)
+}
+
+/// The index into `tree.root_children()` of the top-level form containing
+/// `target`, or `None` when `target` lies inside no top-level form.
+///
+/// A binary search over the top level: each step is a node-id lookup and a span
+/// read, and neither allocates. Deliberately *not* `tree.root_view()` followed
+/// by a search — `root_view` deep-materializes a `Vec` per node and a `String`
+/// per atom for the whole document, uncached, so asking it about one node costs
+/// the whole file, and a rule that asks once per finding then costs
+/// findings × file.
+fn root_child_index_containing(tree: &SyntaxTree, target: ByteSpan) -> Option<usize> {
+    let start_of = |index: usize| {
+        tree.select_path(&Path::root_child(index))
+            .ok()
+            .map(|selection| selection.span().start().get())
+    };
+    // Top-level forms are in document order and do not overlap, so the only
+    // candidate is the last one beginning at or before `target`.
+    let mut low = 0;
+    let mut high = tree.root_children().len();
+    while low < high {
+        let middle = low + (high - low) / 2;
+        if start_of(middle)? <= target.start().get() {
+            low = middle + 1;
+        } else {
+            high = middle;
+        }
+    }
+    let index = low.checked_sub(1)?;
+    let selection = tree.select_path(&Path::root_child(index)).ok()?;
+    span_contains(selection.span(), target).then_some(index)
+}
+
 /// The reader-quote state in force at `target`.
 ///
-/// Descends from the root through the one child at each level whose span
-/// contains `target`, so the cost is the node's depth, not the file's size.
+/// Descends through the one child at each level whose span contains `target`,
+/// starting from the *one* top-level form that contains it, so the cost is that
+/// form's size and never the file's.
 ///
 /// The verdict is read *at* the target and nowhere shallower. An ancestor being
 /// data does not settle it: `` `(a ,(truncate (float x))) `` has a quasiquoted
 /// ancestor and an evaluated target. Being inside a hard `'` does settle it, and
 /// that is already modelled by `hard` never clearing.
 ///
-/// The root's own span is never consulted. A file with one top-level form has a
-/// root whose span equals that form's, and comparing them would call every such
-/// form evaluated before looking at its prefixes at all.
+/// A span inside no top-level form at all — one a caller synthesized rather than
+/// took from the tree — is evaluated, because nothing quotes it.
 fn quote_state_at(tree: &SyntaxTree, target: ByteSpan) -> QuoteState {
-    let root = tree.root_view();
-    let mut view: &ExpressionView = &root;
-    let mut state = QuoteState::EVALUATED;
+    let Some(index) = root_child_index_containing(tree, target) else {
+        return QuoteState::EVALUATED;
+    };
+    let Some(top_level) = tree
+        .select_path(&Path::root_child(index))
+        .ok()
+        .map(|selection| selection.view())
+    else {
+        return QuoteState::EVALUATED;
+    };
+    let mut view: &ExpressionView = &top_level;
+    // The root carries no reader prefix and is not a `(quote …)` form, so the
+    // state entering the top-level form is whatever that form's own prefixes
+    // say.
+    let mut state = QuoteState::EVALUATED.after_prefixes(view);
 
-    loop {
+    while view.span != target {
         let quoting = is_quote_form(view);
         // A span that names no node is judged by the innermost node that
         // contains it, which is the honest answer for a span the caller
         // synthesized rather than took from the tree.
-        let Some(child) = view
-            .children
-            .iter()
-            .find(|child| span_contains(child.span, target))
-        else {
+        let Some(child) = child_containing(view, target) else {
             return state;
         };
         state = state.after_prefixes(child);
@@ -135,10 +189,8 @@ fn quote_state_at(tree: &SyntaxTree, target: ByteSpan) -> QuoteState {
             state = state.quoted();
         }
         view = child;
-        if view.span == target {
-            return state;
-        }
     }
+    state
 }
 
 /// Whether the node at `target` is unevaluated data rather than code — under

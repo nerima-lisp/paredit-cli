@@ -7,6 +7,7 @@
 use paredit_core_lint_engine::LintResult;
 
 use crate::redundant_divisor::domain::examine;
+use crate::support::is_hard_quoted_at;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
 use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
@@ -56,6 +57,17 @@ impl LintRule for Rule {
         let mut items = Vec::new();
         examine(view, &mut quotient_form_count, &mut items);
         for item in items {
+            // This rule is `Fixable`, so a finding inside hard-quoted data is
+            // not merely noise: applying the fix rewrites a *data literal*.
+            // **Preventive**: none of this rule's 1 424 fixes over the 28 827
+            // parsed Common Lisp files sat under a `'`, so it has no observed
+            // misfires and the guard costs nothing observed. It is here because
+            // `'(floor x 1)` held as data — an expectation table of quotient
+            // forms is exactly what `sign-comparison` was measured corrupting —
+            // would otherwise be rewritten just as silently.
+            if is_hard_quoted_at(context.tree(), item.span) {
+                continue;
+            }
             let span = item.span;
             let fix = {
                 // (floor x 1) is (floor x): drop the redundant unit divisor.
@@ -65,8 +77,14 @@ impl LintRule for Rule {
                     context_slice(item.number_span)
                 );
 
+                // The fix region is `content_span`, not `span`: `span` starts at this
+                // form's *own* reader prefixes, so replacing it deletes them. A
+                // `` `(…) `` has to keep its backquote — without it the commas
+                // underneath are commas outside a backquote, and the file stops
+                // reading altogether. The two spans coincide on any form with no
+                // prefix, which is almost all code, so nothing else moves.
                 RuleFix::single(
-                    item.span,
+                    view.content_span,
                     text,
                     format!("Drop the redundant 1 divisor from {}", item.operator),
                 )

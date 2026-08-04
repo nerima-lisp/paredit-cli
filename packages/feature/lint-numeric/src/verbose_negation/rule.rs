@@ -6,6 +6,7 @@
 
 use paredit_core_lint_engine::LintResult;
 
+use crate::support::is_hard_quoted_at;
 use crate::verbose_negation::domain::examine_form;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
 use paredit_core_lint_engine::model::{
@@ -47,6 +48,19 @@ impl LintRule for Rule {
         let mut items = Vec::new();
         examine_form(view, &mut arithmetic_form_count, &mut items);
         for item in items {
+            // This rule is `Fixable`, so a finding inside hard-quoted data is
+            // not merely noise: applying the fix rewrites a *data literal*.
+            // **Preventive**: both of this rule's 2 hard-quoted findings over
+            // the 28 827 parsed Common Lisp files were `(deftransform core:negate
+            // (((n fixnum))) '(- 0 n))` in one clasp file, where the quoted list
+            // is the transform's expansion and so really is code. The guard
+            // costs those 2 and prevented none there. Two findings in one file
+            // do not establish that hard-quoted `(- 0 x)` is systematically a
+            // template — `sign-comparison`'s 64 and `nil-comparison`'s 57 show
+            // the opposite population — so the silent-corruption risk decides.
+            if is_hard_quoted_at(context.tree(), item.span) {
+                continue;
+            }
             let span = item.span;
             let fix = {
                 // Rewrite as unary `(- X)`, copying X's source.
