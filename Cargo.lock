@@ -681,6 +681,7 @@ dependencies = [
  "paredit-feature-lint-clojure-idiom",
  "paredit-feature-lint-compile-time",
  "paredit-feature-lint-concurrency",
+ "paredit-feature-lint-condition-depth",
  "paredit-feature-lint-condition-system",
  "paredit-feature-lint-conditional",
  "paredit-feature-lint-contract-annotation",
@@ -1069,6 +1070,14 @@ dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
  "serde_json",
+]
+
+[[package]]
+name = "paredit-feature-lint-condition-depth"
+version = "1.4.0"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
 ]
 
 [[package]]

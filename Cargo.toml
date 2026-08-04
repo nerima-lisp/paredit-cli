@@ -129,6 +129,7 @@ paredit-feature-lint-custom = { path = "packages/feature/lint-custom" }
 paredit-feature-lint-repl-debug = { path = "packages/feature/lint-repl-debug" }
 paredit-feature-lint-object-system = { path = "packages/feature/lint-object-system" }
 paredit-feature-lint-condition-system = { path = "packages/feature/lint-condition-system" }
+paredit-feature-lint-condition-depth = { path = "packages/feature/lint-condition-depth" }
 paredit-feature-lint-iteration-flow = { path = "packages/feature/lint-iteration-flow" }
 paredit-feature-lint-testing = { path = "packages/feature/lint-testing" }
 paredit-feature-lint-concurrency = { path = "packages/feature/lint-concurrency" }

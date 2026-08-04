@@ -3036,6 +3036,18 @@
     {
       "category": "conditions",
       "count": 0,
+      "description": "a signalling form naming a condition type and then passing a string, which lands in an initarg-name position rather than being a message",
+      "rule": "condition-type-datum-with-string-initarg"
+    },
+    {
+      "category": "conditions",
+      "count": 0,
+      "description": "an unwind-protect cleanup form that calls error, replacing whatever condition was unwinding",
+      "rule": "unwind-protect-cleanup-signals"
+    },
+    {
+      "category": "conditions",
+      "count": 0,
       "description": "a define-condition with an empty () supertype list, which defaults to condition, not error",
       "rule": "define-condition-empty-superclass-list"
     },
