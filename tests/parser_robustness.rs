@@ -369,9 +369,17 @@ fn every_edit_at_an_arbitrary_offset_returns_rather_than_panicking() {
 /// exactly for the caller who redirects stdout.
 #[test]
 fn a_lossy_edit_is_refused_before_it_is_emitted() {
-    // Reduced from a generated counterexample. Emacs Lisp reads `[...]` as a
-    // vector, so unlike Common Lisp it accepts the input — which is what makes
-    // this reachable from a command at all.
+    // Reduced from a generated counterexample. The dialect has to be one whose
+    // reader accepts the input *and* still mis-lexes the spliced result, since
+    // otherwise there is no lossy rewrite to refuse.
+    //
+    // That used to be Emacs Lisp. It no longer is: making `"` terminate a token
+    // for Emacs Lisp is exactly what makes the post-splice lex agree with the
+    // pre-splice one, so Emacs reads the same four forms from both. The fixture
+    // stopped being a counterexample because the defect it demonstrates was
+    // fixed *for that dialect*, not because this guard weakened — the
+    // permissive reader still refuses the same rewrite, which is what the
+    // `is_err` assertion below pins.
     let source = "\"\"[x]\"(]a []x\"a";
 
     let tree = SyntaxTree::parse(source).expect("the permissive reader accepts this");
@@ -385,7 +393,7 @@ fn a_lossy_edit_is_refused_before_it_is_emitted() {
          so the case it guards has changed"
     );
     assert!(
-        SyntaxTree::parse_with_dialect(source, Dialect::EmacsLisp).is_ok(),
+        SyntaxTree::parse_with_dialect(source, Dialect::Unknown).is_ok(),
         "the fixture must be reachable through a real dialect to mean anything"
     );
 
@@ -396,7 +404,9 @@ fn a_lossy_edit_is_refused_before_it_is_emitted() {
     ));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).expect("create temp dir");
-    let file = dir.join("core.el");
+    // Extensionless, so the CLI resolves `Dialect::Unknown` -- the dialect
+    // that still exhibits the hazard. A `.el` name would now parse cleanly.
+    let file = dir.join("core");
     fs::write(&file, source).expect("write source");
 
     for extra in [vec![], vec!["--write"]] {

@@ -3469,12 +3469,18 @@ fn racket_string_terminates_the_token_before_it() {
         assert_eq!(form.children.len(), 2, "{input}");
         assert_eq!(form.children[1].span.slice(input), expected, "{input}");
     }
-    // Nine other dialects keep the reading they had. Hy is the reason the rule
+    // Eight other dialects keep the reading they had. Hy is the reason the rule
     // cannot be unconditional: there `r"a"` really is a prefixed literal.
+    //
+    // Emacs Lisp used to be in this list and is now asserted with Racket
+    // instead. That is not a weakening: `read0` breaks a symbol on any of
+    // `"';#()[]` and `,`, so `(format"x" 1)` really is a symbol followed by a
+    // string, and reading it as one token made `edit format` insert a line
+    // break *inside* the string literal -- silent corruption in `table.el`,
+    // `autoarg.el` and `tpu-mapper.el`.
     for dialect in [
         Dialect::Scheme,
         Dialect::CommonLisp,
-        Dialect::EmacsLisp,
         Dialect::Clojure,
         Dialect::Lfe,
         Dialect::Carp,
@@ -3488,7 +3494,12 @@ fn racket_string_terminates_the_token_before_it() {
         );
     }
     assert!(!DialectReaderPolicy::new(Dialect::Hy).is_atom_boundary(b"r\"b", 1));
-    assert!(DialectReaderPolicy::new(Dialect::Racket).is_atom_boundary(b"a\"b", 1));
+    for dialect in [Dialect::Racket, Dialect::EmacsLisp] {
+        assert!(
+            DialectReaderPolicy::new(dialect).is_atom_boundary(b"a\"b", 1),
+            "{dialect:?}"
+        );
+    }
 }
 
 /// Splitting Racket out of `classify_scheme` must leave Scheme byte-identical.

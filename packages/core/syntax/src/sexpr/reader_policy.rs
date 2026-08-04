@@ -257,14 +257,45 @@ impl DialectReaderPolicy {
 
     /// Whether a bare `\` escapes the next character *outside* `|...|`.
     ///
-    /// Deliberately narrower than [`Self::supports_bar_quoted_symbols`].
-    /// Common Lisp's single-escape works anywhere in a token, so `a\ b` is one
-    /// symbol; Scheme has no such rule, and its `\x41;` escapes are legal only
-    /// inside a vertical-line region, which `consume_multiple_escape` handles
-    /// on its own. Reading a stray `\` as an escape in Scheme would swallow
-    /// the delimiter after it and unbalance the tree.
+    /// Deliberately narrower than [`Self::bar_quoting`]. Common Lisp's
+    /// single-escape works anywhere in a token, so `a\ b` is one symbol;
+    /// Scheme has no such rule, and its `\x41;` escapes are legal only inside
+    /// a vertical-line region, which `consume_multiple_escape` handles on its
+    /// own. Reading a stray `\` as an escape in Scheme would swallow the
+    /// delimiter after it and unbalance the tree.
+    ///
+    /// ### Why Emacs Lisp belongs here
+    ///
+    /// Its reader has the same rule in both of the places a `\` can appear
+    /// outside a string. `read0`'s symbol loop (`src/lread.c`) takes the byte
+    /// after a `\` verbatim and marks the token `quoted`, so `'a\ b` is the
+    /// one symbol whose name is `a b` and `'byte\[\]` is the one symbol
+    /// `byte[]`; and `read_escape`, which handles the payload of a `?…`
+    /// character literal, is *recursive* through its modifier prefixes, so
+    /// `?\S-\ ` is super-space and `?\C-\[` is 27 — six and six bytes, one
+    /// token each.
+    ///
+    /// Leaving Emacs Lisp out was not a missing nicety. `consume_atom_body`
+    /// stopped at the byte *after* the backslash, so the literal's payload
+    /// fell out of its own span and the formatter re-emitted the truncated
+    /// token followed by whatever came next:
+    ///
+    /// ```text
+    /// (if (= char ?\S-\ ) …)   ->   (if (= char ?\S-\) …)
+    /// ```
+    ///
+    /// which Emacs then reads as super-`)` and runs off the end of the file.
+    /// That is `isearch.el`; `elp.el` and `trace.el` lost the trailing space
+    /// of `'ELP-instrumentation\ `, `soap-client.el` gained a space inside
+    /// `byte\[\]`, and `?\C-\[` unbalanced the tree outright. Measured with
+    /// Emacs's own reader as the oracle over the 1588 files of `lisp/` that
+    /// `read` accepts, `edit format` changed what Emacs reads in 14 of them
+    /// and made 7 unreadable, at exit 0.
     pub(super) const fn supports_single_escape(self) -> bool {
-        matches!(self.dialect, Dialect::CommonLisp | Dialect::Unknown)
+        matches!(
+            self.dialect,
+            Dialect::CommonLisp | Dialect::EmacsLisp | Dialect::Unknown
+        )
     }
 
     pub(super) fn delimiter_from_open(self, byte: u8) -> Option<Delimiter> {
@@ -299,11 +330,14 @@ impl DialectReaderPolicy {
 
     /// Whether a `"` ends the token before it rather than belonging to it.
     ///
-    /// Racket only, and narrowly on purpose. `char-delimiter?`
-    /// (`racket/src/expander/read/delimiter.rkt`) lists `"` beside whitespace
-    /// and the brackets, so `(format"~a" x)` is the symbol `format` followed by
-    /// a string — no space required, and Racket's own benchmark suite writes it
-    /// that way.
+    /// Racket and Emacs Lisp, and narrowly on purpose. Racket's
+    /// `char-delimiter?` (`racket/src/expander/read/delimiter.rkt`) lists `"`
+    /// beside whitespace and the brackets, so `(format"~a" x)` is the symbol
+    /// `format` followed by a string — no space required, and Racket's own
+    /// benchmark suite writes it that way. Emacs Lisp's `read0`
+    /// (`src/lread.c`) ends a symbol on the same byte, through the
+    /// `strchr ("\"';#()[]`,", c)` test its scanning loop runs per character,
+    /// and `(read "(format\"x\" 1)")` returns `(format "x" 1)`.
     ///
     /// Reading it as one token was not merely coarse. The atom swallowed the
     /// opening quote, stopped at the space *inside* the literal, and the rest
@@ -313,21 +347,33 @@ impl DialectReaderPolicy {
     /// corpus round trip against Racket's own reader caught in
     /// `benchmarks/shootout/wordfreq.rkt`.
     ///
+    /// Emacs Lisp had the identical defect, found the identical way. Over the
+    /// 1588 files of GNU Emacs's `lisp/` that `read` accepts, `edit format`
+    /// changed what Emacs reads in `table.el`, `tpu-mapper.el` and
+    /// `autoarg.el`, and each one is a `(format"…"` or `:lighter"…"` written
+    /// without the space: the atom swallowed the opening quote, the closing
+    /// one opened a *new* string, and everything between two literals swapped
+    /// places with everything inside them. `table.el`'s
+    /// `(format"    </%s>\n" …)` came back as `(format " </%s>\n" …)` — HTML
+    /// indentation deleted from inside a string, at exit 0.
+    ///
     /// Every dialect here except Hy terminates a token at `"` for the same
-    /// reason, so this is a general gap. It stays gated on Racket because
-    /// widening it is a behaviour change for nine other readers that needs
-    /// each one's own corpus audit — and because Hy is the counter-example
-    /// that shows the rule cannot simply be made unconditional:
+    /// reason, so this is still a general gap. It stays gated on the two
+    /// dialects whose corpus has been audited against their own reader,
+    /// because widening it is a behaviour change for eight others that needs
+    /// each one's own audit — and because Hy is the counter-example that shows
+    /// the rule cannot simply be made unconditional:
     /// [`Self::has_prefixed_strings`] exists because there an identifier
     /// immediately before a `"` really is a prefix on the literal.
     ///
-    /// Racket's other non-bracket delimiters — `'`, `` ` `` and `,` — are
-    /// deliberately still missing. They mis-read a token the same way, but they
-    /// cannot corrupt one: the merged atom is re-emitted verbatim, so a format
-    /// round trip over the corpus is byte-identical for them. Fixing them is
-    /// worth doing on its own evidence, not as a rider here.
+    /// The other non-bracket delimiters both readers have — `'`, `` ` `` and
+    /// `,`, plus `#` and `;` in Emacs Lisp — are deliberately still missing.
+    /// They mis-read a token the same way, but they cannot corrupt one: the
+    /// merged atom is re-emitted verbatim, so a format round trip over the
+    /// corpus is byte-identical for them. Fixing them is worth doing on its
+    /// own evidence, not as a rider here.
     pub(super) const fn string_terminates_a_token(self) -> bool {
-        matches!(self.dialect, Dialect::Racket)
+        matches!(self.dialect, Dialect::Racket | Dialect::EmacsLisp)
     }
 
     pub(super) fn is_atom_boundary(self, bytes: &[u8], pos: usize) -> bool {
@@ -570,6 +616,74 @@ impl DialectReaderPolicy {
             _ => return None,
         };
         bytes.get(pos + width).is_some().then_some(width)
+    }
+
+    /// The total byte width of the character literal at `pos`, for a dialect
+    /// whose character-literal grammar is modelled exactly.
+    ///
+    /// `None` means either that no literal starts here or that this dialect
+    /// has no exact model, and the caller falls back to
+    /// [`Self::character_literal_prefix_width`] plus one character plus a scan
+    /// to the next atom boundary.
+    ///
+    /// Emacs Lisp is the only dialect modelled exactly, because it is the only
+    /// one here whose literal can *contain* what would otherwise end a token.
+    /// `read_char_escape` (`src/lread.c`) reads the payload after a modifier
+    /// prefix with a bare `READCHAR` and takes whatever comes back verbatim:
+    ///
+    /// ```c
+    ///   mod_key:
+    ///     {
+    ///       int c1 = READCHAR;
+    ///       if (c1 != '-') { ... }
+    ///       modifiers |= mod;
+    ///       c1 = READCHAR;
+    ///       if (c1 == '\\') { next_char = READCHAR; goto again; }
+    ///       chr = c1;
+    ///       break;
+    ///     }
+    /// ```
+    ///
+    /// So `?\C- ` is control-space and `?\C-]` is 29 — a space and a closing
+    /// bracket that are payload, not boundary. Scanning to the next atom
+    /// boundary cannot find the end of those, however the backslash rule is
+    /// written, which is why [`Self::supports_single_escape`] is necessary for
+    /// Emacs Lisp but not sufficient:
+    ///
+    /// ```text
+    /// (define-key map [?\C- ] 'kkc-first-char-only)
+    ///   ->  (define-key map [?\C-] 'kkc-first-char-only)
+    /// ```
+    ///
+    /// which Emacs then reads as control-`]` with the vector left open.
+    /// `bindings.el`, `kkc.el`, `korea-util.el` and `ns-win.el` are all this
+    /// one shape.
+    ///
+    /// The caller advances past this width and then keeps scanning to the next
+    /// atom boundary rather than ending the token here, which is what makes
+    /// the new extent a superset of the old one for every input;
+    /// `Parser::consume_character_literal` records why that matters and what
+    /// terminating instead broke.
+    ///
+    /// | source | payload | width |
+    /// |---|---|---|
+    /// | `?a` `?あ` `?{` | the character itself | 1 + its UTF-8 length |
+    /// | `?\n` `?\e` `?\;` `?\)` `?\ ` | the character after the `\` | 2 + its UTF-8 length |
+    /// | `?\x41` | every hex digit, at least one | scanned |
+    /// | `?\u00e9` `?\U0001F600` | exactly 4 / 8 hex digits | 7 / 11 |
+    /// | `?\N{U+261D}` `?\N{OGHAM SPACE MARK}` | up to the `}` | scanned |
+    /// | `?\101` | at most three octal digits | scanned |
+    /// | `?\C-` `?\M-` `?\S-` `?\H-` `?\A-` `?\s-` `?\^` | a whole payload again | recursive |
+    ///
+    /// A spelling Emacs itself refuses — `?\x` with no digit, `?\Ca`, `?\N`
+    /// with no brace, a truncated literal at end of input — returns `None` and
+    /// leaves the old scan in place rather than inventing a refusal for input
+    /// no reader accepts anyway.
+    pub(super) fn exact_character_literal_width(self, bytes: &[u8], pos: usize) -> Option<usize> {
+        if !matches!(self.dialect, Dialect::EmacsLisp) || bytes.get(pos) != Some(&b'?') {
+            return None;
+        }
+        emacs_lisp_character_payload_end(bytes, pos + 1).map(|end| end - pos)
     }
 
     /// Whether a character literal is *exactly* its prefix plus one character,
@@ -2125,6 +2239,115 @@ fn emacs_lisp_radix_literal_is_valid(bytes: &[u8], pos: usize) -> bool {
     cursor > digits_run_start
 }
 
+/// How many modifier prefixes one Emacs Lisp character literal may stack
+/// before [`emacs_lisp_character_payload_end`] gives up.
+///
+/// Emacs has six (`A- C- H- M- S- s-`) and `read_char_escape` applies each at
+/// most once per literal, so any chain longer than this is input no reader
+/// accepts. The bound exists because the payload rule is recursive and the
+/// scanner is not: without it, `?\C-\C-\C-…` would walk the rest of the file.
+const MAX_EMACS_LISP_CHARACTER_MODIFIERS: usize = 8;
+
+/// The offset just past the payload of the Emacs Lisp character literal whose
+/// `?` sits at `start - 1`, or `None` when Emacs itself would refuse it.
+///
+/// Transcribed from `read_char_escape` in `src/lread.c`; see
+/// [`DialectReaderPolicy::exact_character_literal_width`] for the table this
+/// implements and for why the recursion matters.
+fn emacs_lisp_character_payload_end(bytes: &[u8], start: usize) -> Option<usize> {
+    let mut cursor = start;
+    for _ in 0..MAX_EMACS_LISP_CHARACTER_MODIFIERS {
+        let byte = *bytes.get(cursor)?;
+        if byte != b'\\' {
+            // `?a`, `?あ`, `?{`, `? `. One whole character, taken verbatim.
+            return Some(cursor + utf8_sequence_width(byte));
+        }
+        let escape = *bytes.get(cursor + 1)?;
+        let after = cursor + 2;
+        match escape {
+            // A modifier prefix. `read_char_escape` re-enters its own switch
+            // on whatever follows the hyphen, so the payload may be another
+            // escape (`?\M-\C-b`) or a raw byte that would otherwise end the
+            // token (`?\C- `, `?\C-]`).
+            b'A' | b'C' | b'H' | b'M' | b'S' | b's' if bytes.get(after) == Some(&b'-') => {
+                cursor = after + 1;
+            }
+            // `\s` *not* followed by a hyphen is SPC, and is the one escape
+            // whose letter is both a modifier and a character. `\A`, `\C`,
+            // `\H`, `\M` and `\S` without a hyphen are errors in Emacs, so
+            // they fall to the `None` below rather than being read as the
+            // letter.
+            b's' => return Some(after),
+            b'A' | b'C' | b'H' | b'M' | b'S' => return None,
+            // `?\^I` is control-I, and `^` takes a whole payload again just as
+            // `C-` does — `read_char_escape` reaches it by falling through
+            // from the `C` case.
+            b'^' => cursor = after,
+            // `\x` takes every hex digit that follows, and at least one.
+            b'x' => {
+                let digits = hex_digit_run(bytes, after);
+                return (digits > 0).then_some(after + digits);
+            }
+            // `\uXXXX` and `\UXXXXXXXX` are exact-length, and Emacs raises
+            // "Malformed Unicode escape" for anything shorter.
+            b'u' => return exact_hex_run(bytes, after, 4),
+            b'U' => return exact_hex_run(bytes, after, 8),
+            // `?\N{U+261D}` and `?\N{OGHAM SPACE MARK}`. The brace is
+            // mandatory ("Expected opening brace after \\N"), and the name may
+            // contain spaces — which is the whole reason this cannot be left
+            // to a boundary scan.
+            b'N' => {
+                if bytes.get(after) != Some(&b'{') {
+                    return None;
+                }
+                let close = bytes.get(after + 1..)?.iter().position(|&b| b == b'}')?;
+                return Some(after + 1 + close + 1);
+            }
+            // At most three octal digits, and only `0`-`7`: `?\8` and `?\9`
+            // are the characters `8` and `9`, through the verbatim arm below.
+            b'0'..=b'7' => {
+                let mut digits = 1;
+                while digits < 3 && matches!(bytes.get(cursor + 1 + digits), Some(b'0'..=b'7')) {
+                    digits += 1;
+                }
+                return Some(cursor + 1 + digits);
+            }
+            // `?\n`, `?\e`, `?\;`, `?\)`, `?\ `, `?\\`. The character after
+            // the backslash, whatever it is.
+            _ => return Some(cursor + 1 + utf8_sequence_width(escape)),
+        }
+    }
+    None
+}
+
+/// The byte length of the UTF-8 sequence `lead` starts.
+///
+/// Every caller has already been handed a `&str`'s bytes, so `lead` is a real
+/// lead byte; a continuation byte returns 1 so a malformed slice advances
+/// rather than stalling.
+const fn utf8_sequence_width(lead: u8) -> usize {
+    match lead {
+        0xC2..=0xDF => 2,
+        0xE0..=0xEF => 3,
+        0xF0..=0xF4 => 4,
+        _ => 1,
+    }
+}
+
+/// How many hex digits run from `pos`.
+fn hex_digit_run(bytes: &[u8], pos: usize) -> usize {
+    bytes[pos.min(bytes.len())..]
+        .iter()
+        .take_while(|byte| byte.is_ascii_hexdigit())
+        .count()
+}
+
+/// `pos + count` when exactly `count` hex digits sit at `pos`.
+fn exact_hex_run(bytes: &[u8], pos: usize, count: usize) -> Option<usize> {
+    let run = bytes.get(pos..pos + count)?;
+    run.iter().all(u8::is_ascii_hexdigit).then_some(pos + count)
+}
+
 /// The language a `#lang` line names, given the line's text.
 ///
 /// Lives beside the reader's own directive constants so the parser and the
@@ -2309,6 +2532,246 @@ mod emacs_lisp_radix_tests {
                 !emacs_lisp_radix_literal_is_valid(source.as_bytes(), 0),
                 "{source} is truncated"
             );
+        }
+    }
+}
+
+#[cfg(test)]
+mod emacs_lisp_character_literal_tests {
+    use super::{Dialect, DialectReaderPolicy};
+
+    fn width(source: &str) -> Option<usize> {
+        DialectReaderPolicy::new(Dialect::EmacsLisp)
+            .exact_character_literal_width(source.as_bytes(), 0)
+    }
+
+    /// Every row was produced by a running GNU Emacs 31.0.91 rather than read
+    /// off the manual, with `(read-from-string ...)` under `emacs --batch -Q`.
+    /// The width column is the byte length of the prefix that call consumed;
+    /// the value column is what it returned, and is carried so a later change
+    /// that shortens a literal without changing its width still fails a review
+    /// of this table.
+    ///
+    /// The rows that matter most are the ones whose payload is a byte that
+    /// ends a token everywhere else: `?\C- `, `?\C-]`, `?\N{OGHAM SPACE MARK}`.
+    /// Those are why this function exists at all — no backslash rule, however
+    /// written, finds the end of them.
+    const ACCEPTED_BY_EMACS: &[(&str, usize, i64)] = &[
+        // A bare character, taken verbatim, delimiters included.
+        ("?a", 2, 97),
+        ("?{", 2, 123),
+        ("?}", 2, 125),
+        ("?[", 2, 91),
+        ("?\"", 2, 34),
+        ("? ", 2, 32),
+        // Multi-byte payloads are one character, not one byte.
+        ("?\u{3042}", 4, 12354),
+        ("?\u{1F600}", 5, 128512),
+        // Named escapes, and the ordinary escaped-character arm.
+        ("?\\n", 3, 10),
+        ("?\\e", 3, 27),
+        ("?\\d", 3, 127),
+        ("?\\s", 3, 32),
+        ("?\\;", 3, 59),
+        ("?\\)", 3, 41),
+        ("?\\\\", 3, 92),
+        ("?\\ ", 3, 32),
+        // `\8` and `\9` are the digits, not octal: the octal arm is `0`-`7`.
+        ("?\\8", 3, 56),
+        ("?\\9", 3, 57),
+        // Radix escapes. `\x` is greedy, `\u` and `\U` are exact-length.
+        ("?\\x41", 5, 65),
+        ("?\\xeFc", 6, 3836),
+        ("?\\u00e9", 7, 233),
+        ("?\\U0001F600", 11, 128512),
+        ("?\\101", 5, 65),
+        ("?\\0", 3, 0),
+        // Named characters. The name may contain spaces, which is the whole
+        // reason a boundary scan cannot find the end of one.
+        ("?\\N{U+261D}", 11, 9757),
+        ("?\\N{OGHAM SPACE MARK}", 21, 5760),
+        // Modifier prefixes, whose payload is read all over again.
+        ("?\\C-a", 5, 1),
+        ("?\\^I", 4, 9),
+        ("?\\M-\\C-b", 8, 134217730),
+        ("?\\M-\\S-\\C-a", 11, 167772161),
+        ("?\\s-a", 5, 8388705),
+        ("?\\S-a", 5, 33554529),
+        // The reported corruption, and its family: a payload that is itself a
+        // token boundary. `isearch.el` line 3335 is the first row.
+        ("?\\S-\\ ", 6, 33554464),
+        ("?\\M-\\ ", 6, 134217760),
+        ("?\\C-\\[", 6, 27),
+        ("?\\C-\\]", 6, 29),
+        ("?\\^\\]", 5, 29),
+        // `bindings.el`, `kkc.el`, `korea-util.el` and `ns-win.el`: a modifier
+        // followed by a *bare* space or bracket, with no backslash at all.
+        ("?\\C- ", 5, 67108896),
+        ("?\\S- ", 5, 33554464),
+        ("?\\C-]", 5, 29),
+        ("?\\M- ", 5, 134217760),
+        ("?\\^ ", 4, 67108896),
+        ("?\\C-\\s- ", 8, 75497504),
+    ];
+
+    /// Spellings a running Emacs 31.0.91 refuses with `invalid-read-syntax` or
+    /// "Invalid escape char syntax". `None` leaves the old prefix-plus-scan
+    /// reading in place rather than inventing a refusal for input no reader
+    /// accepts, so this table pins that they fall through — not that they are
+    /// rejected.
+    const REFUSED_BY_EMACS: &[&str] = &[
+        // "\\x not followed by hex digit"
+        "?\\x",
+        // "Malformed Unicode escape"
+        "?\\u00e",
+        "?\\U0001F6",
+        // "Expected opening brace after \\N"
+        "?\\Na",
+        "?\\N",
+        "?\\N{unterminated",
+        // "\\C not followed by -"
+        "?\\Ca",
+        "?\\Sa",
+        "?\\Ma",
+        // Truncated at end of input.
+        "?",
+        "?\\",
+    ];
+
+    #[test]
+    fn every_width_matches_what_emacs_consumed() {
+        for (source, expected, _value) in ACCEPTED_BY_EMACS {
+            assert_eq!(
+                width(source),
+                Some(*expected),
+                "{source:?} is {expected} bytes to GNU Emacs"
+            );
+        }
+    }
+
+    #[test]
+    fn a_spelling_emacs_refuses_falls_through_to_the_old_scan() {
+        for source in REFUSED_BY_EMACS {
+            assert_eq!(
+                width(source),
+                None,
+                "{source:?} is refused by GNU Emacs and must not be modelled"
+            );
+        }
+    }
+
+    /// The width is measured from `pos`, not from zero: this is called once per
+    /// literal, mid-document, for every file.
+    #[test]
+    fn the_width_is_relative_to_the_offset_it_is_asked_about() {
+        let source = "(define-key map [?\\C- ] 'f)";
+        let at = source.find('?').expect("the fixture has a literal");
+        assert_eq!(
+            DialectReaderPolicy::new(Dialect::EmacsLisp)
+                .exact_character_literal_width(source.as_bytes(), at),
+            Some(5)
+        );
+    }
+
+    /// The model is gated on Emacs Lisp alone. `#\` and `\` literals in the
+    /// other ten readers keep the prefix-plus-scan path they have always had,
+    /// which is what makes a cross-dialect corpus sweep byte-identical by
+    /// construction rather than by luck.
+    #[test]
+    fn no_other_dialect_is_modelled() {
+        for dialect in [
+            Dialect::CommonLisp,
+            Dialect::Lfe,
+            Dialect::Scheme,
+            Dialect::Racket,
+            Dialect::Clojure,
+            Dialect::Hy,
+            Dialect::Carp,
+            Dialect::Janet,
+            Dialect::Fennel,
+            Dialect::Unknown,
+        ] {
+            let policy = DialectReaderPolicy::new(dialect);
+            for source in ["?a", "?\\C- ", "#\\a", "\\newline", "?\\N{U+261D}"] {
+                assert_eq!(
+                    policy.exact_character_literal_width(source.as_bytes(), 0),
+                    None,
+                    "{dialect:?} must keep its own character-literal scan for {source:?}"
+                );
+            }
+        }
+    }
+
+    /// A `?` that opens no literal, and a document that ends inside one, must
+    /// both return `None` rather than a width past the end of the slice.
+    #[test]
+    fn a_non_literal_or_truncated_input_has_no_width() {
+        for source in ["", "a", "(", "#\\a", "?"] {
+            assert_eq!(width(source), None, "{source:?} opens no complete literal");
+        }
+    }
+
+    /// A modifier chain is bounded, so adversarial input cannot walk the rest
+    /// of the document. Emacs has six modifiers and applies each at most once,
+    /// so nothing legal comes close to the bound.
+    #[test]
+    fn an_unbounded_modifier_chain_is_refused_rather_than_scanned_to_the_end() {
+        let source = format!("?{}a", "\\C-".repeat(64));
+        assert_eq!(width(&source), None);
+    }
+
+    /// The literal reported against `isearch.el`, spelled out. `?\S-\ ` is six
+    /// bytes; reading five re-emitted `?\S-\`, and Emacs then took the closing
+    /// paren after it as the escaped character.
+    #[test]
+    fn the_isearch_literal_keeps_its_escaped_space() {
+        assert_eq!(width("?\\S-\\ "), Some(6));
+    }
+
+    /// `"` ends a token in Emacs Lisp as it does in Racket, and in neither of
+    /// the other nine: `(read "(format\"x\" 1)")` is `(format "x" 1)`.
+    #[test]
+    fn a_string_terminates_a_token_in_emacs_lisp_and_racket_only() {
+        for dialect in [Dialect::EmacsLisp, Dialect::Racket] {
+            assert!(DialectReaderPolicy::new(dialect).string_terminates_a_token());
+        }
+        for dialect in [
+            Dialect::CommonLisp,
+            Dialect::Lfe,
+            Dialect::Scheme,
+            Dialect::Clojure,
+            Dialect::Hy,
+            Dialect::Carp,
+            Dialect::Janet,
+            Dialect::Fennel,
+            Dialect::Unknown,
+        ] {
+            assert!(
+                !DialectReaderPolicy::new(dialect).string_terminates_a_token(),
+                "{dialect:?} has had no corpus audit for this rule"
+            );
+        }
+    }
+
+    /// Emacs Lisp joins Common Lisp in reading `\` as a single escape, and the
+    /// eight dialects without the rule must not acquire it: a stray `\` read as
+    /// an escape in Scheme swallows the delimiter after it.
+    #[test]
+    fn single_escape_is_emacs_lisp_common_lisp_and_the_legacy_reader() {
+        for dialect in [Dialect::CommonLisp, Dialect::EmacsLisp, Dialect::Unknown] {
+            assert!(DialectReaderPolicy::new(dialect).supports_single_escape());
+        }
+        for dialect in [
+            Dialect::Lfe,
+            Dialect::Scheme,
+            Dialect::Racket,
+            Dialect::Clojure,
+            Dialect::Hy,
+            Dialect::Carp,
+            Dialect::Janet,
+            Dialect::Fennel,
+        ] {
+            assert!(!DialectReaderPolicy::new(dialect).supports_single_escape());
         }
     }
 }
