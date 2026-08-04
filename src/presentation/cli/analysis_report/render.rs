@@ -250,7 +250,9 @@ fn delta_json(
     let comparable = previous_outline.len()
         == previous["metrics"]["outlineEntries"]
             .as_u64()
-            .map_or(previous_outline.len(), |count| count as usize);
+            .map_or(previous_outline.len(), |count| {
+                usize::try_from(count).unwrap_or(usize::MAX)
+            });
 
     json!({
         "compared_against": previous["digest"],

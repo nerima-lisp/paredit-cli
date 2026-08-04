@@ -713,19 +713,18 @@ fn parse_directive(comment: &str) -> Option<ParsedDirective> {
 /// offset where its comment begins (if any), whether non-whitespace code
 /// preceded that comment, and the in-string state after the line.
 fn scan_line(line: &str, mut in_string: bool) -> (Option<usize>, bool, bool) {
-    let chars: Vec<(usize, char)> = line.char_indices().collect();
     let mut had_code = false;
-    let mut i = 0;
-    while i < chars.len() {
-        let (offset, ch) = chars[i];
+    let mut chars = line.char_indices().peekable();
+    while let Some((offset, ch)) = chars.next() {
         if in_string {
             match ch {
-                '\\' => i += 2, // skip the escaped character
+                '\\' => {
+                    chars.next(); // skip the escaped character
+                }
                 '"' => {
                     in_string = false;
-                    i += 1;
                 }
-                _ => i += 1,
+                _ => {}
             }
             continue;
         }
@@ -733,20 +732,19 @@ fn scan_line(line: &str, mut in_string: bool) -> (Option<usize>, bool, bool) {
             '"' => {
                 in_string = true;
                 had_code = true;
-                i += 1;
             }
             // A `#\c` character literal: the char after `#\` is data, not code
             // structure, so skip all three and never read its `;` as a comment.
-            '#' if chars.get(i + 1).is_some_and(|(_, c)| *c == '\\') => {
+            '#' if chars.peek().is_some_and(|(_, c)| *c == '\\') => {
                 had_code = true;
-                i += 3;
+                chars.next();
+                chars.next();
             }
             ';' => return (Some(offset), had_code, in_string),
             _ => {
                 if !ch.is_whitespace() {
                     had_code = true;
                 }
-                i += 1;
             }
         }
     }
