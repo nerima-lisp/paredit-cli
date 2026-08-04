@@ -7,6 +7,7 @@
 use paredit_core_lint_engine::LintResult;
 
 use crate::one_step_arithmetic::domain::examine_form;
+use crate::support::is_hard_quoted_at;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
 use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
@@ -46,6 +47,17 @@ impl LintRule for Rule {
         let mut items = Vec::new();
         examine_form(view, &mut arithmetic_form_count, &mut items);
         for item in items {
+            // This rule is `Fixable`, so a finding inside quoted data is not
+            // merely noise: applying the fix would rewrite `'(+ n 1)` — the
+            // *expected* value of a test asserting what `1+` expands to, or a
+            // program held as data for a macroexpander — into `'(1+ n)` and
+            // invert the assertion. Asked only once a finding exists, so
+            // ordinary code never reaches `root_view()`. A quasiquoted
+            // `` `(+ ,x 1) `` is a template that becomes real arithmetic, and
+            // stays reported.
+            if is_hard_quoted_at(context.tree(), item.span) {
+                continue;
+            }
             let span = item.span;
             let fix = {
                 // Rewrite as the unary shorthand: (+ x 1) -> (1+ x), (- x 1) -> (1- x).

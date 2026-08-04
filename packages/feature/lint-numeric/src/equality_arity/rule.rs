@@ -7,6 +7,7 @@
 use paredit_core_lint_engine::LintResult;
 
 use crate::equality_arity::domain::examine_call;
+use crate::support::is_hard_quoted_at;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
 use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
@@ -41,7 +42,7 @@ impl LintRule for Rule {
 
     fn check(
         &self,
-        _context: &RuleContext<'_>,
+        context: &RuleContext<'_>,
         view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
     ) -> LintResult<()> {
@@ -49,6 +50,17 @@ impl LintRule for Rule {
         let mut items = Vec::new();
         examine_call(view, &mut call_count, &mut items);
         for item in items {
+            // `examine_call` already declines a node carrying its *own* `'`, but
+            // the arity of a form nested inside an enclosing quote is just as
+            // meaningless: `'(cons (eql function) null)` is a type specifier
+            // SBCL writes throughout its own sources, and `(eql function)` there
+            // is a datum, not a one-argument call. Asked only once a finding
+            // exists, so ordinary code never reaches `root_view()`. A
+            // quasiquoted `` `(eql ,a ,b) `` is a template that becomes a real
+            // call, and stays reported.
+            if is_hard_quoted_at(context.tree(), item.span) {
+                continue;
+            }
             let span = item.span;
 
             sink.report(
