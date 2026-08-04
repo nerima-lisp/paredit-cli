@@ -133,6 +133,7 @@ paredit-feature-lint-condition-depth = { path = "packages/feature/lint-condition
 paredit-feature-lint-lfe-carp-depth = { path = "packages/feature/lint-lfe-carp-depth" }
 paredit-feature-lint-hy-depth = { path = "packages/feature/lint-hy-depth" }
 paredit-feature-lint-fennel-janet-depth = { path = "packages/feature/lint-fennel-janet-depth" }
+paredit-feature-lint-destructive-sequence = { path = "packages/feature/lint-destructive-sequence" }
 paredit-feature-lint-iteration-flow = { path = "packages/feature/lint-iteration-flow" }
 paredit-feature-lint-testing = { path = "packages/feature/lint-testing" }
 paredit-feature-lint-concurrency = { path = "packages/feature/lint-concurrency" }

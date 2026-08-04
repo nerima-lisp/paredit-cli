@@ -1482,6 +1482,12 @@
       "rule": "janet-unreachable-match-clause"
     },
     {
+      "category": "dead-code",
+      "count": 0,
+      "description": "a destructive sequence call whose result is discarded, on a variable the body then reads",
+      "rule": "discarded-destructive-sequence-result"
+    },
+    {
       "category": "conditions",
       "count": 0,
       "description": "a define-condition with an empty () supertype list, which defaults to condition, not error",
