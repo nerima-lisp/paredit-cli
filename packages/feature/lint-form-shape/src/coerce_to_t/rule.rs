@@ -43,12 +43,19 @@ const HEADS: [NormalizedHead; 1] = [NormalizedHead::new("coerce")];
 ///   SBCL refuses to read, a splicing unquote having no list to splice into
 ///   there. Verified against SBCL's reader rather than assumed.
 ///
-/// Keyed on the replacement's leading characters and not on the operand's
-/// `ReaderPrefix` list, because the parser labels `,.` — which splices exactly
-/// as `,@` does, and which `` ` `` rejects identically (also verified) — as
-/// `ReaderPrefix::Unquote`. That mislabelling is a real separate defect,
-/// recorded in PR #127; reading the text is what keeps this guard from
-/// inheriting it.
+/// Keyed on the replacement's leading characters rather than on the operand's
+/// `ReaderPrefix` list. When this guard was written the parser labelled `,.` as
+/// `ReaderPrefix::Unquote`, so an enum-keyed guard would have inherited that
+/// mislabel and let a `,.`-spliced operand through. PR #136 fixed the parser —
+/// `,.` is now a two-byte `UnquoteSplicing`, matching SBCL, which splices it
+/// exactly as `,@` and rejects `` `,.xs `` identically.
+///
+/// The text key is kept rather than switched to the enum: both are correct
+/// now, and matching the two spellings the *replacement* can start with is the
+/// more direct statement of what this guard is for. It also stays right if a
+/// caller hands us synthesised text — `ReaderPrefix::as_source()` spells
+/// `UnquoteSplicing` as `,@`, so the enum no longer distinguishes the author's
+/// two spellings at all.
 fn is_spliced_operand(operand: &str) -> bool {
     operand.starts_with(",@") || operand.starts_with(",.")
 }

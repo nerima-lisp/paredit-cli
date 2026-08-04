@@ -237,11 +237,13 @@ mod coerce_to_t_spliced_operand {
         );
     }
 
-    /// `,.` splices exactly as `,@` does and `` ` `` rejects it identically
-    /// (both verified against SBCL), but the parser labels it
-    /// `ReaderPrefix::Unquote` — a separate defect recorded in PR #127. A guard
-    /// written against the prefix enum rather than the replacement text would
-    /// inherit that mislabelling and corrupt this source.
+    /// `,.` splices exactly as `,@` does and `` ` `` rejects it identically,
+    /// both verified against SBCL. When this test was written the parser
+    /// labelled `,.` as `ReaderPrefix::Unquote`, so a guard written against the
+    /// enum rather than the replacement text would have inherited the mislabel
+    /// and corrupted this source. PR #136 fixed the parser, so the enum would
+    /// answer correctly today — this case is kept because it pins the
+    /// *behaviour*, which must hold whichever key the guard uses.
     #[test]
     fn an_unquote_dot_operand_under_a_backquote_is_declined() {
         assert_eq!(
