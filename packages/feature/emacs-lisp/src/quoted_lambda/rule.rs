@@ -18,6 +18,15 @@
 //! what the form *evaluates to* — a closure instead of a list — rather than
 //! only how it is spelled. That is the point of the rule, and a reader
 //! auditing an automated run should see the distinction.
+//!
+//! Which is exactly why the head alone is not enough to fire on. A quoted list
+//! whose first element is the symbol `lambda` is not necessarily a lambda
+//! expression, and GNU Emacs contains several that are not: `bind-key.el`,
+//! `cus-start.el`, `calc-map.el`, `elint.el` and `byte-opt.el` all write
+//! `(memq … '(lambda …))` against a list of *symbol names*. Dropping the quote
+//! there rewrites a membership test into a call, so two things are checked
+//! beyond the head — that the form has a lambda list, and that the quote is
+//! the only reader prefix on it.
 
 use paredit_core_lint_engine::LintResult;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
@@ -29,6 +38,42 @@ use paredit_core_lint_engine::rule::LintRule;
 use paredit_core_syntax::sexpr::{ExpressionKind, ExpressionView, ReaderPrefix};
 
 use crate::shared::atom_text;
+
+/// Whether `view` is the shape a lambda expression actually has.
+///
+/// A lambda expression's second element is its lambda list: a `(…)` list, or
+/// the atom `nil` for the argument-less spelling `(lambda nil …)`. A quoted
+/// list that merely *starts* with the symbol `lambda` need not have one, and
+/// in practice usually does not — `'(lambda function)` and
+/// `'(lambda calcFunc-lambda)` are symbol lists a `memq` searches, and
+/// `'(lambda)` is a one-element list of the symbol. GNU Emacs writes all
+/// three, and dropping the quote from any of them turns a membership test
+/// into a call.
+///
+/// So the lambda list is the discriminator, and it is a cheap one: the second
+/// child of a node the caller has already matched.
+fn has_a_lambda_list(view: &ExpressionView) -> bool {
+    match view.children.get(1) {
+        Some(second) => second.kind == ExpressionKind::List || atom_text(second) == Some("nil"),
+        None => false,
+    }
+}
+
+/// Whether the only reader prefix on the form is the quote this rule is about.
+///
+/// `reader_prefixes` is in source order, so `',(lambda …)` is
+/// `[Quote, Unquote]` and `''(lambda …)` is `[Quote, Quote]`. Only a lone
+/// `Quote` means what the rule claims:
+///
+/// - **`',(lambda …)`** — inside a backquote the unquote *evaluates* the
+///   lambda, so the quote applies to the resulting closure. Embedding a
+///   closure in a generated form this way is how `menu-bar.el` writes a
+///   `menu-item` `:enable` expression.
+/// - **`''(lambda …)`** and **`'#'(lambda …)`** — a second quote makes the
+///   whole thing data by construction; nothing here is going to be called.
+fn is_plainly_quoted(view: &ExpressionView) -> bool {
+    view.reader_prefixes.as_slice() == [ReaderPrefix::Quote]
+}
 
 pub const META: RuleMeta = RuleMeta::new(
     "elisp-quoted-lambda",
@@ -49,8 +94,10 @@ pub const META: RuleMeta = RuleMeta::new(
         "(mapcar (lambda (x) (+ x n)) xs)",
     )
     .with_caveat(
-        "A quoted list that merely starts with something else is not reported: the head must be \
-         the symbol `lambda`.",
+        "The head must be the symbol `lambda`, the form must have a lambda list, and the quote \
+         must be the only reader prefix. So `'(lambda function)` — a symbol list a `memq` \
+         searches — and `',(lambda () …)` — a closure spliced into a backquote — are both left \
+         alone.",
     ),
 );
 
@@ -76,11 +123,13 @@ impl LintRule for Rule {
         view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
     ) -> LintResult {
-        if view.kind != ExpressionKind::List || !view.reader_prefixes.contains(&ReaderPrefix::Quote)
-        {
+        if view.kind != ExpressionKind::List || !is_plainly_quoted(view) {
             return Ok(());
         }
         if view.children.first().and_then(atom_text) != Some("lambda") {
+            return Ok(());
+        }
+        if !has_a_lambda_list(view) {
             return Ok(());
         }
 
