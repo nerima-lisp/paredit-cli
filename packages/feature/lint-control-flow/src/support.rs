@@ -227,6 +227,15 @@ pub struct LexicalChain<'a> {
     /// Whether the target is unevaluated data (inside `'(…)`, `(quote …)`, or
     /// an unescaped `` `(…) ``) rather than code.
     pub unevaluated: bool,
+    /// Whether the target is inside a *hard* quote — `'(…)` or `(quote …)` —
+    /// as opposed to a quasiquote template.
+    ///
+    /// The half of [`unevaluated`](Self::unevaluated) that a *rewrite* may act
+    /// on. A `` `(…) `` template is a template of code and its contents really
+    /// do get evaluated, so suppressing on the quasi half buys false negatives;
+    /// a `'(…)` list is data in every expansion, so a rewrite of its contents
+    /// is always a change to the program's data.
+    pub hard_quoted: bool,
 }
 
 impl<'a> LexicalChain<'a> {
@@ -277,6 +286,7 @@ pub fn with_lexical_chain<R>(
     Some(f(&LexicalChain {
         nodes,
         unevaluated: state.is_data(),
+        hard_quoted: state.hard,
     }))
 }
 
@@ -291,6 +301,25 @@ pub fn with_lexical_chain<R>(
 #[must_use]
 pub fn is_unevaluated_at(tree: &SyntaxTree, target: ByteSpan) -> bool {
     with_lexical_chain(tree, target, |chain| chain.unevaluated).unwrap_or(false)
+}
+
+/// Whether the node at `target` sits inside a hard quote — `'(…)` or
+/// `(quote …)` — and is therefore literal data in every expansion.
+///
+/// The guard a *rewriting* rule wants, where [`is_unevaluated_at`] is the guard
+/// a *reporting* rule wants. The difference is the quasiquote: `` `(progn ,x) ``
+/// is a template whose `progn` really is emitted as code, so a rule that
+/// suppressed itself there would go quiet on the macro bodies it exists to
+/// read; `'(progn a b)` is a three-element list and rewriting it edits the
+/// program's data.
+///
+/// Costs one binary search over the top level plus one descent through the
+/// enclosing top-level form — never [`SyntaxTree::root_view`] — and is meant to
+/// be called only once a rule already holds a finding, so a file with no
+/// findings never pays for it.
+#[must_use]
+pub fn is_hard_quoted_at(tree: &SyntaxTree, target: ByteSpan) -> bool {
+    with_lexical_chain(tree, target, |chain| chain.hard_quoted).unwrap_or(false)
 }
 
 // ---------------------------------------------------------------------------
@@ -822,6 +851,62 @@ pub fn direct_tags(view: &ExpressionView) -> Vec<(Tag, ByteSpan)> {
         .filter(|child| child.children.is_empty() && !is_reader_conditional(child))
         .filter_map(|child| Tag::read(child).map(|tag| (tag, child.span)))
         .collect()
+}
+
+/// Runs one rule end to end through the real lint engine and returns, per
+/// finding, its message and the source that applying its fix produces.
+///
+/// A domain test cannot see either of the two things that actually broke these
+/// rules on real code. It cannot catch a wrong [`HeadFilter::Heads`] list — a
+/// rule that declares the wrong head compiles, passes every domain test, and is
+/// never invoked. And it cannot catch a fix whose *span* is wrong, because the
+/// domain never applies one: a replacement that starts one byte early deletes
+/// the form's reader prefix, and only the spliced source shows it. So this
+/// returns the rewritten text, not just the finding.
+///
+/// [`HeadFilter::Heads`]: paredit_core_lint_engine::model::HeadFilter::Heads
+#[cfg(test)]
+#[must_use]
+pub fn run_rule_fixed(
+    entries: &'static [paredit_core_lint_engine::rule::RuleEntry],
+    source: &str,
+) -> Vec<(String, String)> {
+    use paredit_core_lint_engine::engine::{build_head_index, collect_lint_outcomes};
+    use paredit_core_lint_engine::policy::RuleSelection;
+    use paredit_core_lint_engine::rule::RuleCatalog;
+    use paredit_core_syntax::dialect::Dialect;
+
+    let catalog = RuleCatalog::new(entries);
+    let index = build_head_index(catalog);
+    let tree = SyntaxTree::parse_with_dialect(source, Dialect::CommonLisp).expect("parse");
+    collect_lint_outcomes(
+        catalog,
+        &index,
+        std::path::Path::new("app.lisp"),
+        Dialect::CommonLisp,
+        &tree,
+        source,
+        RuleSelection::All,
+    )
+    .expect("lint pass")
+    .into_iter()
+    .map(|outcome| {
+        let (finding, fix) = outcome.into_parts();
+        let mut fixed = source.to_owned();
+        if let Some(fix) = fix {
+            // Highest offset first, so an earlier edit's span stays valid.
+            let mut edits: Vec<_> = fix.replacements().collect();
+            edits.sort_by_key(|edit| std::cmp::Reverse(edit.span().start().get()));
+            for edit in edits {
+                fixed.replace_range(
+                    edit.span().start().get()..edit.span().end().get(),
+                    edit.text(),
+                );
+            }
+        }
+        (finding.message, fixed)
+    })
+    .collect()
 }
 
 #[cfg(test)]

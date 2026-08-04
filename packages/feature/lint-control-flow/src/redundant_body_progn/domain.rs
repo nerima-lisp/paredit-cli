@@ -57,9 +57,27 @@ fn body_start(head: &str) -> Option<usize> {
     }
 }
 
-/// Whether `view` is a `(progn …)` form.
+/// Whether `view` is a `(progn …)` form *in body position* — a bare one,
+/// carrying no reader prefix of its own.
+///
+/// The prefix test is not a refinement of the head test, it is half of the
+/// premise. `(defmacro m (x) `(progn (f ,x) (g ,x)))` has a `progn` sitting
+/// where `body_start` expects a body form, but that progn is the macro's
+/// *output*, not its body: it is the one form the macro has to return, and the
+/// two calls under it are emitted, not evaluated here. Splicing it away leaves
+/// a macro that evaluates `(f x)` and `(g x)` at expansion time and returns the
+/// second — and, because the backquote goes with the spliced-out wrapper, one
+/// whose remaining `,x` is a comma outside any backquote, which no longer
+/// reads. `'(progn a b)` in the same position is a literal three-element list
+/// and splicing rewrites the data.
+///
+/// Neither is a body progn, and both are exactly what this rule is otherwise
+/// most likely to hit: `` `(progn …) `` is the standard shape of a multi-form
+/// macro expansion.
 fn is_progn(view: &ExpressionView) -> bool {
-    is_paren_list(view) && list_head(view).is_some_and(|head| head.eq_ignore_ascii_case("progn"))
+    view.reader_prefixes.is_empty()
+        && is_paren_list(view)
+        && list_head(view).is_some_and(|head| head.eq_ignore_ascii_case("progn"))
 }
 
 #[derive(Debug, Clone)]
