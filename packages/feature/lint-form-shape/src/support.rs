@@ -250,6 +250,90 @@ pub fn is_unevaluated_at(tree: &SyntaxTree, target: ByteSpan) -> bool {
     quote_state_at(tree, target).is_data()
 }
 
+/// Whether the node at `target` sits inside a hard quote — `'(…)` or
+/// `(quote …)` — and is therefore literal data in every expansion.
+///
+/// The guard a *rewriting* rule wants, where [`is_unevaluated_at`] is the guard
+/// a *reporting* rule wants. The difference is the quasiquote, and it is not a
+/// stylistic preference: `` `(setf ,p (1+ ,p)) `` is a template whose `setf`
+/// really is emitted as code, so a rule that suppressed itself there would go
+/// quiet on exactly the macro bodies it exists to read. `'(setf x (1+ x))` is a
+/// three-element list of symbols, and rewriting it to `'(incf x)` edits a
+/// user's *data literal* — which is why the verdict is read on the `hard`
+/// counter alone, and never on [`QuoteState::is_data`].
+///
+/// The target's *own* reader prefixes count. A rule guarded by this rewrites
+/// the **contents** of the form it matched — `manual-incf` replaces
+/// `view.content_span`, which lies past that `'` — so the edited bytes are data
+/// even when nothing above the node quotes it. A rule that instead rewrote the
+/// node *including* its own prefix has to ask
+/// [`is_enclosing_hard_quoted_at`] instead, because the prefix it is deleting
+/// would otherwise answer the question about itself.
+///
+/// Costs one binary search over the top level plus one descent through the
+/// enclosing top-level form — never `SyntaxTree::root_view` — and is meant to
+/// be called only once a rule already holds a finding, so a file with no
+/// findings never pays for it.
+#[must_use]
+pub fn is_hard_quoted_at(tree: &SyntaxTree, target: ByteSpan) -> bool {
+    quote_state_at(tree, target).is_hard_quoted()
+}
+
+/// Whether the *context the node at `target` sits in* is hard-quoted, ignoring
+/// the node's own reader prefixes.
+///
+/// The guard for a rule that rewrites a node **including** its own prefix.
+/// `redundant-quote` is the whole reason this exists: its finding is a `'`, and
+/// asking [`is_hard_quoted_at`] there answers "yes" for every finding the rule
+/// can possibly make — the quote it is reporting is the quote it would read.
+/// Guarding it that way suppresses the rule entirely rather than only inside
+/// data. What settles `'5` → `5` is whether something *else* quotes it:
+/// inside `'(a '5)` the inner `'` is a datum, in `(f '5)` it is redundant
+/// sugar.
+#[must_use]
+pub fn is_enclosing_hard_quoted_at(tree: &SyntaxTree, target: ByteSpan) -> bool {
+    enclosing_quote_state_at(tree, target).is_hard_quoted()
+}
+
+/// The quote state established by everything *above* `target`, with `target`'s
+/// own reader prefixes deliberately not applied.
+///
+/// [`quote_state_at`] with the last fold left off. The two differ on exactly
+/// the nodes that carry a quote of their own, which is the set
+/// `redundant-quote` reports.
+#[must_use]
+pub fn enclosing_quote_state_at(tree: &SyntaxTree, target: ByteSpan) -> QuoteState {
+    let Some(index) = root_child_index_containing(tree, target) else {
+        return QuoteState::EVALUATED;
+    };
+    let Some(top_level) = root_child_view(tree, index) else {
+        return QuoteState::EVALUATED;
+    };
+    let mut view: &ExpressionView = &top_level;
+    // The state outside `view`: what `view`'s own prefixes have not yet been
+    // applied to. The root carries no prefix, so entering the top-level form
+    // that is plain evaluated code.
+    let mut outer = QuoteState::EVALUATED;
+
+    while view.span != target {
+        let state = outer.after_prefixes(view);
+        let inside = if is_quote_form(view) {
+            state.quoted()
+        } else {
+            state
+        };
+        // A span that names no node is judged by the innermost node that
+        // contains it, which is the honest answer for a span the caller
+        // synthesized rather than took from the tree.
+        let Some(child) = child_containing(view, target) else {
+            return inside;
+        };
+        outer = inside;
+        view = child;
+    }
+    outer
+}
+
 /// The full quote state at `target`, for the one rule that needs to tell a
 /// hard quote from a quasiquote rather than only "is this data".
 #[must_use]

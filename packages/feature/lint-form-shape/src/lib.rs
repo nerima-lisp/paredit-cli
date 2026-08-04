@@ -44,6 +44,9 @@ pub mod setq_non_variable;
 pub mod sharp_quoted_lambda;
 pub mod single_value_bind;
 pub mod support;
+
+#[cfg(test)]
+mod quote_guard_tests;
 pub mod the_arity;
 pub mod typep_predicate;
 pub mod values_list_of_list;

@@ -7,6 +7,7 @@
 use paredit_core_lint_engine::LintResult;
 
 use crate::redundant_quote::domain::examine_quote;
+use crate::support::is_enclosing_hard_quoted_at;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
 use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, RuleCategory, RuleFix, RuleMeta, Severity,
@@ -36,7 +37,7 @@ impl LintRule for Rule {
 
     fn check(
         &self,
-        _context: &RuleContext<'_>,
+        context: &RuleContext<'_>,
         view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
     ) -> LintResult<()> {
@@ -45,6 +46,15 @@ impl LintRule for Rule {
         examine_quote(view, &mut quoted_form_count, &mut items);
         for item in items {
             let span = item.span;
+            // The *enclosing* state, not this node's own: the finding here
+            // is a quote, so `is_hard_quoted_at` would answer "yes" for
+            // every finding this rule can make and silence it entirely.
+            // What settles `'5` → `5` is whether something else quotes it —
+            // inside `'(a '5)` the inner `'` is a datum, in `(f '5)` it is
+            // redundant sugar. Asked once per finding.
+            if is_enclosing_hard_quoted_at(context.tree(), span) {
+                continue;
+            }
             // The replacement is the quoted datum's own source, which the
             // message also names — so it is cloned here rather than moved out
             // of the item, which is the one place in the suite where the fix
