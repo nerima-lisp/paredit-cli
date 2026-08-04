@@ -87,7 +87,14 @@ impl LintRule for Rule {
 
             // (the TYPE form) is form: replace the whole declaration with the
             // inner form.
-            let fix = RuleFix::single(item.span, context_slice(item.form_span), hint);
+            //
+            // The fix region is `content_span`, not `span`: `span` starts at this
+            // form's *own* reader prefixes, so replacing it deletes them. A
+            // `` `(…) `` has to keep its backquote — without it the commas
+            // underneath are commas outside a backquote, and the file stops
+            // reading altogether. The two spans coincide on any form with no
+            // prefix, which is almost all code, so nothing else moves.
+            let fix = RuleFix::single(view.content_span, context_slice(item.form_span), hint);
 
             sink.report_fixed(span, message, fix);
         }

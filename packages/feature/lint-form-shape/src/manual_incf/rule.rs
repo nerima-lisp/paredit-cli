@@ -61,8 +61,14 @@ impl LintRule for Rule {
                     None => format!("({} {})", item.suggested_head, place),
                 };
 
+                // The fix region is `content_span`, not `span`: `span` starts at this
+                // form's *own* reader prefixes, so replacing it deletes them. A
+                // `` `(…) `` has to keep its backquote — without it the commas
+                // underneath are commas outside a backquote, and the file stops
+                // reading altogether. The two spans coincide on any form with no
+                // prefix, which is almost all code, so nothing else moves.
                 RuleFix::single(
-                    item.span,
+                    view.content_span,
                     text,
                     format!("Rewrite the setf as {}", item.suggested_head),
                 )

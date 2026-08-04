@@ -53,8 +53,14 @@ impl LintRule for Rule {
                     item.inner_spans.iter().map(|s| context_slice(*s)).collect();
                 let text = format!("(not ({} {}))", item.opposite, inners.join(" "));
 
+                // The fix region is `content_span`, not `span`: `span` starts at this
+                // form's *own* reader prefixes, so replacing it deletes them. A
+                // `` `(…) `` has to keep its backquote — without it the commas
+                // underneath are commas outside a backquote, and the file stops
+                // reading altogether. The two spans coincide on any form with no
+                // prefix, which is almost all code, so nothing else moves.
                 RuleFix::single(
-                    item.span,
+                    view.content_span,
                     text,
                     format!("Collapse the {} of negations via De Morgan", item.operator),
                 )

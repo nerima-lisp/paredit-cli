@@ -50,8 +50,14 @@ impl LintRule for Rule {
                 // (nthcdr 2 x) is (cddr x): rewrite to the named cdr accessor.
                 let text = format!("({} {})", item.accessor, context_slice(item.list_span));
 
+                // The fix region is `content_span`, not `span`: `span` starts at this
+                // form's *own* reader prefixes, so replacing it deletes them. A
+                // `` `(…) `` has to keep its backquote — without it the commas
+                // underneath are commas outside a backquote, and the file stops
+                // reading altogether. The two spans coincide on any form with no
+                // prefix, which is almost all code, so nothing else moves.
                 RuleFix::single(
-                    item.span,
+                    view.content_span,
                     text,
                     format!("Rewrite (nthcdr n …) as ({} …)", item.accessor),
                 )

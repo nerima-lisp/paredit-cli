@@ -117,7 +117,14 @@ pub fn examine_let(
         return;
     }
 
-    let prefix_span = ByteSpan::new(view.span.start(), binding.span.end());
+    // Anchored at `content_span`, not `span`: `span` starts at the form's *own*
+    // reader prefixes, so a region beginning there swallows them and the
+    // `(progn` written over it lands where the prefix used to be. Only the
+    // `(let ()` opening is being rewritten — the prefix in front of it belongs
+    // to the form as a whole and has to survive, or `` `(let () ,x) `` becomes
+    // `(progn ,x)`, a comma outside any backquote. The two spans coincide on a
+    // `let` with no prefix, which is almost all of them.
+    let prefix_span = ByteSpan::new(view.content_span.start(), binding.span.end());
     violations.push(EmptyLetItem {
         span: view.span,
         prefix_span,

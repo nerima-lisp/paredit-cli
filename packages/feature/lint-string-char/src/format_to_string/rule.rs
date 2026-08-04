@@ -54,8 +54,14 @@ impl LintRule for Rule {
                     context_slice(item.argument_span)
                 );
 
+                // The fix region is `content_span`, not `span`: `span` starts at this
+                // form's *own* reader prefixes, so replacing it deletes them. A
+                // `` `(…) `` has to keep its backquote — without it the commas
+                // underneath are commas outside a backquote, and the file stops
+                // reading altogether. The two spans coincide on any form with no
+                // prefix, which is almost all code, so nothing else moves.
                 RuleFix::single(
-                    item.span,
+                    view.content_span,
                     text,
                     format!("Rewrite (format nil … x) as ({} x)", item.replacement),
                 )
@@ -71,5 +77,43 @@ impl LintRule for Rule {
             );
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::support::run_rule_fixed;
+    use paredit_core_lint_engine::rule::RuleEntry;
+
+    static ENTRIES: [RuleEntry; 1] = [RuleEntry::new(&META, &RULE)];
+
+    /// The source each finding's fix produces, in report order.
+    fn fixed(source: &str) -> Vec<String> {
+        run_rule_fixed(&ENTRIES, source)
+            .into_iter()
+            .map(|(_, source)| source)
+            .collect()
+    }
+
+    #[allow(dead_code)]
+    fn count(source: &str) -> usize {
+        run_rule_fixed(&ENTRIES, source).len()
+    }
+
+    #[test]
+    fn still_fires_on_an_ordinary_unquoted_format() {
+        assert_eq!(
+            fixed("(defun f (i) (format nil \"~A\" i))\n"),
+            vec!["(defun f (i) (princ-to-string i))\n".to_owned()]
+        );
+    }
+
+    #[test]
+    fn a_quasiquoted_format_keeps_its_backquote() {
+        assert_eq!(
+            fixed("(defmacro m (i) `(format nil \"~A\" ,i))\n"),
+            vec!["(defmacro m (i) `(princ-to-string ,i))\n".to_owned()]
+        );
     }
 }

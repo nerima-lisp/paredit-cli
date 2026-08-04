@@ -98,6 +98,20 @@ pub fn examine_progn(
         if !is_progn(child) {
             continue;
         }
+        // A prefixed child is not a nested progn to splice away, it is a datum
+        // sitting in that slot. `` `(progn (f) `(progn (g) (h))) `` has an inner
+        // progn that is the *template* the outer one emits, not a body it
+        // sequences, and splicing it drops the backquote that makes the commas
+        // underneath legal — the file then stops reading. `'(progn a b)` in the
+        // same slot is a literal three-element list and splicing rewrites data.
+        //
+        // The test is on the *child*, deliberately not inside `is_progn`, which
+        // also decides the enclosing form: a `` `(progn (progn a b) c) `` really
+        // does contain a redundant nested progn, and suppressing the whole
+        // template would be a false negative.
+        if !child.reader_prefixes.is_empty() {
+            continue;
+        }
         let body = &child.children[1..];
         let inner_body_form_count = body.len();
         if inner_body_form_count >= 2 {
