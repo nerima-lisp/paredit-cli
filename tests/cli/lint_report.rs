@@ -311,8 +311,13 @@ fn cli_lint_list_rules_prints_the_catalog_without_files() {
         // branch's = 329, the whole suite's 345 less the same 16: none of the
         // 11 carries a tag, so the rise here is once more the full count, and
         // it is the full count across three *dialects* — 5 Racket, 2 Emacs
-        // Lisp, 4 Clojure — none of which the divisor distinguishes.
-        .stdout(predicate::str::contains("\"rule_count\": 331"))
+        // Lisp, 4 Clojure — none of which the divisor distinguishes. + 2 over
+        // the macro-authoring batch = 331. + both of this branch's
+        // `lint-condition-depth` rules = 333, the whole suite's 349 less the
+        // same 16: neither is tagged, so this is a plain +2. Note the divisor
+        // has now held at 16 for eight consecutive batches — it moves only
+        // when a batch ships something tagged `pedantic`.
+        .stdout(predicate::str::contains("\"rule_count\": 333"))
         .stdout(predicate::str::contains("\"self-assignment\""))
         .stdout(predicate::str::contains(
             "a setq/setf/psetq/psetf that assigns a place to itself",
@@ -1016,7 +1021,15 @@ fn cli_lint_list_rules_marks_severity() {
     // together this time: the suite's warning total rises by the same 6, to
     // 247, and 247 less the still-16 `pedantic` rules, all of them warnings,
     // = 231.
-    assert_eq!(warnings, 231);
+    //
+    // + 1 of this branch's 2 `lint-condition-depth` rules.
+    // `unwind-protect-cleanup-signals` is a `Severity::Warning`;
+    // `condition-type-datum-with-string-initarg` is a `Severity::Error`,
+    // because the odd-length case means the named condition is never
+    // signalled at all. Neither is `pedantic`, so again both subtractions
+    // move together: the suite's warning total rises by 1 to 248, and 248
+    // less the still-16 `pedantic` rules = 232.
+    assert_eq!(warnings, 232);
 }
 
 #[test]

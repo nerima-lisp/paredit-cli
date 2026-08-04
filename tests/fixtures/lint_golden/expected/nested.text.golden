@@ -194,6 +194,8 @@ rule	method-qualifier-typo	0
 rule	print-object-without-print-unreadable-object	0
 rule	slot-value-bypasses-accessor	0
 rule	cerror-missing-continue-format	0
+rule	condition-type-datum-with-string-initarg	0
+rule	unwind-protect-cleanup-signals	0
 rule	define-condition-empty-superclass-list	0
 rule	define-condition-missing-report-for-error-type	0
 rule	handler-bind-handler-returns-bare-value	0

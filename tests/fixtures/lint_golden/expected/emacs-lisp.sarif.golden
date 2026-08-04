@@ -2879,6 +2879,38 @@
               }
             },
             {
+              "fullDescription": {
+                "text": "When the datum of `error`/`signal`/`warn`/`cerror` is a symbol naming a condition type, the remaining arguments are alternating initarg names and values — not format arguments. A string in an initarg-name position is either an `odd-length initializer list` error, which means the named condition is never signalled, or, with an even argument count, an unknown initarg that is silently discarded. SBCL diagnoses neither at compile time."
+              },
+              "id": "condition-type-datum-with-string-initarg",
+              "properties": {
+                "category": "conditions",
+                "fixable": false,
+                "rationale": "When the datum of `error`/`signal`/`warn`/`cerror` is a symbol naming a condition type, the remaining arguments are alternating initarg names and values — not format arguments. A string in an initarg-name position is either an `odd-length initializer list` error, which means the named condition is never signalled, or, with an even argument count, an unknown initarg that is silently discarded. SBCL diagnoses neither at compile time.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a signalling form naming a condition type and then passing a string, which lands in an initarg-name position rather than being a message"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Cleanup forms run during the unwind, so an `error` signalled there replaces the condition that caused the unwind. The original is not chained or logged — the caller is told about the cleanup's failure and never hears about the one that started it."
+              },
+              "id": "unwind-protect-cleanup-signals",
+              "properties": {
+                "category": "conditions",
+                "fixable": false,
+                "rationale": "Cleanup forms run during the unwind, so an `error` signalled there replaces the condition that caused the unwind. The original is not chained or logged — the caller is told about the cleanup's failure and never hears about the one that started it.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "an unwind-protect cleanup form that calls error, replacing whatever condition was unwinding"
+              }
+            },
+            {
               "id": "define-condition-empty-superclass-list",
               "properties": {
                 "category": "conditions",
