@@ -168,11 +168,11 @@ pub fn read_baseline(document: &Value) -> Vec<BaselineEntry> {
                         required_arity: finding
                             .get("required_arity")
                             .and_then(Value::as_u64)
-                            .map(|arity| arity as usize),
+                            .and_then(|arity| usize::try_from(arity).ok()),
                         max_arity: finding
                             .get("max_arity")
                             .and_then(Value::as_u64)
-                            .map(|arity| arity as usize),
+                            .and_then(|arity| usize::try_from(arity).ok()),
                     })
                 })
                 .collect()
