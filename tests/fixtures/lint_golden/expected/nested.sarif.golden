@@ -3336,7 +3336,7 @@
               "id": "leftover-print-debug",
               "properties": {
                 "category": "suspicious",
-                "fixable": true,
+                "fixable": false,
                 "severity": "warning",
                 "tags": []
               },

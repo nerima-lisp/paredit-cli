@@ -322,7 +322,23 @@ const _: () = assert!(RULE_COUNT == 358);
 // rules decline for the same reason: an accumulator has to be introduced
 // somewhere, and a timer handle has to be stored in a place the rule cannot
 // name.
-const _: () = assert!(fixable_count() == 106);
+//
+// And this branch moves it down by 1, to 105: `leftover-print-debug` gives up
+// `Fixability::Fixable`. Its fix analysis was sound as far as it went -- it
+// only offered a deletion when the call was a top-level form or a non-last
+// implicit-progn body form, and `OperatorScope` withheld the fix when the head
+// was locally shadowed, which together prove the removal cannot change the
+// body's *value*. What it cannot prove is that the call was not the program's
+// *output*, and that is the whole defect: over 8,959 deduplicated files, 85 of
+// 86 sampled fixable findings were false positives, and `fix apply` deleted 987
+// `(message ...)` calls from Emacs's own source -- including
+// `auth-source.el`'s only confirmation that credentials had been written --
+// while the reader read all 417 files before and after. Narrowing the head list
+// was not available: for five of the eight dialects in scope the offending head
+// is the only head modelled, so narrowing is deleting the dialect. Gating the
+// fix to Common Lisp was not available either -- it was the stratum measured
+// worst, at 14 of 14.
+const _: () = assert!(fixable_count() == 105);
 // 164 (through PR #82) + 31 of this branch's 37 rules. The other 6 are
 // `Severity::Error`: `when-unless-implicit-nil-misused` and the five
 // `lint-safety` rules that report an exploitable defect rather than a risk —

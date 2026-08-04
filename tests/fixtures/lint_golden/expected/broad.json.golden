@@ -1797,7 +1797,7 @@
     },
     {
       "category": "suspicious",
-      "fixable": true,
+      "fixable": false,
       "id": "leftover-print-debug/8410f5d691961e8d/0",
       "message": "print is a leftover debug-print call",
       "path": "broad.lisp",
