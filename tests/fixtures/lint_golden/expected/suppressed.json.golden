@@ -1213,6 +1213,18 @@
       "rule": "unwind-protect-cleanup-signals"
     },
     {
+      "category": "malformed",
+      "count": 0,
+      "description": "a module-qualified call in a `when` guard that Erlang does not permit",
+      "rule": "lfe-illegal-guard-call"
+    },
+    {
+      "category": "dead-code",
+      "count": 0,
+      "description": "a clause that can never run because an earlier clause always matches",
+      "rule": "lfe-clause-after-catch-all"
+    },
+    {
       "category": "conditions",
       "count": 0,
       "description": "a define-condition with an empty () supertype list, which defaults to condition, not error",

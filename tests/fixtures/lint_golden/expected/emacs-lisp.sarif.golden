@@ -2911,6 +2911,38 @@
               }
             },
             {
+              "fullDescription": {
+                "text": "LFE inherits Erlang's guard restriction: a guard may only call a fixed set of BIFs and operators. `lfe_lint.erl` rejects anything else with `illegal guard expression`, and its `check_gexpr/4` permits a qualified call in exactly one case — module `erlang`, a function in the guard BIF set, at an arity that set allows. Every other module-qualified call in a guard is a compile error, not a style question. Verified against LFE 2.2.0 on OTP 27.3.4.15: `(lists:member x '(1 2))` and `(call 'lists 'member x '(1 2))` in a guard both fail to compile, while `(erlang:is_atom x)` compiles cleanly."
+              },
+              "id": "lfe-illegal-guard-call",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "rationale": "LFE inherits Erlang's guard restriction: a guard may only call a fixed set of BIFs and operators. `lfe_lint.erl` rejects anything else with `illegal guard expression`, and its `check_gexpr/4` permits a qualified call in exactly one case — module `erlang`, a function in the guard BIF set, at an arity that set allows. Every other module-qualified call in a guard is a compile error, not a style question. Verified against LFE 2.2.0 on OTP 27.3.4.15: `(lists:member x '(1 2))` and `(call 'lists 'member x '(1 2))` in a guard both fail to compile, while `(erlang:is_atom x)` compiles cleanly.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a module-qualified call in a `when` guard that Erlang does not permit"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "LFE matches clauses in order, so a clause written after one that matches everything can never run. The compiler says so itself: LFE 2.2.0 on OTP 27.3.4.15 reports \"this clause cannot match because a previous clause always matches\" for `case`, `receive` and matching `defun` alike. A catch-all is `_`, or a bare variable — LFE binds a fresh variable in a pattern rather than comparing against an existing binding, so a bare name always matches whatever else is in scope."
+              },
+              "id": "lfe-clause-after-catch-all",
+              "properties": {
+                "category": "dead-code",
+                "fixable": false,
+                "rationale": "LFE matches clauses in order, so a clause written after one that matches everything can never run. The compiler says so itself: LFE 2.2.0 on OTP 27.3.4.15 reports \"this clause cannot match because a previous clause always matches\" for `case`, `receive` and matching `defun` alike. A catch-all is `_`, or a bare variable — LFE binds a fresh variable in a pattern rather than comparing against an existing binding, so a bare name always matches whatever else is in scope.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a clause that can never run because an earlier clause always matches"
+              }
+            },
+            {
               "id": "define-condition-empty-superclass-list",
               "properties": {
                 "category": "conditions",
