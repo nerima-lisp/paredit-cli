@@ -258,6 +258,217 @@ mod engine_pass_tests {
     }
 }
 
+/// The `eq`/`eql` family's quote model, driven through the *real* engine.
+///
+/// These three rules guard on a **hard** quote only, which is a weaker guard
+/// than the float-precision rules' `is_unevaluated_at`, and the asymmetry is the
+/// whole point: `'((eq function "f_eq") …)` is a data table and `` `(eq ,val 0)
+/// `` is a macro template that becomes code. Both directions are pinned here,
+/// because a fix for one is the standard way to break the other.
+#[cfg(test)]
+mod eq_family_quote_tests {
+    use std::path::Path;
+
+    use paredit_core_lint_engine::engine::{build_head_index, collect_lint_outcomes};
+    use paredit_core_lint_engine::policy::RuleSelection;
+    use paredit_core_lint_engine::rule::{RuleCatalog, RuleEntry};
+    use paredit_core_syntax::dialect::Dialect;
+    use paredit_core_syntax::sexpr::SyntaxTree;
+
+    static ENTRIES: [RuleEntry; 3] = [
+        RuleEntry::new(
+            &crate::eq_char_comparison::rule::META,
+            &crate::eq_char_comparison::rule::RULE,
+        ),
+        RuleEntry::new(
+            &crate::eq_number_comparison::rule::META,
+            &crate::eq_number_comparison::rule::RULE,
+        ),
+        RuleEntry::new(
+            &crate::eql_string_comparison::rule::META,
+            &crate::eql_string_comparison::rule::RULE,
+        ),
+    ];
+
+    fn fired(source: &str) -> Vec<&'static str> {
+        let catalog = RuleCatalog::new(&ENTRIES);
+        let index = build_head_index(catalog);
+        let tree = SyntaxTree::parse_with_dialect(source, Dialect::CommonLisp).expect("parse");
+        let mut names: Vec<&'static str> = collect_lint_outcomes(
+            catalog,
+            &index,
+            Path::new("t.lisp"),
+            Dialect::CommonLisp,
+            &tree,
+            source,
+            RuleSelection::All,
+        )
+        .expect("lint pass")
+        .into_iter()
+        .map(|outcome| outcome.into_parts().0.rule)
+        .collect();
+        names.sort_unstable();
+        names
+    }
+
+    // -- the rules still fire on real code (no over-suppression) -------------
+
+    /// The control. Without these passing, every assertion below is vacuous.
+    #[test]
+    fn each_rule_fires_on_an_unquoted_call() {
+        assert_eq!(
+            fired("(defun f (x) (eq x \"done\"))"),
+            vec!["eql-string-comparison"]
+        );
+        assert_eq!(
+            fired("(defun f (x) (eql x \"done\"))"),
+            vec!["eql-string-comparison"]
+        );
+        assert_eq!(
+            fired("(defun f (x) (eq x 42))"),
+            vec!["eq-number-comparison"]
+        );
+        assert_eq!(
+            fired("(defun f (x) (eq x #\\a))"),
+            vec!["eq-char-comparison"]
+        );
+    }
+
+    /// The genuine float defect this rule exists for, as SBCL's own
+    /// `cross-float.lisp:28` spells it. Dropping to zero findings on the corpus
+    /// would mean this stopped working.
+    #[test]
+    fn a_negative_zero_float_comparison_is_still_reported() {
+        assert_eq!(
+            fired("(defun f (flonum) (eq flonum -0.0f0))"),
+            vec!["eq-number-comparison"]
+        );
+        assert_eq!(
+            fired("(defun f (flonum) (eq flonum -0.0d0))"),
+            vec!["eq-number-comparison"]
+        );
+    }
+
+    /// A quasiquoted macro template really does become code, so it must keep
+    /// firing. This is the false *negative* that suppressing `quasi` would
+    /// introduce — the shape of `hashset.lisp`'s `` `(eq ,val 0) ``.
+    #[test]
+    fn a_quasiquoted_macro_template_still_fires() {
+        assert_eq!(fired("`(eq ,val 0)"), vec!["eq-number-comparison"]);
+        assert_eq!(fired("`(eq ,name \"done\")"), vec!["eql-string-comparison"]);
+        assert_eq!(fired("`(eq ,ch #\\a)"), vec!["eq-char-comparison"]);
+    }
+
+    /// A quasiquote with no unquote at all is still a template that becomes
+    /// code, and is deliberately *not* suppressed.
+    #[test]
+    fn a_quasiquote_without_an_unquote_still_fires() {
+        assert_eq!(fired("`(eq x \"done\")"), vec!["eql-string-comparison"]);
+    }
+
+    /// A `defmacro` body is ordinary code until something quotes it.
+    #[test]
+    fn a_call_in_an_unquoted_defmacro_body_still_fires() {
+        assert_eq!(
+            fired("(defmacro m (x) (when (eq x \"done\") (error \"no\")))"),
+            vec!["eql-string-comparison"]
+        );
+        assert_eq!(
+            fired("(defmacro m (x) `(if ,(eq x \"done\") 1 2))"),
+            vec!["eql-string-comparison"]
+        );
+    }
+
+    // -- hard-quoted data is not a call --------------------------------------
+
+    /// The measured false positive: mgl-pax's HyperSpec index table, whose rows
+    /// are `(symbol locative filename)` triples inside one `'(…)`.
+    #[test]
+    fn a_hard_quoted_data_table_yields_nothing() {
+        assert_eq!(
+            fired(
+                "(defparameter *hyperspec-definitions*\n  '((eq function \"f_eq\")\n    (eql function \"f_eql\")\n    (eql type \"t_eql\")))"
+            ),
+            Vec::<&str>::new()
+        );
+    }
+
+    /// The other measured false positive: an opcode-to-runtime alist, whose
+    /// entries are dotted pairs inside one `'(…)`.
+    #[test]
+    fn a_hard_quoted_dotted_alist_entry_yields_nothing() {
+        assert_eq!(
+            fired("(dolist (entry '((eql . \"RT-EQL\") (equal . \"RT-EQUAL\")))\n  (use entry))"),
+            Vec::<&str>::new()
+        );
+    }
+
+    #[test]
+    fn no_rule_fires_on_a_hard_quoted_form() {
+        for source in ["'(eq x \"done\")", "'(eq x 42)", "'(eq x #\\a)"] {
+            assert_eq!(fired(source), Vec::<&str>::new(), "{source}");
+        }
+    }
+
+    #[test]
+    fn no_rule_fires_inside_a_long_hand_quote_form() {
+        assert_eq!(fired("(quote (eq x \"done\"))"), Vec::<&str>::new());
+        assert_eq!(fired("(quote (eq x 42))"), Vec::<&str>::new());
+    }
+
+    /// A comma inside a *hard* quote is a literal comma in a literal list, so
+    /// everything under it stays data. This is the shape a single `i32` depth
+    /// counter gets wrong, and it is why `hard` is a `bool` that never clears.
+    #[test]
+    fn no_rule_fires_on_a_comma_inside_a_hard_quote() {
+        assert_eq!(fired("'(a ,(eq x \"done\"))"), Vec::<&str>::new());
+        assert_eq!(fired("'(a ,(eq x 42))"), Vec::<&str>::new());
+    }
+
+    /// A node several levels inside a quote is still data.
+    #[test]
+    fn no_rule_fires_deep_inside_a_quoted_list() {
+        assert_eq!(fired("'(a (b (c (eq x \"done\"))))"), Vec::<&str>::new());
+    }
+
+    // -- a one-argument form is not a comparison ------------------------------
+
+    /// trivia's match patterns are one-argument by construction:
+    /// `(is-match #\a (eq #\a))` reads `(eq #\a)` as a *pattern*, not a call.
+    /// SBCL warns that a one-argument `eq` "wants exactly two", so whatever such
+    /// a form is, it is not the bug these rules are named for.
+    #[test]
+    fn a_one_argument_form_is_not_reported() {
+        for source in [
+            "(is-match #\\a (eq #\\a))",
+            "(is-match 1 (eq 1))",
+            "(is-match \"s\" (eql \"s\"))",
+        ] {
+            assert_eq!(fired(source), Vec::<&str>::new(), "{source}");
+        }
+    }
+
+    /// The arity guard must not swallow the two-argument call it sits next to.
+    #[test]
+    fn the_arity_guard_leaves_a_two_argument_call_alone() {
+        assert_eq!(
+            fired("(progn (eq #\\a) (eq ch #\\a))"),
+            vec!["eq-char-comparison"]
+        );
+    }
+
+    // -- string literals ------------------------------------------------------
+
+    /// A string is one atom, so nothing spelled inside one is ever a form.
+    #[test]
+    fn no_rule_fires_on_a_defect_spelled_inside_a_string_literal() {
+        assert_eq!(
+            fired("(format nil \"(eq x \\\"done\\\")\")"),
+            Vec::<&str>::new()
+        );
+    }
+}
+
 /// The false-positive sweep: realistic *correct* numeric code must produce no
 /// findings at all, and the same code with the defects introduced must produce
 /// exactly the expected ones.

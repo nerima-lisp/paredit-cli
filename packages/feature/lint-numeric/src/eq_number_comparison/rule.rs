@@ -7,6 +7,7 @@
 use paredit_core_lint_engine::LintResult;
 
 use crate::eq_number_comparison::domain::{NumberEvidence, examine_comparison};
+use crate::support::is_hard_quoted_at;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
 use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
@@ -59,6 +60,13 @@ impl LintRule for Rule {
         let mut items = Vec::new();
         examine_comparison(view, &is_number, &mut comparison_form_count, &mut items);
         for item in items {
+            // Asked only once a finding exists, so a file with no `eq` against
+            // a number never reaches `root_view()` at all. `'((eq 1 x) …)` is a
+            // data row; a quasiquoted `` `(eq ,val 0) `` is a macro template
+            // that becomes code, and stays reported.
+            if is_hard_quoted_at(context.tree(), item.span) {
+                continue;
+            }
             let span = item.span;
             let fix = {
                 RuleFix::single(

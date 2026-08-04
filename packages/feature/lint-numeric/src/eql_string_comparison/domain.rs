@@ -100,6 +100,16 @@ pub fn examine_comparison(
     }
     *comparison_form_count += 1;
 
+    // A comparison needs both operands. `(eql "a_eql")` is a row in a data
+    // table or a one-argument pattern in a match DSL such as trivia's
+    // `(is-match #\a (eql #\a))`, and SBCL already warns that `eq` "is called
+    // with one argument, but wants exactly two" — so whatever a one-argument
+    // form is, it is not the bug this rule is named for. Counted in the
+    // denominator either way: it *is* an `eq`/`eql` form that was scanned.
+    if view.children.len() < 3 {
+        return;
+    }
+
     // Report the first string-literal argument (after the operator); a call
     // with two string literals is still one bug, not two.
     if let Some(literal) = view
@@ -266,6 +276,16 @@ mod tests {
         let (_, violations) = comparisons("(EQ x \"root\")");
         assert_eq!(violations[0].kind(), "eq");
         assert_eq!(violations[0].operator, "EQ");
+    }
+
+    /// A one-argument form is not a comparison — trivia spells patterns that
+    /// way, and SBCL warns that `eq` "wants exactly two" — but it *is* an
+    /// `eq`/`eql` form that was scanned, so the denominator still counts it.
+    #[test]
+    fn a_one_argument_form_is_counted_but_not_flagged() {
+        let (comparison_form_count, violations) = comparisons("(eql \"a_eql\")");
+        assert_eq!(comparison_form_count, 1);
+        assert!(violations.is_empty());
     }
 
     #[test]

@@ -7,6 +7,7 @@
 use paredit_core_lint_engine::LintResult;
 
 use crate::eq_char_comparison::domain::{CharacterEvidence, examine_comparison};
+use crate::support::is_hard_quoted_at;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
 use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
@@ -59,6 +60,13 @@ impl LintRule for Rule {
         let mut items = Vec::new();
         examine_comparison(view, &is_character, &mut comparison_form_count, &mut items);
         for item in items {
+            // Asked only once a finding exists, so a file with no `eq` against
+            // a character never reaches `root_view()` at all. `'((eq #\a) …)`
+            // is a data row; a quasiquoted template that becomes code is not,
+            // and stays reported.
+            if is_hard_quoted_at(context.tree(), item.span) {
+                continue;
+            }
             let span = item.span;
             let fix = {
                 RuleFix::single(

@@ -148,6 +148,15 @@ pub fn examine_comparison(
     }
     *comparison_form_count += 1;
 
+    // A comparison needs both operands. `(eq 1)` is a one-argument pattern in a
+    // match DSL such as trivia's `(is-match 1 (eq 1))`, and SBCL already warns
+    // that `eq` "is called with one argument, but wants exactly two" — so
+    // whatever it is, it is not the bug this rule is named for. Counted in the
+    // denominator either way: it *is* an `eq` form that was scanned.
+    if view.children.len() < 3 {
+        return;
+    }
+
     // Report the first numeric argument (after the operator); a call with two
     // numbers is still one bug, not two. A literal is looked for across every
     // argument before the type context is asked about any, so a call that has

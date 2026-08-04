@@ -7,6 +7,7 @@
 use paredit_core_lint_engine::LintResult;
 
 use crate::eql_string_comparison::domain::examine_comparison;
+use crate::support::is_hard_quoted_at;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
 use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
@@ -36,7 +37,7 @@ impl LintRule for Rule {
 
     fn check(
         &self,
-        _context: &RuleContext<'_>,
+        context: &RuleContext<'_>,
         view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
     ) -> LintResult<()> {
@@ -44,6 +45,12 @@ impl LintRule for Rule {
         let mut items = Vec::new();
         examine_comparison(view, &mut comparison_form_count, &mut items);
         for item in items {
+            // Asked only once a finding exists, so a file with no `eq`/`eql`
+            // against a string never reaches `root_view()` at all.
+            // `'((eq function "f_eq") …)` is a table of data rows, not a call.
+            if is_hard_quoted_at(context.tree(), item.span) {
+                continue;
+            }
             let span = item.span;
 
             sink.report(
