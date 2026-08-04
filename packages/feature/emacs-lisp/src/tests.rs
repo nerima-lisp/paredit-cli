@@ -214,6 +214,105 @@ fn an_obsolete_cl_alias_is_reported_and_its_replacement_named() {
 }
 
 #[test]
+fn every_obsolete_alias_is_still_reported_in_its_real_calling_shape() {
+    // The negative control for the two guards below: narrowing the rule must
+    // not have silenced any of the fourteen names in the form it is actually
+    // written in.
+    for body in [
+        "(defun f () (block done (return-from done 1)))",
+        "(defun f (x) (case x (1 'a) (t 'b)))",
+        "(defun f (x) (ecase x (1 'a)))",
+        "(defun f () (do ((i 0 (1+ i))) ((= i 3) i)))",
+        "(defun f () (do* ((i 0 (1+ i))) ((= i 3) i)))",
+        "(defun f () (loop for n from 1 to 3 collect n))",
+        "(defun f () (flet ((g () 1)) (g)))",
+        "(defun f () (labels ((g () 1)) (g)))",
+        "(defun f () (macrolet ((g () 1)) (g)))",
+        "(defun f () (symbol-macrolet ((g 1)) g))",
+        "(defun f (x) (letf (((car x) 1)) x))",
+        "(defun f (x) (letf* (((car x) 1)) x))",
+        "(defun f (x) (destructuring-bind (a b) x (list a b)))",
+        "(defun f (x) (multiple-value-bind (a b) x (list a b)))",
+    ] {
+        assert_eq!(
+            rules_for(&format!("{body}\n")),
+            ["elisp-obsolete-cl-alias"],
+            "missed {body}"
+        );
+    }
+}
+
+#[test]
+fn a_binding_pair_or_lambda_list_named_after_an_alias_is_not_a_call() {
+    // Every one of these is real GNU Emacs 31 code that the rule reported.
+    // None is evaluated as a call, so none can fail to load.
+    for body in [
+        // `help.el`, `markdown-ts-mode.el`: a `dolist` variable named `block`.
+        "(defun f (blocks) (dolist (block blocks) block))",
+        // `pcase.el`: a `dolist` variable named `case`.
+        "(defun f (cases) (dolist (case cases) case))",
+        // `sort.el`: a `let` binding named `do`.
+        "(defun f () (let (ll (do t)) (while do (setq do nil)) ll))",
+        // `xsd-regexp.el`: a `let` binding named `block`.
+        "(defun f (name) (let ((block (intern name))) block))",
+        // `mail-utils.el`: a `defun` parameter named `labels`.
+        "(defun mail-comma-list-regexp (labels) labels)",
+        // `pcase.el`: a `lambda` parameter named `case`.
+        "(defun f (cases) (mapcar (lambda (case) (car case)) cases))",
+        // `rmailkwd.el`: an arglist in a `declare-function`.
+        "(declare-function mail-comma-list-regexp \"mail-utils\" (labels))",
+    ] {
+        assert_eq!(rules_for(&format!("{body}\n")), [] as [&str; 0], "{body}");
+    }
+}
+
+#[test]
+fn a_named_let_recursion_named_after_an_alias_is_a_call_to_itself() {
+    // `byte-opt.el`, `bytecomp.el`, `package.el` and `oclosure.el` all write
+    // `(named-let loop …)` and then call `loop` with two arguments — which the
+    // arity guard cannot tell from `cl-loop`. Only the binding table can.
+    let body = "(defun f (args acc) \
+                (named-let loop ((args args) (acc acc)) \
+                (if args (loop (cdr args) acc) acc)))";
+    assert_eq!(rules_for(&format!("{body}\n")), [] as [&str; 0]);
+}
+
+#[test]
+fn a_first_argument_of_the_wrong_shape_is_not_the_macro() {
+    for body in [
+        // `do` and its relatives open with a *binding list*. `sort.el` writes
+        // `(let (ll (do t)) …)`, and `doctor.el` types `(do you know …)` at
+        // the user; neither first argument is one.
+        "(defun f () (do you know about this))",
+        "(defun f () (labels are not bindings))",
+        "(defun f () (destructuring-bind a b c))",
+        // `block` opens with a *name*, which is a symbol. `markdown-ts-mode.el`
+        // writes this exact `cond` clause, where `block` is a `let*` variable
+        // and the clause is its value, not a call.
+        "(defun f (block moved) \
+         (cond ((block (goto-char (cdr block)) (setq moved (1+ moved))))))",
+    ] {
+        assert_eq!(rules_for(&format!("{body}\n")), [] as [&str; 0], "{body}");
+    }
+}
+
+#[test]
+fn a_quoted_list_headed_by_an_alias_is_data() {
+    // `cl-macs.el` searches `'(do doing)` with `memq`; `doctor.el` types
+    // `'(do you know Stallman \?)` at the user. Neither is evaluated, so
+    // neither can fail to load. The third has the exact shape of a real
+    // `case` call and is stopped only by the quote.
+    for body in [
+        "(defun f (word) (memq word '(do doing)))",
+        "(defun f () (doctor-type '(do you know Stallman)))",
+        "(defun f (form) (equal form '(case x (1 a))))",
+        "(defun f (form) (equal form '(block done (return-from done 1))))",
+    ] {
+        assert_eq!(rules_for(&format!("{body}\n")), [] as [&str; 0], "{body}");
+    }
+}
+
+#[test]
 fn the_two_function_cell_aliases_say_that_the_replacement_differs() {
     // `cl-flet` is not a rename of `flet`: the old form rebound the function
     // cell for a dynamic extent, so a callee saw the replacement.
@@ -244,6 +343,63 @@ fn a_quoted_lambda_is_reported_and_a_sharp_quoted_one_is_not() {
     assert_eq!(
         rules_for("(defun f () (mapcar (lambda (n) n) xs))\n"),
         [] as [&str; 0]
+    );
+}
+
+#[test]
+fn a_quoted_symbol_list_starting_with_lambda_is_not_a_quoted_lambda() {
+    // GNU Emacs writes all four of these against lists of *symbol names*:
+    // `bind-key.el` and `byte-opt.el` search them with `memq`, and dropping
+    // the quote would rewrite the membership test into a call. What tells
+    // them apart from a lambda expression is the lambda list.
+    for body in [
+        "(defun f (e) (memq (car e) '(lambda function)))\n",
+        "(defun f (e) (memq (car e) '(lambda)))\n",
+        "(defun f (e) (memq (car e) '(lambda macro)))\n",
+        "(defun f (e) (memq (car e) '(lambda internal-make-closure length cons)))\n",
+    ] {
+        assert_eq!(rules_for(body), [] as [&str; 0], "reported on {body}");
+    }
+}
+
+#[test]
+fn a_lambda_list_is_what_makes_a_quoted_lambda_one() {
+    // The negative control for the check above: each of these *does* have a
+    // lambda list, so narrowing the rule must not have silenced it. `nil` is
+    // the argument-less spelling and is a lambda list too.
+    for body in [
+        "(defun f () (mapcar '(lambda (n) n) xs))\n",
+        "(defun f () (mapcar '(lambda () 1) xs))\n",
+        "(defun f () (mapcar '(lambda nil 1) xs))\n",
+        "(defun f () (mapcar '(lambda (a &optional b) (list a b)) xs))\n",
+    ] {
+        assert_eq!(rules_for(body), ["elisp-quoted-lambda"], "missed {body}");
+    }
+}
+
+#[test]
+fn a_quote_that_is_not_the_only_reader_prefix_is_not_reported() {
+    // `',(lambda …)` inside a backquote is `menu-bar.el`'s idiom for putting a
+    // real closure into a generated form: the unquote evaluates the lambda, so
+    // the quote applies to the closure. A second quote, or a `#'`, makes the
+    // form data by construction.
+    for body in [
+        "(defun f () `(funcall ',(lambda () t)))\n",
+        "(defun f () (equal x ''(lambda () t)))\n",
+        "(defun f () (equal x '#'(lambda () t)))\n",
+    ] {
+        assert_eq!(rules_for(body), [] as [&str; 0], "reported on {body}");
+    }
+}
+
+#[test]
+fn a_quoted_lambda_inside_a_backquote_is_still_reported() {
+    // The negative control for the prefix check: a lone quote is still a lone
+    // quote inside a template, and this is the real defect the rule exists
+    // for -- the generated code will contain a list, not a closure.
+    assert_eq!(
+        rules_for("(defmacro m () `(mapcar '(lambda (n) n) xs))\n"),
+        ["elisp-quoted-lambda"]
     );
 }
 

@@ -907,6 +907,7 @@ name = "paredit-feature-emacs-lisp"
 version = "1.4.0"
 dependencies = [
  "paredit-core-lint-engine",
+ "paredit-core-semantics",
  "paredit-core-syntax",
 ]
 

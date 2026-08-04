@@ -12,6 +12,9 @@ repository.workspace = true
 [dependencies]
 paredit-core-syntax = { path = "../../core/syntax" }
 paredit-core-lint-engine = { path = "../../core/lint-engine" }
+# For `NodeKey`, which is how `elisp-obsolete-cl-alias` asks the binding table
+# whether a head resolves to a local binding rather than to the removed macro.
+paredit-core-semantics = { path = "../../core/semantics" }
 
 # Mandatory: without it this package silently opts out of the workspace lint
 # table, including `unsafe_code = "deny"`, with no error at all.
