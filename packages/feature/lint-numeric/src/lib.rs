@@ -763,3 +763,155 @@ mod corpus_sweep_tests {
         );
     }
 }
+
+/// The quote model of the two rules whose findings a nested `'` makes
+/// meaningless, driven through the *real* engine.
+///
+/// Both guard on a **hard** quote only, which is weaker than the float-precision
+/// rules' `is_unevaluated_at`, and the asymmetry is the whole point. Measured
+/// over 5,506 Common Lisp files: `equality-arity` reported 674 findings inside a
+/// hard quote — a third of its output, nearly all of them `(eql x)` *type
+/// specifiers* in `'(cons (eql function) null)` — and `one-step-arithmetic`
+/// reported 163, several of them the expected value of a test asserting what
+/// `1+` expands to, which its auto-fix would have rewritten into the assertion's
+/// own negation.
+///
+/// Every suppression below is paired with a control proving the rule still fires
+/// on the same shape as code, because over-suppression is the standard way to
+/// "fix" a false positive and buy a false negative instead.
+#[cfg(test)]
+mod arity_and_shorthand_quote_tests {
+    use std::path::Path;
+
+    use paredit_core_lint_engine::engine::{build_head_index, collect_lint_outcomes};
+    use paredit_core_lint_engine::policy::RuleSelection;
+    use paredit_core_lint_engine::rule::{RuleCatalog, RuleEntry};
+    use paredit_core_syntax::dialect::Dialect;
+    use paredit_core_syntax::sexpr::SyntaxTree;
+
+    static ENTRIES: [RuleEntry; 2] = [
+        RuleEntry::new(
+            &crate::equality_arity::rule::META,
+            &crate::equality_arity::rule::RULE,
+        ),
+        RuleEntry::new(
+            &crate::one_step_arithmetic::rule::META,
+            &crate::one_step_arithmetic::rule::RULE,
+        ),
+    ];
+
+    fn fired(source: &str) -> Vec<&'static str> {
+        let catalog = RuleCatalog::new(&ENTRIES);
+        let index = build_head_index(catalog);
+        let tree = SyntaxTree::parse_with_dialect(source, Dialect::CommonLisp).expect("parse");
+        let mut names: Vec<&'static str> = collect_lint_outcomes(
+            catalog,
+            &index,
+            Path::new("t.lisp"),
+            Dialect::CommonLisp,
+            &tree,
+            source,
+            RuleSelection::All,
+        )
+        .expect("lint pass")
+        .into_iter()
+        .map(|outcome| outcome.into_parts().0.rule)
+        .collect();
+        names.sort_unstable();
+        names
+    }
+
+    // -- the controls: both rules still fire on code ------------------------
+
+    #[test]
+    fn a_misarity_equality_call_in_plain_code_is_still_reported() {
+        assert_eq!(fired("(defun f (x) (eql x))"), vec!["equality-arity"]);
+    }
+
+    #[test]
+    fn a_one_step_addition_in_plain_code_is_still_reported() {
+        assert_eq!(fired("(defun f (x) (+ x 1))"), vec!["one-step-arithmetic"]);
+    }
+
+    /// The false negative a `quasi`-suppressing guard would buy, and the test
+    /// that fails if this guard is ever "simplified" to `is_unevaluated_at`.
+    ///
+    /// SBCL spells this shape throughout — `` `(eq ,val 0) `` in `hashset.lisp`,
+    /// and the same in `srctran.lisp` and `ir1tran-lambda.lisp` — and a template
+    /// really does become code, so a quasiquoted ancestor must not suppress.
+    #[test]
+    fn a_quasiquoted_template_is_code_and_stays_reported() {
+        assert_eq!(fired("`(a (eql x))"), vec!["equality-arity"]);
+        assert_eq!(fired("`(a (+ x 1))"), vec!["one-step-arithmetic"]);
+    }
+
+    #[test]
+    fn a_defmacro_body_building_a_form_stays_reported() {
+        assert_eq!(
+            fired("(defmacro m (v) `(a (eql v)))"),
+            vec!["equality-arity"]
+        );
+        assert_eq!(
+            fired("(defmacro m (v) `(a (+ v 1)))"),
+            vec!["one-step-arithmetic"]
+        );
+    }
+
+    /// An unquote escapes back to code several levels down, so the guard must
+    /// not simply ask whether *any* ancestor was quoted.
+    ///
+    /// Only `one-step-arithmetic` can witness this: `equality-arity`'s own
+    /// `examine_call` has long declined any node carrying a reader prefix of its
+    /// own, so `,(eql x)` never reaches the guard added here.
+    #[test]
+    fn an_unquoted_form_inside_a_template_stays_reported() {
+        assert_eq!(fired("`(+ ,x 1)"), vec!["one-step-arithmetic"]);
+    }
+
+    // -- the suppressions ---------------------------------------------------
+
+    /// The shape that dominated the corpus: a quoted CLHS type specifier, in
+    /// which a one-argument `eql` is correct Common Lisp.
+    #[test]
+    fn a_quoted_type_specifier_is_data_and_is_not_reported() {
+        assert!(fired("(typep x '(cons (eql function) null))").is_empty());
+    }
+
+    #[test]
+    fn a_quoted_arithmetic_form_is_data_and_is_not_reported() {
+        assert!(fired("(assert-equal '(1+ n) (expand '(+ n 1)))").is_empty());
+    }
+
+    /// The long-hand `(quote …)` the reader also produces and macro output
+    /// spells out.
+    #[test]
+    fn a_long_hand_quote_form_is_data_below_its_head() {
+        assert!(fired("(quote (a (eql x)))").is_empty());
+        assert!(fired("(quote (a (+ x 1)))").is_empty());
+    }
+
+    /// The shape a single depth counter gets wrong: a comma inside a **hard**
+    /// quote is a literal comma in a literal list, not an escape back to code.
+    #[test]
+    fn a_comma_inside_a_hard_quote_stays_data() {
+        assert!(fired("'(a ,(eql x))").is_empty());
+        assert!(fired("'(a ,(+ x 1))").is_empty());
+    }
+
+    /// Depth is not the discriminator: nesting does not restore evaluation.
+    #[test]
+    fn a_deeply_nested_quoted_form_is_still_data() {
+        assert!(fired("'(a (b (c (eql x))))").is_empty());
+        assert!(fired("'(a (b (c (+ x 1))))").is_empty());
+    }
+
+    /// A quoted sibling must not silence a real finding in the same file.
+    #[test]
+    fn quoting_one_form_does_not_suppress_its_unquoted_neighbour() {
+        assert_eq!(fired("(list '(eql a) (eql b))"), vec!["equality-arity"]);
+        assert_eq!(
+            fired("(list '(+ a 1) (+ b 1))"),
+            vec!["one-step-arithmetic"]
+        );
+    }
+}
