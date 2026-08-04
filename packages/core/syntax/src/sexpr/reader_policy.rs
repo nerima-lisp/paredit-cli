@@ -1104,6 +1104,7 @@ impl DialectReaderPolicy {
     fn classify_scheme(self, bytes: &[u8], pos: usize) -> Option<ReaderMacro> {
         let byte = *bytes.get(pos)?;
         let next = bytes.get(pos + 1).copied();
+        let third = bytes.get(pos + 2).copied();
         if byte == b'#' && next == Some(b';') {
             return Some(ReaderMacro::Discard { width: 2 });
         }
@@ -1116,12 +1117,9 @@ impl DialectReaderPolicy {
         if let Some(dispatch) = classify_numeric_dispatch(bytes, pos, false) {
             return Some(dispatch);
         }
-        if matches!(next, Some(b'u' | b'U'))
-            && bytes.get(pos + 2) == Some(&b'8')
-            && bytes.get(pos + 3) == Some(&b'(')
-        {
+        if let Some(width) = scheme_uniform_vector_width(bytes, pos) {
             return Some(ReaderMacro::MultiDatum {
-                width: 3,
+                width,
                 payload_forms: 1,
             });
         }
@@ -1141,15 +1139,71 @@ impl DialectReaderPolicy {
                 b'\\' | b't' | b'T' | b'f' | b'F' | b'b' | b'B' | b'o' | b'O' | b'd' | b'D' | b'x'
                 | b'X' | b'e' | b'E' | b'i' | b'I',
             ) => None,
-            // `#:mode` is a Racket keyword: a self-evaluating literal, and the
-            // spelling of every keyword argument in Racket's standard library.
-            // It reads as one atom, so it is not a reader macro at all.
-            Some(b':') if matches!(self.dialect, Dialect::Racket) => None,
+            // `#:mode` is a keyword: a self-evaluating literal that reads as
+            // one atom, so it is not a reader macro at all.
+            //
+            // This arm used to carry `if matches!(self.dialect,
+            // Dialect::Racket)`, which could never be true —
+            // `classify_reader_macro` reaches this function from its
+            // `Dialect::Scheme` arm alone, and Racket has had its own
+            // `classify_racket` since the split. So `#:` fell through to the
+            // refusal below and took the whole file with it. That one dead
+            // condition was **433 of 794 Scheme parse failures (54.5%)** over
+            // a 2356-file corpus, and **230 of Guile 2.2.7's own 240 (95.8%)**:
+            // `#:use-module`, `#:export` and `#:key` are how every Guile module
+            // header and every `define*` lambda list is spelled, so Guile's own
+            // tree parsed at 17.4%.
+            Some(b':') => None,
             // `#!fold-case`, `#!no-fold-case`, `#!eof`, `#!default`: R7RS
             // directives and their Guile/MIT extensions. A structural tool has
             // nothing to do with them beyond keeping them in the tree as
             // atoms, which is what `None` achieves.
             Some(b'!') => None,
+            // `#nil` is Guile's empty-list-and-false value, shared with its
+            // Emacs Lisp compatibility layer. It is one self-evaluating atom.
+            // Spelled out in full rather than accepting any `#n…` so that a
+            // genuinely unknown `#n` dispatch still refuses loudly.
+            Some(b'n') if bytes.get(pos + 1..pos + 4) == Some(b"nil".as_slice()) => None,
+            // `#'x`, `` #`x ``, `#,x`, `#,@x` — R6RS 4.3.5 lexical syntax for
+            // `syntax`, `quasisyntax`, `unsyntax` and `unsyntax-splicing`.
+            // Guile 2.2.7's own `read` accepts all four (confirmed by running
+            // it, not by reading the report), as do Chez and Chicken.
+            //
+            // `classify_racket`'s doc comment named these as Scheme's remaining
+            // gap and deferred them to "its own Scheme corpus audit"; this is
+            // that audit. The readings are byte-identical to Racket's, which is
+            // the point — the two dialects genuinely agree here, and the
+            // divergence that justified the split was elsewhere.
+            //
+            // `#'` keeps its child visible through `ReaderPrefix::Function`, so
+            // rename and every lint rule still see `x`. The other three become
+            // opaque `MultiDatum` forms rather than new `ReaderPrefix`
+            // variants: `ReaderPrefix` carries a fixed `as_source` spelling
+            // that three re-emission paths write back into source text, and
+            // `reader::apply_reader_prefix_context` matches it exhaustively
+            // across all 347 lint rules. Opaque is also the suppressing
+            // direction — a `` #`(…) `` template reads as inert data rather
+            // than as live code that could invent findings.
+            Some(b'\'') => prefix(ReaderPrefix::Function, 2),
+            Some(b'`') => Some(ReaderMacro::MultiDatum {
+                width: 2,
+                payload_forms: 1,
+            }),
+            // `#,@` is three bytes, not two: the `@` binds to the dispatch, and
+            // both spellings take exactly one following datum.
+            Some(b',') => Some(ReaderMacro::MultiDatum {
+                width: 2 + usize::from(third == Some(b'@')),
+                payload_forms: 1,
+            }),
+            // What is deliberately *not* here: `##name` (Gambit's namespaced
+            // identifiers, 257 failures), `#/re/` `#"str"` `#[char-set]`
+            // (Gauche, 68 between them) and `#{sym}#` (Guile's extended
+            // symbols, 3). Guile's reader rejects every one of them, so they
+            // are not Scheme — they are per-implementation extensions that
+            // `Dialect::Scheme` has no way to tell apart, and admitting them
+            // here would make this reader accept a language no implementation
+            // actually reads. They need a per-implementation flavour of
+            // `Dialect::Scheme`, which is a larger change than this one.
             _ => Some(ReaderMacro::UnsupportedDispatch { width: 1 }),
         }
     }
@@ -1165,11 +1219,12 @@ impl DialectReaderPolicy {
     /// parse is a file none of this workspace's commands can say anything
     /// about, so this capped every Racket lint rule at 60% of its corpus.
     ///
-    /// [`Self::classify_scheme`] is left byte-identical. Several of the forms
-    /// below — `#'`, `` #` ``, `#,`, `#,@` — are R6RS lexical syntax that Guile,
-    /// Chez and Chicken all accept, so Scheme has a real gap here too, but
-    /// closing it is a change to a *different* dialect's reader that needs its
-    /// own Scheme corpus audit rather than a rider on this one.
+    /// The split left [`Self::classify_scheme`] byte-identical at the time, and
+    /// flagged four forms below — `#'`, `` #` ``, `#,`, `#,@` — as R6RS lexical
+    /// syntax that Guile, Chez and Chicken all accept, so a real Scheme gap
+    /// deferred to "its own Scheme corpus audit". That audit has since been
+    /// done and those four now read the same way in both dialects; the tables
+    /// still differ everywhere else, which is what kept them separate.
     ///
     /// | source | reading | handled by |
     /// |---|---|---|
@@ -2044,6 +2099,63 @@ pub(crate) fn starts_with_lang_directive(bytes: &[u8], pos: usize) -> bool {
         && bytes
             .get(pos + LANG_DIRECTIVE.len())
             .is_some_and(u8::is_ascii_whitespace)
+}
+
+/// The width of the `#…` dispatch opening a Scheme uniform vector at `pos`.
+///
+/// One family, three specs. SRFI-4 defines `#u8(`, `#s8(`, `#u16(`, `#s16(`,
+/// `#u32(`, `#s32(`, `#u64(`, `#s64(`, `#f32(`, `#f64(` and Guile adds `#c32(`
+/// and `#c64(`; R6RS 4.3.4 spells the byte vector `#vu8(`; R7RS keeps only
+/// `#u8(`. Guile 2.2.7 reads every one of them — confirmed by feeding each
+/// spelling to its own `read` — so they are one grammar rather than twelve
+/// special cases, and writing them as a table is what stops `#u32(` and `#s8(`
+/// from each needing their own arm and being forgotten until a corpus finds
+/// them, which is exactly how they were found.
+///
+/// The trailing `(` is required, not assumed: `#u8` on its own is not a vector,
+/// so returning a width for it would glue the next unrelated datum onto a
+/// dispatch that never opened. Guile is stricter still — it *refuses* a bare
+/// `#f32`, because `f32` is a real tag whose `(` is missing — where this falls
+/// back to scanning an atom. That is the permissive direction, so it
+/// under-reports disagreement with the implementation rather than inventing
+/// structure the implementation does not see.
+fn scheme_uniform_vector_width(bytes: &[u8], pos: usize) -> Option<usize> {
+    if bytes.get(pos) != Some(&b'#') {
+        return None;
+    }
+    let (tag_pos, r6rs) = match bytes.get(pos + 1) {
+        Some(b'v' | b'V') => (pos + 2, true),
+        _ => (pos + 1, false),
+    };
+    let tag = bytes.get(tag_pos)?.to_ascii_lowercase();
+    let digits_start = tag_pos + 1;
+    let mut digits_end = digits_start;
+    while matches!(bytes.get(digits_end), Some(byte) if byte.is_ascii_digit()) {
+        digits_end += 1;
+    }
+    if bytes.get(digits_end) != Some(&b'(') {
+        return None;
+    }
+    let digits = bytes.get(digits_start..digits_end)?;
+    let widths: &[&[u8]] = if r6rs {
+        // `#vu8(` is R6RS's one and only `#v…` form; there is no `#vs16(`.
+        if tag != b'u' {
+            return None;
+        }
+        &[b"8".as_slice()]
+    } else {
+        match tag {
+            b'u' | b's' => &[
+                b"8".as_slice(),
+                b"16".as_slice(),
+                b"32".as_slice(),
+                b"64".as_slice(),
+            ],
+            b'f' | b'c' => &[b"32".as_slice(), b"64".as_slice()],
+            _ => return None,
+        }
+    };
+    widths.contains(&digits).then_some(digits_end - pos)
 }
 
 const fn classify_shared_prefix(

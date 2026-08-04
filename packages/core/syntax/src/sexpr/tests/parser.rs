@@ -3502,19 +3502,23 @@ fn racket_string_terminates_the_token_before_it() {
     }
 }
 
-/// Splitting Racket out of `classify_scheme` must leave Scheme byte-identical.
+/// Which Racket-only dispatch forms Scheme still refuses.
 ///
-/// Every form Racket gained above is still exactly as Scheme read it before —
-/// refused where it was refused, read where it was read. `#'`, `` #` ``, `#,`
-/// and `#,@` are R6RS lexical syntax that Guile, Chez and Chicken all accept,
-/// so this pins a *known gap* rather than an intended reading; closing it is a
-/// change to Scheme's reader needing its own Scheme corpus audit.
+/// This began as `scheme_reader_is_unchanged_by_the_racket_split`, pinning
+/// that the Racket split left Scheme byte-identical. Four entries have since
+/// moved out of the refusal list below and into
+/// [`scheme_reads_r6rs_syntax_quotation`]: `#'`, `` #` ``, `#,` and `#,@` are
+/// R6RS 4.3.5 lexical syntax, the old doc comment flagged them as a *known
+/// gap* awaiting "its own Scheme corpus audit", and that audit has now been
+/// done — Guile 2.2.7's own `read` accepts all four, and refusing them cost
+/// 23 files of a 2356-file corpus. They were moved rather than deleted: the
+/// list below is still the load-bearing claim that Scheme is not Racket.
+///
+/// Everything remaining is genuinely Racket-only, verified by feeding each
+/// spelling to Guile 2.2.7, which rejects every one.
 #[test]
-fn scheme_reader_is_unchanged_by_the_racket_split() {
+fn scheme_still_refuses_racket_only_dispatch() {
     for input in [
-        "(f #'x)",
-        "(f #`x)",
-        "(f #,x)",
         "(f #\"bytes\")",
         "(f #rx\"a\")",
         "(f #px\"a\")",
@@ -3550,6 +3554,192 @@ fn scheme_reader_is_unchanged_by_the_racket_split() {
             tree.root_view().children[0].children.len(),
             children,
             "{input}"
+        );
+    }
+}
+
+/// `#:keyword` is one atom in Scheme, which is what the dead guard prevented.
+///
+/// The arm reading `#:` used to be written `Some(b':') if matches!(self.dialect,
+/// Dialect::Racket)`, inside `classify_scheme` — a function
+/// `classify_reader_macro` only ever reaches from its `Dialect::Scheme` arm.
+/// The condition could not be true, so `#:` fell through to
+/// `UnsupportedDispatch` and failed the entire file.
+///
+/// That is not a rare spelling. `#:use-module`, `#:export` and `#:key` are how
+/// every Guile module header and every `define*` lambda list is written, so
+/// Guile 2.2.7's own source tree parsed at 17.4%. Over a 2356-file corpus of
+/// real Scheme it was 433 of 794 failures; fixing it took Scheme from 66.2% to
+/// 85.2% and Guile specifically from 17.4% to 97.2%.
+#[test]
+fn scheme_reads_a_keyword_as_one_atom() {
+    let tree = SyntaxTree::parse_with_dialect("(define-module (x) #:export (f))", Dialect::Scheme)
+        .expect("a Guile module header must parse");
+    let form = &tree.root_view().children[0];
+    assert_eq!(form.children.len(), 4, "head, (x), #:export, (f)");
+    assert_eq!(form.children[2].text.as_deref(), Some("#:export"));
+
+    // The keyword must not swallow what follows it, and must not be split.
+    let tree = SyntaxTree::parse_with_dialect("(f #:a #:b 1)", Dialect::Scheme).expect("valid");
+    let form = &tree.root_view().children[0];
+    assert_eq!(form.children.len(), 4);
+    assert_eq!(form.children[1].text.as_deref(), Some("#:a"));
+    assert_eq!(form.children[2].text.as_deref(), Some("#:b"));
+
+    // Racket keeps reading it too: the guard was dead, so deleting it changes
+    // nothing for the dialect it named.
+    let tree = SyntaxTree::parse_with_dialect("(f #:a 1)", Dialect::Racket).expect("valid");
+    assert_eq!(
+        tree.root_view().children[0].children[1].text.as_deref(),
+        Some("#:a")
+    );
+}
+
+/// R6RS 4.3.5 syntax quotation, and the widths each spelling consumes.
+///
+/// Guile 2.2.7's own `read` accepts all four; the readings here are
+/// byte-identical to `classify_racket`'s, which is the point — the dialects
+/// genuinely agree here and the divergence that justified the split was
+/// elsewhere. `#'` keeps its child visible through `ReaderPrefix::Function`
+/// so rename and the lint rules still see it; the other three are opaque,
+/// which is the suppressing direction rather than the finding-inventing one.
+#[test]
+fn scheme_reads_r6rs_syntax_quotation() {
+    for (input, children) in [
+        ("(f #'x)", 2usize),
+        ("(f #`x)", 2),
+        ("(f #,x)", 2),
+        ("(f #,@x)", 2),
+    ] {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::Scheme)
+            .unwrap_or_else(|error| panic!("{input}: {error}"));
+        assert_eq!(
+            tree.root_view().children[0].children.len(),
+            children,
+            "{input}"
+        );
+    }
+    // `#,@` is three bytes, not two, and the child count cannot show it: at
+    // width 2 the `#,` would take the atom `@x` as its one datum and the form
+    // would still have two children. Only the extent distinguishes them, so
+    // this asserts on the text rather than on the shape.
+    for (input, expected) in [("(f #,@x)", "#,@x"), ("(f #,x)", "#,x"), ("(f #`x)", "#`x")] {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::Scheme).expect("valid");
+        assert_eq!(
+            tree.root_view().children[0].children[1].text.as_deref(),
+            Some(expected),
+            "{input}"
+        );
+    }
+}
+
+/// The SRFI-4 / R6RS uniform vector family, and the boundaries of it.
+///
+/// `#u8(` was the only spelling admitted before, so `#u32(` and `#s8(` were
+/// refused and took their files with them. Guile 2.2.7 reads every accepted
+/// spelling below and rejects every refused one.
+#[test]
+fn scheme_reads_uniform_vectors() {
+    for input in [
+        "(f #u8(1 2))",
+        "(f #s8(1 2))",
+        "(f #u16(1 2))",
+        "(f #s16(1 2))",
+        "(f #u32(1 2))",
+        "(f #s32(1 2))",
+        "(f #u64(1 2))",
+        "(f #s64(1 2))",
+        "(f #f32(1.0))",
+        "(f #f64(1.0))",
+        "(f #c32(1.0))",
+        "(f #c64(1.0))",
+        // R6RS 4.3.4 spells the byte vector `#vu8(`.
+        "(f #vu8(1 2))",
+    ] {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::Scheme)
+            .unwrap_or_else(|error| panic!("{input}: {error}"));
+        assert_eq!(
+            tree.root_view().children[0].children.len(),
+            2,
+            "{input} is one vector, not two data"
+        );
+    }
+    for input in [
+        // A width outside the family, and a tag letter that has none.
+        "(f #u7(1))",
+        "(f #q8(1))",
+        // `#vu8` is the only `#v…` form: there is no `#vs16(`.
+        "(f #vs16(1))",
+        // The `(` is required, and a `[` is not it. Admitting a width here
+        // would consume a dispatch that never opened a vector.
+        "(f #u8[1 2])",
+    ] {
+        assert!(
+            SyntaxTree::parse_with_dialect(input, Dialect::Scheme).is_err(),
+            "{input} should be refused for Scheme"
+        );
+    }
+    // Two spellings where this reader and Guile 2.2.7 knowingly differ, both
+    // in the permissive direction. Pinned rather than left implicit, because
+    // discovering them by assuming was how this test first failed.
+    //
+    // `#f8(1)`: `f` is a uniform-vector tag but `8` is not one of its widths,
+    // so the family table declines and the `#f`/`#t` arm takes over, scanning
+    // `#f8` as one atom. Guile splits it into the boolean `#f` and the number
+    // `8`, giving four data where this gives three. That divergence predates
+    // the uniform-vector table — it belongs to the boolean arm, which no
+    // corpus file exercises this way — and the whole-corpus oracle diff showed
+    // it introduced no new disagreement.
+    //
+    // `#f32 x`: Guile *refuses* this, because `f32` is a real tag and its `(`
+    // is missing. Reading it as an atom accepts more than Guile does, which
+    // under-reports disagreement rather than inventing structure.
+    for (input, children) in [("(f #f8(1))", 3usize), ("(f #f32 x)", 3)] {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::Scheme)
+            .unwrap_or_else(|error| panic!("{input}: {error}"));
+        assert_eq!(
+            tree.root_view().children[0].children.len(),
+            children,
+            "{input}"
+        );
+    }
+}
+
+/// `#nil` is spelled out in full, so an unknown `#n…` still refuses loudly.
+#[test]
+fn scheme_reads_guile_nil_but_not_every_hash_n() {
+    let tree = SyntaxTree::parse_with_dialect("(f #nil)", Dialect::Scheme).expect("valid");
+    let form = &tree.root_view().children[0];
+    assert_eq!(form.children.len(), 2);
+    assert_eq!(form.children[1].text.as_deref(), Some("#nil"));
+    assert!(
+        SyntaxTree::parse_with_dialect("(f #num)", Dialect::Scheme).is_err(),
+        "an unknown #n dispatch must still refuse"
+    );
+}
+
+/// What Scheme deliberately still refuses, and why it is not a gap.
+///
+/// Each of these is a *per-implementation* extension: Gambit's namespaced
+/// `##car`, Gauche's `#/re/`, `#"interpolated"` and `#[char-set]`, Guile's
+/// `#{extended symbol}#`. Between them they are every remaining failure
+/// cluster in the corpus (349 of 2352 files). They are refused on purpose —
+/// Guile's reader rejects the Gauche and Gambit spellings and vice versa, so
+/// admitting them into one `Dialect::Scheme` would make this reader accept a
+/// language no implementation actually reads. Separating them needs a
+/// per-implementation flavour of the dialect, which is a larger change.
+#[test]
+fn scheme_refuses_per_implementation_extensions() {
+    for input in [
+        "(##car x)",
+        "(f #/re/)",
+        "(f #\"interpolated ~x\")",
+        "(f #[a-z])",
+        "(f #{sym}#)",
+    ] {
+        assert!(
+            SyntaxTree::parse_with_dialect(input, Dialect::Scheme).is_err(),
+            "{input} is implementation-specific and must still refuse"
         );
     }
 }
