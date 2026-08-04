@@ -9,6 +9,7 @@ use paredit_core_lint_engine::LintResult;
 use crate::equality_arity::domain::examine_call;
 use crate::support::is_eql_type_specifier_at;
 use crate::support::is_hard_quoted_at;
+use crate::support::is_key_or_binding_position_at;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
 use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
@@ -60,6 +61,21 @@ impl LintRule for Rule {
             // quasiquoted `` `(eql ,a ,b) `` is a template that becomes a real
             // call, and stays reported.
             if is_hard_quoted_at(context.tree(), item.span) {
+                continue;
+            }
+            // A `case`-family clause **key** and a variable-binding list are
+            // positions that name something rather than call it. CLHS 5.3
+            // makes each `case` clause `(keys form*)`, so the `eql` in
+            // `(case kind (eql x) …)` is a symbol being compared against and
+            // `x` is a body form; `(multiple-value-bind (equal certain) …)`
+            // binds two variables. Neither has an arity to be wrong about.
+            //
+            // Unlike the quote guard this cannot be settled locally, so it
+            // walks the ancestors — but, like every guard here, only once a
+            // finding already exists, so ordinary code never reaches
+            // `root_view()`. A genuine `(eql x)` in a clause *body* is child 1
+            // or later of the clause and stays reported.
+            if is_key_or_binding_position_at(context.tree(), item.span) {
                 continue;
             }
             let span = item.span;
