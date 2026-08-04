@@ -193,8 +193,48 @@ fn root_child_containing(tree: &SyntaxTree, target: ByteSpan) -> Option<Expressi
 /// tree — is evaluated, because nothing quotes it.
 #[must_use]
 pub fn is_unevaluated_at(tree: &SyntaxTree, target: ByteSpan) -> bool {
+    quote_state_at(tree, target).is_data()
+}
+
+/// Whether the node at `target` sits inside a hard quote — `'(…)` or
+/// `(quote …)` — and is therefore literal data in every expansion.
+///
+/// The guard a *rewriting* rule wants, where [`is_unevaluated_at`] is the guard
+/// a *reporting* rule wants. The difference is the quasiquote, and it is not a
+/// stylistic preference: `` `(nthcdr 0 ,x) `` is a template whose `nthcdr` really
+/// is emitted as code, so a rule that suppressed itself there would go quiet on
+/// exactly the macro bodies it exists to read. `'(nthcdr 0 x)` is a
+/// three-element list of symbols, and rewriting it to `'x` edits a user's *data
+/// literal* — which is why the verdict is read on the `hard` counter alone, and
+/// never on [`QuoteState::is_data`].
+///
+/// The target's *own* reader prefixes count, and every rule guarded by this
+/// passes the span of the form it matched. That is deliberate: whether such a
+/// rule's fix replaces `view.span` (prefix included) or `view.content_span`
+/// (past it), rewriting a `'`-carrying form is either an edit to a datum or a
+/// deletion of the `'` itself, and both are corruption. A rule whose *premise*
+/// is a quote — one that exists to remove the very `'` it reads — would need
+/// the enclosing state instead, and this package has none: no rule here matches
+/// a `quote` head.
+///
+/// Costs one binary search over the top level plus one descent through the
+/// enclosing top-level form — never [`SyntaxTree::root_view`] — and is meant to
+/// be called only once a rule already holds a finding, so a file with no
+/// findings never pays for it.
+#[must_use]
+pub fn is_hard_quoted_at(tree: &SyntaxTree, target: ByteSpan) -> bool {
+    quote_state_at(tree, target).hard
+}
+
+/// The quote state at `target`: the one descent both [`is_unevaluated_at`] and
+/// [`is_hard_quoted_at`] read their verdict off.
+///
+/// One implementation rather than two, because the failure mode of two is that
+/// they drift: the `hard`-only reading and the `is_data` reading have to agree
+/// about `` `(a ,x) `` or the guard and the report disagree about the same node.
+fn quote_state_at(tree: &SyntaxTree, target: ByteSpan) -> QuoteState {
     let Some(top_level) = root_child_containing(tree, target) else {
-        return false;
+        return QuoteState::EVALUATED;
     };
     let mut view: &ExpressionView = &top_level;
     // The root carries no reader prefix and is not a `(quote …)` form, so the
@@ -208,7 +248,7 @@ pub fn is_unevaluated_at(tree: &SyntaxTree, target: ByteSpan) -> bool {
         // contains it, which is the honest answer for a span the caller
         // synthesized rather than took from the tree.
         let Some(index) = child_index_containing(view, target) else {
-            return state.is_data();
+            return state;
         };
         let child = &view.children[index];
         state = state.after_prefixes(child);
@@ -217,7 +257,7 @@ pub fn is_unevaluated_at(tree: &SyntaxTree, target: ByteSpan) -> bool {
         }
         view = child;
     }
-    state.is_data()
+    state
 }
 
 /// The innermost form that strictly contains `target`, or `None` when `target`

@@ -18,6 +18,9 @@ pub mod return_from_unmatched_block;
 pub mod return_outside_implicit_nil_block;
 pub mod self_recursive_tail_call;
 pub mod support;
+
+#[cfg(test)]
+mod quote_guard_tests;
 pub mod tagbody_unreachable_tag;
 pub mod unwind_protect_no_cleanup;
 

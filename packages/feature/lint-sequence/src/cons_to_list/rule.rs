@@ -7,6 +7,7 @@
 use paredit_core_lint_engine::LintResult;
 
 use crate::cons_to_list::domain::examine_cons;
+use crate::support::is_hard_quoted_at;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
 use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
@@ -46,6 +47,13 @@ impl LintRule for Rule {
         examine_cons(view, &mut cons_form_count, &mut items);
         for item in items {
             let span = item.span;
+            // Rewriting hard-quoted data edits a user's data literal rather than
+            // code, and no round-trip property catches it. Read on the `hard`
+            // counter alone: a `` `(…) `` template's contents really are emitted as
+            // code. See `support::is_hard_quoted_at`.
+            if is_hard_quoted_at(context.tree(), span) {
+                continue;
+            }
             let fix = {
                 // Rewrite as `(list ELEMENT [TAIL_ELEMENTS])`.
                 let element = context_slice(item.element_span);
@@ -106,15 +114,19 @@ mod tests {
         );
     }
 
-    /// The measured defect: the fix replaced `view.span`, which begins at the
-    /// quote, so `'(cons x nil)` became `(list x)` — the quote gone and a
-    /// literal list turned into a call.
+    /// Two defects, one after the other, and the second is why this no longer
+    /// asserts a rewrite at all.
+    ///
+    /// First the fix replaced `view.span`, which begins at the quote, so
+    /// `'(cons x nil)` became `(list x)` — the quote gone and a literal list
+    /// turned into a call. Moving the fix to `content_span` fixed *that* and
+    /// left `'(list x)`, which is still wrong: `'(cons x nil)` is a
+    /// three-element list of symbols, and `'(list x)` is a two-element one, so
+    /// the rewrite silently edits a user's data literal either way. The rule
+    /// now declines to fix inside a hard quote, so the datum is left alone.
     #[test]
-    fn a_quoted_cons_keeps_its_quote() {
-        assert_eq!(
-            fixed("(defparameter *p* '(cons x nil))\n"),
-            vec!["(defparameter *p* '(list x))\n".to_owned()]
-        );
+    fn a_quoted_cons_is_data_and_is_left_alone() {
+        assert_eq!(count("(defparameter *p* '(cons x nil))\n"), 0);
     }
 
     /// A template is code, so the rewrite is right here and must still happen.

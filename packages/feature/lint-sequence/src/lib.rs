@@ -29,6 +29,9 @@ pub mod single_operand_list_op;
 pub mod subseq_zero;
 pub mod support;
 
+#[cfg(test)]
+mod quote_guard_tests;
+
 // The root's REGISTRY names each rule's META and RULE across this crate
 // boundary (section 4.2), and each slice's cli owns its own subcommand.
 
