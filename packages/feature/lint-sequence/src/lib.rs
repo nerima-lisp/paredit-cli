@@ -32,6 +32,9 @@ pub mod support;
 #[cfg(test)]
 mod quote_guard_tests;
 
+#[cfg(test)]
+mod reader_prefix_fix_tests;
+
 // The root's REGISTRY names each rule's META and RULE across this crate
 // boundary (section 4.2), and each slice's cli owns its own subcommand.
 

@@ -54,8 +54,19 @@ impl LintRule for Rule {
                     context_slice(item.list_span)
                 );
 
+                // The fix region is `content_span`, not `span`: `span` starts at this
+                // form's *own* reader prefixes, so replacing it deletes them. A
+                // `` `(…) `` has to keep its backquote — without it the commas
+                // underneath are commas outside a backquote, and the file stops
+                // reading altogether. The two spans coincide on any form with no
+                // prefix, which is almost all code, so nothing else moves.
+                //
+                // This rule is deliberately not hard-quote guarded (see
+                // `quote_guard_tests`), so it is the one rule here that also
+                // reaches `'(car (nthcdr n x))` — where replacing `span` deleted
+                // the `'` and turned a quoted datum into a live call.
                 RuleFix::single(
-                    item.span,
+                    view.content_span,
                     text,
                     "Rewrite (car (nthcdr n x)) as (nth n x)".to_owned(),
                 )
