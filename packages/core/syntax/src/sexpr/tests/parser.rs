@@ -2830,3 +2830,235 @@ fn carp_refuses_what_its_reader_has_no_dispatch_for() {
         );
     }
 }
+
+/// Emacs Lisp reads a radix integer as one atom, exactly as Common Lisp does.
+///
+/// `#b1010`, `#o777`, `#x2a` and `#<radix>r<digits>` are the four spellings in
+/// the Elisp reference manual's "Integer Basics". Every one of them was an
+/// `unsupported reader dispatch` before, which fails the whole document: 122 of
+/// the 1674 files in GNU Emacs's own `lisp/` tree -- `bookmark.el`,
+/// `ansi-color.el`, `bindings.el`, `calc.el` among them -- parsed not at all,
+/// so none of this workspace's commands could say anything about any of them.
+#[test]
+fn emacs_lisp_reads_radix_integers_as_single_atoms() {
+    let input = "(a #x1f #b101 #o777 #24r1k #X1F #24R1K #x-1f #36rzz #016r10)";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::EmacsLisp).expect("valid");
+    let form = &tree.root_view().children[0];
+    let texts: Vec<&str> = form
+        .children
+        .iter()
+        .map(|child| child.span.slice(input))
+        .collect();
+    assert_eq!(
+        texts,
+        [
+            "a", "#x1f", "#b101", "#o777", "#24r1k", "#X1F", "#24R1K", "#x-1f", "#36rzz",
+            "#016r10",
+        ]
+    );
+    // One atom each, with no reader prefix: the `#` belongs to the token, it
+    // does not introduce a form.
+    assert!(
+        form.children
+            .iter()
+            .all(|child| child.kind == ExpressionKind::Atom && child.reader_prefixes.is_empty())
+    );
+}
+
+/// A radix integer ends where Emacs ends it, including when the delimiter,
+/// comment or string that follows touches the digits.
+///
+/// Emacs's `read_integer` stops at the first byte that is not ASCII
+/// alphanumeric, so `#xFF)` is 255 followed by the paren -- it does not run on
+/// to the next whitespace. The delimiters and the comment character are already
+/// atom boundaries here, which is why recognising the literal is the whole fix
+/// and no bespoke extent is needed.
+///
+/// A `"` touching the digits is deliberately *not* in this table. `#o777"s"`
+/// reads as one atom, where Emacs reads 511 and then the string -- but so do
+/// `abc"s"` and `12"s"`, both of which read as one atom on `main` today. That
+/// is the atom scanner's existing model of a token adjacent to a string
+/// literal, shared by every dialect, and not something the radix arm
+/// introduces or is free to change unilaterally.
+#[test]
+fn emacs_lisp_radix_integer_ends_at_an_atom_boundary() {
+    for (input, expected) in [
+        ("(f #xFF)", "#xFF"),
+        ("[#xff]", "#xff"),
+        ("(f #x1f;c\n)", "#x1f"),
+        ("(f #o777 )", "#o777"),
+        ("(f #b101(g))", "#b101"),
+    ] {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::EmacsLisp)
+            .unwrap_or_else(|error| panic!("{input}: {error}"));
+        let outer = &tree.root_view().children[0];
+        let atom = outer
+            .children
+            .iter()
+            .find(|child| child.span.slice(input).starts_with('#'))
+            .unwrap_or_else(|| panic!("{input}: no radix atom"));
+        assert_eq!(atom.span.slice(input), expected, "{input}");
+    }
+}
+
+/// A malformed radix integer stays a hard parse error, because that is what
+/// Emacs does with it.
+///
+/// `#xZZ` signals `invalid-read-syntax` and the file does not load, so refusing
+/// it here agrees with the reader rather than silently reading a number Emacs
+/// never would. It is also unchanged behaviour -- every one of these was
+/// refused before this arm existed -- so the fix only widens what parses.
+///
+/// `#d99` earns its place: Common Lisp has `#d` (CLHS 2.4.8.6) and Emacs Lisp
+/// does not, so copying the Common Lisp arm's byte list would have accepted it.
+#[test]
+fn emacs_lisp_refuses_malformed_radix_integers() {
+    for input in [
+        "(f #x)",
+        "(f #xZZ)",
+        "(f #b2)",
+        "(f #o8)",
+        "(f #d99)",
+        "(f #D99)",
+        "(f #37r1)",
+        "(f #1r0)",
+        "(f #39r1)",
+        "(f #35rz)",
+        "(f #10r9a)",
+        "(f #x1f2gh)",
+        "(f #o7778)",
+        "(f #24r)",
+        "(f #x-)",
+        "(f #r1)",
+        "#x",
+    ] {
+        assert!(
+            SyntaxTree::parse_with_dialect(input, Dialect::EmacsLisp).is_err(),
+            "{input} is invalid-read-syntax in Emacs and must be refused"
+        );
+    }
+}
+
+/// The `#` forms Emacs Lisp has that are *not* radix integers stay exactly as
+/// they were.
+///
+/// `#s(...)` records, `#[...]` byte-code objects, `#(...)` propertized strings,
+/// `#^[...]` char-tables, `#&N"..."` bool-vectors, `##` (the empty symbol) and
+/// `#:foo` (uninterned) are all real Emacs Lisp reader syntax that this arm
+/// deliberately does not touch. They remain refused, as they were before, and
+/// they account for 33 of the 86 files still failing over Emacs's `lisp/` tree.
+/// Pinning them here records that the gap is known and scoped out rather than
+/// accidentally closed or accidentally widened.
+#[test]
+fn emacs_lisp_radix_arm_leaves_the_other_sharp_forms_refused() {
+    for input in [
+        "(f #s(foo 1))",
+        "(f #[1 2 3])",
+        "(f #(\"ab\" 0 1 (face bold)))",
+        "(f #^[1 2])",
+        "(f #&5\"x\")",
+        "(f ##)",
+        "(f #:foo)",
+        "(f #1=(a))",
+    ] {
+        assert!(
+            SyntaxTree::parse_with_dialect(input, Dialect::EmacsLisp).is_err(),
+            "{input} is outside this fix and must still be refused"
+        );
+    }
+    // `#'` is the one `#` form Emacs Lisp already had, and it keeps its
+    // two-byte function prefix rather than being mistaken for a radix.
+    let input = "(f #'g)";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::EmacsLisp).expect("valid");
+    let argument = &tree.root_view().children[0].children[1];
+    assert_eq!(argument.reader_prefixes, vec![ReaderPrefix::Function]);
+}
+
+/// The radix arm is scoped to Emacs Lisp and changes no other dialect.
+///
+/// `#x`/`#b`/`#o` are Common Lisp and Scheme radix syntax too, and `#<n>r` is
+/// Common Lisp's and LFE's, so this is the pin that would catch the arm being
+/// widened past the dialect it was written for. Each expectation below is what
+/// the dialect's own reader does, and every one of them was verified
+/// byte-identical between binaries built before and after this change:
+///
+/// * Common Lisp already returned `None` for these bytes (CLHS 2.4.8.6-2.4.8.9),
+///   so it always read them as single atoms. Emacs Lisp now matches it exactly.
+/// * LFE, Hy and the permissive legacy reader have no `#`-radix dispatch, so
+///   the atom scanner already took the whole token.
+/// * Scheme and Racket accept `#x`/`#b`/`#o` (R7RS 6.2.5 has no `#<n>r`), so
+///   `#24r1k` is an unsupported dispatch there and stays one.
+/// * Clojure has none of them.
+#[test]
+fn emacs_lisp_radix_arm_does_not_change_other_dialects() {
+    let letter_bases = "(a #x1f #b101 #o777)";
+    for dialect in [
+        Dialect::CommonLisp,
+        Dialect::Lfe,
+        Dialect::Hy,
+        Dialect::Unknown,
+        Dialect::Scheme,
+        Dialect::Racket,
+    ] {
+        let tree = SyntaxTree::parse_with_dialect(letter_bases, dialect)
+            .unwrap_or_else(|error| panic!("{dialect:?}: {error}"));
+        let texts: Vec<&str> = tree.root_view().children[0]
+            .children
+            .iter()
+            .map(|child| child.span.slice(letter_bases))
+            .collect();
+        assert_eq!(texts, ["a", "#x1f", "#b101", "#o777"], "{dialect:?}");
+    }
+
+    // `#<n>r` is Common Lisp's and LFE's, and nobody else's.
+    let general_radix = "(a #24r1k)";
+    for dialect in [
+        Dialect::CommonLisp,
+        Dialect::Lfe,
+        Dialect::Hy,
+        Dialect::Unknown,
+    ] {
+        let tree = SyntaxTree::parse_with_dialect(general_radix, dialect)
+            .unwrap_or_else(|error| panic!("{dialect:?}: {error}"));
+        assert_eq!(
+            tree.root_view().children[0].children[1]
+                .span
+                .slice(general_radix),
+            "#24r1k",
+            "{dialect:?}"
+        );
+    }
+    for dialect in [Dialect::Scheme, Dialect::Racket, Dialect::Clojure] {
+        assert!(
+            SyntaxTree::parse_with_dialect(general_radix, dialect).is_err(),
+            "{dialect:?} has no #<n>r radix and must keep refusing it"
+        );
+    }
+
+    // A spelling Common Lisp accepts and Emacs Lisp refuses, so the two arms
+    // cannot be collapsed into one shared table.
+    assert!(SyntaxTree::parse_with_dialect("(a #d99)", Dialect::CommonLisp).is_ok());
+    assert!(SyntaxTree::parse_with_dialect("(a #d99)", Dialect::EmacsLisp).is_err());
+}
+
+/// Formatting a document containing radix integers round-trips.
+///
+/// `treefmt` formats this repository's own Lisp with paredit, so a formatter
+/// regression here is a build break rather than a cosmetic one. The literal
+/// must survive as written -- neither re-cased nor split -- and a second pass
+/// must be a fixed point.
+#[test]
+fn emacs_lisp_radix_integers_survive_a_format_round_trip() {
+    let input = "(defconst c\n  (list #x1f #B101 #o777 #24R1K #x-1f))\n";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::EmacsLisp).expect("valid");
+    let formatter = Formatter::with_dialect(2, Dialect::EmacsLisp);
+    let formatted = formatter.format(&tree);
+    for literal in ["#x1f", "#B101", "#o777", "#24R1K", "#x-1f"] {
+        assert!(
+            formatted.contains(literal),
+            "{literal} lost from {formatted:?}"
+        );
+    }
+    let again = SyntaxTree::parse_with_dialect(&formatted, Dialect::EmacsLisp).expect("valid");
+    assert_eq!(formatter.format(&again), formatted);
+}

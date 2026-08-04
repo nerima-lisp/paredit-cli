@@ -817,6 +817,17 @@ impl DialectReaderPolicy {
         if byte != b'#' {
             return None;
         }
+        // A well-formed radix integer is not a reader macro at all. `#x1f` has
+        // no delimiter in it, so returning `None` lets the ordinary atom
+        // scanner take the whole token -- which is exactly how
+        // [`Self::classify_common_lisp`] and [`Self::classify_scheme`] already
+        // read their own `#x`/`#b`/`#o` spellings, and why neither of them ever
+        // had this defect. See [`emacs_lisp_radix_literal_is_valid`] for the
+        // grammar and for why a malformed one is deliberately left to the
+        // refusal below.
+        if emacs_lisp_radix_literal_is_valid(bytes, pos) {
+            return None;
+        }
         match next {
             Some(b'\'') => prefix(ReaderPrefix::Function, 2),
             _ => Some(ReaderMacro::UnsupportedDispatch { width: 1 }),
@@ -1463,6 +1474,130 @@ const fn prefix(semantic: ReaderPrefix, width: usize) -> Option<ReaderMacro> {
     Some(ReaderMacro::Prefix { semantic, width })
 }
 
+/// Whether a well-formed Emacs Lisp radix integer begins at `pos`.
+///
+/// Emacs Lisp spells an integer in a non-decimal base four ways, all of them
+/// in the Elisp reference manual's "Integer Basics": `#b1010`, `#o777`,
+/// `#x2a`, and `#<radix>r<digits>` for any radix from 2 to 36. Every one of
+/// them was an `unsupported reader dispatch` here, which failed the whole
+/// document -- 122 of 1674 files in GNU Emacs's own `lisp/` tree, including
+/// `bookmark.el`, `ansi-color.el` and `calc.el`, parsed not at all.
+///
+/// The grammar below is `read_integer` in `src/lread.c`, and every clause of it
+/// was confirmed against a running Emacs rather than read off the manual:
+///
+/// | source     | Emacs reads | why                                    |
+/// |------------|-------------|----------------------------------------|
+/// | `#x10`     | 16          | `b`/`o`/`x` are the only letter bases   |
+/// | `#X10`     | 16          | the prefix letter is case-insensitive   |
+/// | `#d99`     | **error**   | Emacs Lisp has no `#d`, unlike CLHS 2.4.8.6 |
+/// | `#24r1k`   | 44          | `r` takes a radix of 2..=36             |
+/// | `#24R1K`   | 44          | the `r` and the digits are both case-insensitive |
+/// | `#016r10`  | 16          | the radix may carry leading zeros       |
+/// | `#37r1`    | **error**   | radix above 36                          |
+/// | `#1r0`     | **error**   | radix below 2                           |
+/// | `#x-1f`    | -31         | a sign belongs to the *digits*          |
+/// | `#-2r1`    | **error**   | but never to the radix                  |
+/// | `#x`       | **error**   | at least one digit is required          |
+/// | `#o8`      | **error**   | a digit must be in range for the base   |
+/// | `#x1f2gh`  | **error**   | *including* one past the end of the number |
+///
+/// That last row is the clause that a hand-written reader gets wrong, and it is
+/// why this validates instead of merely recognising a prefix. `digit_to_number`
+/// returns -2 for a non-alphanumeric byte and -1 for an alphanumeric one that
+/// is out of range for the base, and `read_integer`'s loop continues on -1
+/// while setting `valid = 0`. So the token runs to the end of the alphanumeric
+/// run whatever that run contains, and one out-of-range letter anywhere in it
+/// invalidates the whole literal rather than ending it early: `#x1f2gh` is an
+/// error, not `#x1f2` followed by the symbol `gh`.
+///
+/// A byte that is not alphanumeric ends the number instead of poisoning it, so
+/// `#xFF)`, `#xFF;c` and `#xff]` all read as 255 -- the literal ends at the
+/// paren, the comment and the bracket. Those three are already atom boundaries
+/// here, which is what makes returning `None` the whole fix: the atom scanner
+/// stops on exactly the bytes Emacs stops on for every literal that occurs in
+/// real code.
+///
+/// A [`Self::character_literal_prefix_width`]-style bespoke extent is
+/// deliberately *not* introduced for the bytes where the two disagree, because
+/// the disagreement is not specific to radix integers. `#o777"s"` reads as one
+/// atom where Emacs reads 511 and then a string -- but `abc"s"` and `12"s"`
+/// already do the same on `main`, in every dialect. That is the atom scanner's
+/// existing model of a token adjacent to a string literal, and changing it is a
+/// separate cross-dialect decision rather than a rider on this one.
+///
+/// # Why a malformed literal is still refused
+///
+/// Returning `false` leaves the caller's `UnsupportedDispatch`, which fails the
+/// parse. That is not this function inventing a rule -- it is what Emacs itself
+/// does: `#xZZ` signals `invalid-read-syntax`, so a file containing one does not
+/// load, and refusing it here agrees with the reader rather than silently
+/// reading a number that Emacs never would. It is also the behaviour every one
+/// of these spellings already had before this function existed, so nothing
+/// regresses for input that was refused yesterday.
+///
+/// # Known approximation
+///
+/// A *valid* literal followed immediately by a non-alphanumeric byte that is
+/// not an atom boundary here -- `#xa+b`, `#x1.5` -- reads as one atom, where
+/// Emacs reads `#xa` and then `+b`. Both spellings are absent from all 1674
+/// files of GNU Emacs's `lisp/` tree, and closing the gap would mean giving the
+/// literal a bespoke extent in the atom scanner, which is a change to a code
+/// path shared by all ten dialects. The safe reading is taken instead.
+fn emacs_lisp_radix_literal_is_valid(bytes: &[u8], pos: usize) -> bool {
+    if bytes.get(pos) != Some(&b'#') {
+        return false;
+    }
+
+    let (radix, digits_start) = match bytes.get(pos + 1).copied() {
+        Some(b'b' | b'B') => (2u32, pos + 2),
+        Some(b'o' | b'O') => (8, pos + 2),
+        Some(b'x' | b'X') => (16, pos + 2),
+        // `#<radix>r`. The radix is a decimal run that may carry leading zeros
+        // (`#0002r11` is 3), so it is accumulated rather than length-limited;
+        // saturating arithmetic keeps an adversarially long run from wrapping
+        // into the valid range instead of failing the bound below.
+        Some(byte) if byte.is_ascii_digit() => {
+            let mut cursor = pos + 1;
+            let mut radix: u32 = 0;
+            while let Some(&byte) = bytes.get(cursor) {
+                let Some(digit) = char::from(byte).to_digit(10) else {
+                    break;
+                };
+                radix = radix.saturating_mul(10).saturating_add(digit);
+                cursor += 1;
+            }
+            if !matches!(bytes.get(cursor), Some(b'r' | b'R')) {
+                return false;
+            }
+            (radix, cursor + 1)
+        }
+        _ => return false,
+    };
+
+    // Guards `to_digit` below, which panics above 36, as well as rejecting the
+    // radices Emacs rejects.
+    if !(2..=36).contains(&radix) {
+        return false;
+    }
+
+    let mut cursor = digits_start;
+    if matches!(bytes.get(cursor), Some(b'-' | b'+')) {
+        cursor += 1;
+    }
+    let digits_run_start = cursor;
+    while let Some(&byte) = bytes.get(cursor) {
+        if !byte.is_ascii_alphanumeric() {
+            break;
+        }
+        if char::from(byte).to_digit(radix).is_none() {
+            return false;
+        }
+        cursor += 1;
+    }
+    cursor > digits_run_start
+}
+
 /// The language a `#lang` line names, given the line's text.
 ///
 /// Lives beside the reader's own directive constants so the parser and the
@@ -1473,4 +1608,180 @@ pub(crate) fn lang_directive_language(line: &str) -> Option<&str> {
     }
     let language = line[LANG_DIRECTIVE.len()..].trim();
     (!language.is_empty()).then_some(language)
+}
+
+#[cfg(test)]
+mod emacs_lisp_radix_tests {
+    use super::emacs_lisp_radix_literal_is_valid;
+
+    /// Every row was produced by a running GNU Emacs 31.0.91 rather than read
+    /// off the manual, with `(read-from-string ...)` under `emacs --batch -Q`.
+    /// The value column is what that call returned; a row in
+    /// [`REFUSED_BY_EMACS`] is one where it signalled `invalid-read-syntax`.
+    ///
+    /// Keeping the oracle's own answers here is what makes this table worth
+    /// more than the implementation restated: `#d99`, `#x1f2gh` and `#35rz`
+    /// are all shapes a plausible hand-written reader accepts and Emacs does
+    /// not.
+    const ACCEPTED_BY_EMACS: &[(&str, i128)] = &[
+        // The three letter bases, each case-insensitive.
+        ("#b101", 5),
+        ("#B101", 5),
+        ("#o777", 511),
+        ("#O777", 511),
+        ("#x10", 16),
+        ("#X10", 16),
+        ("#xAb", 171),
+        ("#XaB", 171),
+        // `#<radix>r`, radix 2..=36, `r` and digits both case-insensitive.
+        ("#2r1111", 15),
+        ("#24r1k", 44),
+        ("#24R1K", 44),
+        ("#24r1K", 44),
+        ("#24R1k", 44),
+        ("#36rZZ", 1295),
+        ("#36rzz", 1295),
+        ("#10r99", 99),
+        // A radix may carry leading zeros: `read_integer` accumulates the run.
+        ("#016r10", 16),
+        ("#02r11", 3),
+        ("#0002r11", 3),
+        // A sign belongs to the digits.
+        ("#x-1f", -31),
+        ("#x+1f", 31),
+        ("#b-101", -5),
+        ("#b+101", 5),
+        ("#o-7", -7),
+        ("#24r-1k", -44),
+        ("#2r-1", -1),
+        // Zero, and redundant leading zeros in the digits.
+        ("#x0", 0),
+        ("#b0", 0),
+        ("#o0", 0),
+        ("#x00ff", 255),
+        ("#b00000000", 0),
+        // `e` is an ordinary hex digit here, not an exponent marker.
+        ("#xFFe0", 65504),
+        // Beyond 64 bits. The reader's own bignum path; nothing here parses the
+        // value, but the token must still be recognised.
+        ("#o17777777777777777777777", 147_573_952_589_676_412_927),
+        ("#x0000000000000000000000001", 1),
+    ];
+
+    /// Spellings Emacs refuses with `invalid-read-syntax`, so a file containing
+    /// one does not load. Returning `false` for these leaves the caller's
+    /// `UnsupportedDispatch`, which fails the parse -- agreeing with the reader
+    /// rather than inventing a number Emacs never produced.
+    const REFUSED_BY_EMACS: &[&str] = &[
+        // Emacs Lisp has no `#d`, though CLHS 2.4.8.6 gives Common Lisp one.
+        // Copying the Common Lisp arm wholesale would have accepted these.
+        "#d99", "#D99", // No digits at all.
+        "#x", "#b", "#o", "#24r", "#x-", "#x+", "#24r-",
+        // A digit out of range for the base.
+        "#b2", "#o8", "#xg", "#xZZ", "#10r9a", "#24rZZ",
+        // Radix 35 is legal; `z` is 35, which is not a digit in base 35.
+        "#35rz", // Radix out of range.
+        "#0r0", "#1r0", "#37r1", "#39r1",
+        // The clause a hand-written reader gets wrong: `digit_to_number`
+        // returns -1 (not -2) for an alphanumeric byte out of range, and the
+        // loop keeps consuming while marking the literal invalid. So the token
+        // runs to the end of the alphanumeric run and one bad letter anywhere
+        // in it poisons the whole literal -- `#x1f2gh` is an error, not
+        // `#x1f2` followed by the symbol `gh`.
+        "#x1f2gh", "#b101abc", "#o7778", "#24r1kz", "#xFFxFF",
+        // A radix takes no sign; `#-`/`#+` are their own (absent) dispatch.
+        "#-2r1", "#+2r1",
+        // `_` is not alphanumeric, so it ends the run -- leaving none.
+        "#x_1", // Not radix syntax at all.
+        "#r1", "#'foo", "#s(a)", "#[1]", "##", "#:foo", "#(a)", "#&5\"x\"", "#1=(a)", "#^[1]",
+    ];
+
+    #[test]
+    fn accepts_every_radix_integer_emacs_accepts() {
+        for (source, value) in ACCEPTED_BY_EMACS {
+            assert!(
+                emacs_lisp_radix_literal_is_valid(source.as_bytes(), 0),
+                "{source} reads as {value} in Emacs and must be accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn refuses_every_spelling_emacs_refuses() {
+        for source in REFUSED_BY_EMACS {
+            assert!(
+                !emacs_lisp_radix_literal_is_valid(source.as_bytes(), 0),
+                "{source} is invalid-read-syntax in Emacs and must be refused"
+            );
+        }
+    }
+
+    /// A non-alphanumeric byte ends the number instead of invalidating it, so
+    /// the literal is still well formed when the delimiter, comment or string
+    /// that follows it touches the digits.
+    #[test]
+    fn a_non_alphanumeric_byte_ends_the_literal() {
+        for source in [
+            "#xFF)",
+            "#xff]",
+            "#xFF}",
+            "#xFF;c",
+            "#xFF\"s\"",
+            "#x1f'",
+            "#xFF ",
+            "#xFF\n",
+            "#xFF\t",
+            "#xa+b",
+            "#x1.5",
+            "#x1_0",
+            "#xff.",
+        ] {
+            assert!(
+                emacs_lisp_radix_literal_is_valid(source.as_bytes(), 0),
+                "{source} begins a well-formed radix integer"
+            );
+        }
+    }
+
+    /// The scan starts at `pos`, not at 0, because `classify_reader_macro` is
+    /// called at every dispatch position in the document.
+    #[test]
+    fn scans_from_the_given_offset() {
+        let source = b"(f #x1f #xZZ)";
+        assert!(emacs_lisp_radix_literal_is_valid(source, 3));
+        assert!(!emacs_lisp_radix_literal_is_valid(source, 8));
+        // Not a `#` at all.
+        assert!(!emacs_lisp_radix_literal_is_valid(source, 0));
+        assert!(!emacs_lisp_radix_literal_is_valid(source, 1));
+    }
+
+    /// A radix run long enough to overflow `u32` must fail the 2..=36 bound
+    /// rather than wrap into it -- and must not reach `to_digit`, which panics
+    /// above radix 36.
+    #[test]
+    fn an_absurd_radix_saturates_rather_than_wrapping() {
+        for source in [
+            "#99999999999999999999999999r1",
+            "#4294967298r1",
+            "#4294967320r1",
+        ] {
+            assert!(
+                !emacs_lisp_radix_literal_is_valid(source.as_bytes(), 0),
+                "{source} has a radix far outside 2..=36"
+            );
+        }
+    }
+
+    /// Truncation at end of input is refused rather than read as a complete
+    /// literal, which is what keeps the formatter's trailing newline from
+    /// becoming a digit on the next parse.
+    #[test]
+    fn a_truncated_literal_at_end_of_input_is_refused() {
+        for source in ["#", "#x", "#2", "#24", "#24r", "#24r-", "#b", "#o"] {
+            assert!(
+                !emacs_lisp_radix_literal_is_valid(source.as_bytes(), 0),
+                "{source} is truncated"
+            );
+        }
+    }
 }
