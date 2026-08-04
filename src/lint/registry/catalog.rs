@@ -427,7 +427,7 @@ const _: () = assert!(fixable_count() == 106);
 // process, and a parking op outside the go transform that asserts or silently
 // yields `nil` -- and `racket-match-unreachable-clause` reports a clause that
 // can never be taken, which is dead code rather than a preference.
-const _: () = assert!(warning_count() == 255);
+const _: () = assert!(warning_count() == 256);
 const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
 // 6 (through PR #82) + 8 of this branch's rules: `lint-call-shape`'s four
 // threshold rules, whose limits are conventions a codebase either adopted or

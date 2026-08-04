@@ -1060,7 +1060,13 @@ fn cli_lint_list_rules_marks_severity() {
     //
     // + this branch's 1 = 239. `discarded-destructive-sequence-result` is a
     // `Severity::Warning` and untagged, so both totals rise by 1 again.
-    assert_eq!(warnings, 239);
+    //
+    // + 1 from demoting `equality-arity` to `Severity::Warning` = 240. It is
+    // untagged, so the suite's warning total and this preset-filtered count
+    // move together again -- 256 and 240. This is the one entry in this
+    // narrative that comes from a severity change rather than a new rule: the
+    // rule was measured at 407 findings and no true positives on 5556 files.
+    assert_eq!(warnings, 240);
 }
 
 #[test]

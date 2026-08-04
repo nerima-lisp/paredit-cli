@@ -697,7 +697,7 @@
       "message": "eq takes exactly 2 arguments but has 1",
       "path": "broad.lisp",
       "rule": "equality-arity",
-      "severity": "error",
+      "severity": "warning",
       "span": {
         "end": 7753,
         "start": 7747

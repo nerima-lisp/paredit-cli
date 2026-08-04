@@ -2391,7 +2391,7 @@
           "ruleId": "the-arity"
         },
         {
-          "level": "error",
+          "level": "warning",
           "locations": [
             {
               "physicalLocation": {
@@ -6585,7 +6585,7 @@
               "properties": {
                 "category": "arity",
                 "fixable": false,
-                "severity": "error",
+                "severity": "warning",
                 "tags": []
               },
               "shortDescription": {

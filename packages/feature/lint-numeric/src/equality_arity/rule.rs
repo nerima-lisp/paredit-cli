@@ -17,10 +17,44 @@ use paredit_core_lint_engine::model::{
 use paredit_core_lint_engine::rule::LintRule;
 use paredit_core_syntax::sexpr::ExpressionView;
 
+/// Reported at `Warning`, not `Error`, because its measured precision on real
+/// code is zero.
+///
+/// [`Severity::Error`] means "a likely or certain bug". A genuine `(eq x)` is
+/// certainly one — but over 5506 Common Lisp files (5556 listed, 50 unparsable)
+/// the rule produces 407 findings and **every one of them is false**: 14 of 14
+/// in one adjudication, 120 of 120 in another, and the whole population survives
+/// only in three projects — SBCL's own compiler (561 of the 624 same-class
+/// findings the suite as a whole produces in these positions), `trivia` (62) and
+/// `mgl-pax` (1).
+///
+/// Four merged PRs took the count from 1981 to 407 by closing structurally
+/// different classes — hard-quoted data (#119/#120), CLHS type positions (#121),
+/// `case` keys and binding lists (#123). What remains is not a fifth class of
+/// the same kind. 312 of the 407 sit in an argument position of a macro that
+/// treats that position as data (`deftransform`'s lambda list, `defknown`'s type
+/// specifier, `define-vop`'s `:arg-types`, `trivia`'s pattern DSL), and the
+/// other 95 are compound type specifiers reached through `or`/`and`/`not`/`cons`
+/// combinators plus a long tail of one-off DSL heads.
+///
+/// No general mechanism closes that. Suppressing inside any head the engine has
+/// never seen defined would silence 32886 of the suite's 113979 corpus findings
+/// (28.9%) across 186 of the 214 rules that fire at all, and an adjudicated
+/// sample of 30 of those found 23 genuine, 5 false, 2 ambiguous — roughly 25000
+/// real findings destroyed to remove 405 false ones. A configurable list of
+/// "heads whose arguments are data" needs `(head, position)` pairs rather than
+/// names, because `deftransform`'s *body* is ordinary code, and it would still
+/// leave the 95-finding residue reported. Both leave a build-blocking rule that
+/// blocks builds on correct programs.
+///
+/// So the finding stays — a real `(eq x)` is still worth saying — but it stops
+/// being a gate. See `packages/feature/lint-numeric/README.md` if this is ever
+/// revisited with a macroexpander behind it, which is what would actually
+/// settle which argument positions are evaluated.
 pub const META: RuleMeta = RuleMeta::new(
     "equality-arity",
     RuleCategory::Arity,
-    Severity::Error,
+    Severity::Warning,
     "an eq/eql/equal/equalp call without exactly two arguments",
     Fixability::ReportOnly,
 );
