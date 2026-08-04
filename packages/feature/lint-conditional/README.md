@@ -66,6 +66,42 @@ The slice directory uses the rule's name; the alias only mattered while moving.
 `constant_if_test` keeps its registry-driven tests in the root as
 `domain::lint::rule_registry_tests`, because they call `collect_lint_findings`.
 
+## The hard-quote guard, and why it is a copy
+
+Every `Fixability::Fixable` rule here except `one-armed-if` calls
+`support::is_hard_quoted_at` once it already holds a finding, and declines to
+report when the answer is yes. `'(or x)` is a two-element list; rewriting it to
+`'x` makes it a symbol, so the "fix" changes what the datum *is* — and
+`paredit fix --write` edits the user's file. Measured over 6,474 unique Common
+Lisp files, these rules landed 109 fixes inside a hard `'`.
+
+Two things about it are load-bearing:
+
+* **It reads the `hard` counter alone, never `is_data()`.** A `` `(…) ``
+  template's contents really are emitted as code, so guarding on the quasiquote
+  half would go quiet on exactly the macro bodies these rules exist to read.
+  The same corpus shows 707 fixes inside templates that must keep firing.
+* **`one-armed-if` is deliberately unguarded.** A hard quote is not always
+  inert: `#.` read-eval and SBCL's `deftransform` templates splice quoted forms
+  back as code, and 6 of that rule's 16 hard-quoted findings sit in one of the
+  two. Guarding it would buy false negatives on live code. `sharp-quoted-lambda`
+  in `lint-form-shape` is worse still, at 4 of 4.
+
+`QuoteState` and the descent are **copied** from
+`paredit-feature-lint-condition-system`'s `support.rs`, as they are in
+`lint-testing`, `lint-form-shape` and `lint-control-flow`. A lint feature
+package depending on another lint feature package would be a new feature→feature
+edge, which `tests/cli/feature_dependency_contract.rs` would have to admit, for
+a hundred lines of traversal. **When a consolidation lands, this belongs in
+`core/lint-engine` or `core/syntax` and all five copies should collapse into
+it.**
+
+Note that the older `is_unevaluated_at` in the same file still calls
+`SyntaxTree::root_view`, which materializes a view per node for the whole
+document. `is_hard_quoted_at` deliberately does not: it binary-searches
+`root_children` and descends the one enclosing top-level form. Nothing new
+should follow `is_unevaluated_at`.
+
 ## When you change this package
 
 | You are… | and it belongs here because… |

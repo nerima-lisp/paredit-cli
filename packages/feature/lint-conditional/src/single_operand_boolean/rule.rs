@@ -7,6 +7,7 @@
 use paredit_core_lint_engine::LintResult;
 
 use crate::single_operand_boolean::domain::examine_boolean;
+use crate::support::is_hard_quoted_at;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
 use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
@@ -47,6 +48,20 @@ impl LintRule for Rule {
         examine_boolean(view, &mut boolean_form_count, &mut items);
         for item in items {
             let span = item.span;
+            // A hard-quoted form is a literal list, not code: rewriting its
+            // contents edits the program's data rather than its behaviour.
+            // `'(or x)` is a two-element list and `'x` is a symbol, so the
+            // "fix" changes what the datum *is*.
+            //
+            // The verdict is the `hard` counter alone. A `` `(…) `` template's
+            // contents really are emitted as code, so suppressing there would
+            // go quiet on the macro bodies this rule exists to read.
+            //
+            // Asked only here, once a finding already exists — never per
+            // visited node — so a file with no findings never pays for it.
+            if is_hard_quoted_at(context.tree(), span) {
+                continue;
+            }
             let fix = {
                 // Replace the wrapper with its sole operand, copied verbatim.
 
@@ -138,12 +153,25 @@ mod tests {
         );
     }
 
+    /// `'(or x)` is a two-element *list*; `'x` is a symbol. Preserving the
+    /// quote was never enough — the rewrite changed what the datum is, and the
+    /// guard now declines to report it at all.
     #[test]
-    fn a_quoted_single_operand_or_keeps_its_quote() {
-        assert_eq!(
-            fixed("(defparameter *f* '(or x))\n"),
-            vec!["(defparameter *f* 'x)\n".to_owned()]
-        );
+    fn a_hard_quoted_single_operand_or_is_not_a_finding_at_all() {
+        assert_eq!(count("(defparameter *f* '(or x))\n"), 0);
+    }
+
+    /// The measured shape: a quoted *expected value* in a test table. Rewriting
+    /// `'(and x)` to `'x` makes `(and x)` expand to itself and the assertion
+    /// vacuous.
+    #[test]
+    fn a_boolean_inside_a_quoted_ancestor_is_not_a_finding() {
+        assert_eq!(count("(deftest e (check '(\"single\" (and x) x)))\n"), 0);
+    }
+
+    #[test]
+    fn a_long_hand_quoted_single_operand_or_is_not_a_finding() {
+        assert_eq!(count("(defparameter *f* (quote (or x)))\n"), 0);
     }
 
     /// `` `(or ,@predicates) `` is not a one-operand `or`: `predicates` may hold

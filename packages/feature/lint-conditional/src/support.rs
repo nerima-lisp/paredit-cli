@@ -27,7 +27,7 @@
 //! [`RuleContext`]: paredit_core_lint_engine::engine::RuleContext
 
 use paredit_core_syntax::sexpr::reader::atom_symbol_text;
-use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, ReaderPrefix, SyntaxTree};
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path, ReaderPrefix, SyntaxTree};
 use paredit_core_syntax::view_query::{
     atom_text, is_paren_list, list_head, symbol_is, unqualified,
 };
@@ -155,6 +155,108 @@ pub fn is_unevaluated_at(tree: &SyntaxTree, target: ByteSpan) -> bool {
             return state.is_data();
         }
     }
+}
+
+/// The index into `tree.root_children()` of the top-level form containing
+/// `target`, or `None` when `target` lies inside no top-level form.
+///
+/// A binary search over the top level: each step is a node-id lookup and a span
+/// read, and neither allocates. Deliberately *not* [`SyntaxTree::root_view`]
+/// followed by a search — `root_view` builds an [`ExpressionView`] for every
+/// node in the file, so asking it about one node costs the whole document, and
+/// a rule that asks once per match then costs matches × document.
+///
+/// [`is_unevaluated_at`] above still pays that cost; it predates this and its
+/// callers are report-only rules. Nothing new should follow it.
+fn root_child_index_containing(tree: &SyntaxTree, target: ByteSpan) -> Option<usize> {
+    let start_of = |index: usize| {
+        tree.select_path(&Path::root_child(index))
+            .ok()
+            .map(|selection| selection.span().start().get())
+    };
+    // Top-level forms are in document order and do not overlap, so the only
+    // candidate is the last one beginning at or before `target`.
+    let mut low = 0;
+    let mut high = tree.root_children().len();
+    while low < high {
+        let middle = low + (high - low) / 2;
+        if start_of(middle)? <= target.start().get() {
+            low = middle + 1;
+        } else {
+            high = middle;
+        }
+    }
+    let index = low.checked_sub(1)?;
+    let selection = tree.select_path(&Path::root_child(index)).ok()?;
+    span_contains(selection.span(), target).then_some(index)
+}
+
+/// The one child of `view` whose span covers `target`, found without reading
+/// the others.
+///
+/// A node's children are in document order and do not overlap, so the only
+/// child that can contain `target` is the last one beginning at or before it —
+/// which a binary search finds in `log₂ k` comparisons instead of `k`.
+fn child_containing(view: &ExpressionView, target: ByteSpan) -> Option<&ExpressionView> {
+    let after = view
+        .children
+        .partition_point(|child| child.span.start().get() <= target.start().get());
+    let child = view.children.get(after.checked_sub(1)?)?;
+    span_contains(child.span, target).then_some(child)
+}
+
+/// Whether the node at `target` sits inside a hard quote — `'(…)` or
+/// `(quote …)` — and is therefore literal data in every expansion.
+///
+/// The guard a *rewriting* rule wants, where [`is_unevaluated_at`] is the guard
+/// a *reporting* rule wants. The difference is the quasiquote, and it is not a
+/// stylistic preference: `` `(when c (or ,x)) `` is a template whose `or`
+/// really is emitted as code, so a rule that suppressed itself there would go
+/// quiet on exactly the macro bodies it exists to read. `'(or x)` is a
+/// two-element list, and rewriting it to `'x` turns a list into a symbol —
+/// which is why the verdict is read on the `hard` counter alone.
+///
+/// The target's *own* reader prefixes count. A rule here rewrites the
+/// **contents** of the form it matched — `single-operand-boolean` replaces
+/// `(or x)` inside `'(or x)` — so the edited bytes sit past that `'` and are
+/// data even though nothing above the node quotes it. A rule that instead
+/// rewrote the quote itself would need the enclosing state, and there is none
+/// in this package.
+///
+/// Costs one binary search over the top level plus one descent through the
+/// enclosing top-level form — never [`SyntaxTree::root_view`] — and is meant to
+/// be called only once a rule already holds a finding, so a file with no
+/// findings never pays for it.
+#[must_use]
+pub fn is_hard_quoted_at(tree: &SyntaxTree, target: ByteSpan) -> bool {
+    let Some(index) = root_child_index_containing(tree, target) else {
+        return false;
+    };
+    let Ok(selection) = tree.select_path(&Path::root_child(index)) else {
+        return false;
+    };
+    let top_level = selection.view();
+    let mut view: &ExpressionView = &top_level;
+    // The root carries no reader prefix and is not a `(quote …)` form, so the
+    // state entering the top-level form is whatever that form's own prefixes
+    // say.
+    let mut state = QuoteState::EVALUATED.after_prefixes(view);
+
+    while view.span != target {
+        let quoting = is_quote_form(view);
+        // A span that names no node is judged by the innermost node that
+        // contains it, which is the honest answer for a span the caller
+        // synthesized rather than took from the tree.
+        let Some(child) = child_containing(view, target) else {
+            return state.hard;
+        };
+        state = state.after_prefixes(child);
+        if quoting {
+            state = state.quoted();
+        }
+        view = child;
+    }
+    state.hard
 }
 
 /// An atom's symbol text, past any reader prefix, lowercased and stripped of
@@ -475,6 +577,92 @@ mod tests {
             }
         });
         heads
+    }
+
+    // -- the hard-quote guard -----------------------------------------------
+
+    /// The span of the first `(head …)` form in the file, found with the same
+    /// quote-blind walk the engine's own dispatch uses — so a form inside
+    /// `'(…)` is found exactly as the engine finds it.
+    fn span_of(parsed: &SyntaxTree, head: &str) -> ByteSpan {
+        let root = parsed.root_view();
+        let mut found = None;
+        paredit_core_syntax::view_query::for_each_subview(&root, |view| {
+            if found.is_none() && list_head(view).is_some_and(|name| symbol_is(name, head)) {
+                found = Some(view.span);
+            }
+        });
+        found.expect("a form with that head")
+    }
+
+    fn hard_quoted(source: &str, head: &str) -> bool {
+        let parsed = tree(source);
+        is_hard_quoted_at(&parsed, span_of(&parsed, head))
+    }
+
+    #[test]
+    fn plain_code_is_not_hard_quoted() {
+        assert!(!hard_quoted("(defun f (x) (or x))", "or"));
+    }
+
+    #[test]
+    fn a_form_carrying_its_own_quote_is_hard_quoted() {
+        assert!(hard_quoted("(defparameter *f* '(or x))", "or"));
+    }
+
+    #[test]
+    fn a_form_inside_a_quoted_ancestor_is_hard_quoted() {
+        assert!(hard_quoted("(defparameter *f* '(a (or x)))", "or"));
+    }
+
+    #[test]
+    fn a_long_hand_quote_form_makes_its_contents_hard_quoted() {
+        assert!(hard_quoted("(defparameter *f* (quote (or x)))", "or"));
+    }
+
+    /// The whole reason the guard reads `hard` and not `is_data`: a template's
+    /// contents really are emitted as code, and a rule that went quiet here
+    /// would stop reading macro bodies altogether.
+    #[test]
+    fn a_quasiquote_template_is_not_hard_quoted() {
+        assert!(!hard_quoted("(defmacro m (x) `(or ,x))", "or"));
+    }
+
+    #[test]
+    fn an_unquote_inside_a_quasiquote_is_not_hard_quoted() {
+        assert!(!hard_quoted("(defmacro m (x) `(a ,(or x)))", "or"));
+    }
+
+    /// A comma inside a *hard* quote is a comma character in a literal list,
+    /// not an escape back to code — the shape a single depth counter reads
+    /// wrongly.
+    #[test]
+    fn a_comma_inside_a_hard_quote_is_still_hard_quoted() {
+        assert!(hard_quoted("(defparameter *f* '(a ,(or x)))", "or"));
+    }
+
+    /// A hard quote *inside* a template stays hard: backquote processing does
+    /// not evaluate what a nested `'` covers.
+    #[test]
+    fn a_hard_quote_inside_a_quasiquote_is_hard_quoted() {
+        assert!(hard_quoted("(defmacro m () `(a '(or x)))", "or"));
+    }
+
+    /// Only the enclosing top-level form is descended, so a target in the last
+    /// of many forms is judged without materializing the ones before it.
+    #[test]
+    fn the_guard_finds_a_target_in_a_later_top_level_form() {
+        let source = "(defun a () 1)\n(defun b () 2)\n(defparameter *f* '(or x))\n";
+        assert!(hard_quoted(source, "or"));
+    }
+
+    #[test]
+    fn the_guard_reads_a_later_top_level_form_as_code_when_it_is_code() {
+        let source = "(defparameter *f* '(and y))\n(defun b (x) (or x))\n";
+        let parsed = tree(source);
+        // `and` is the quoted one; `or` in the following form is not.
+        assert!(is_hard_quoted_at(&parsed, span_of(&parsed, "and")));
+        assert!(!is_hard_quoted_at(&parsed, span_of(&parsed, "or")));
     }
 
     // -- the five quote shapes, on the walk ---------------------------------
