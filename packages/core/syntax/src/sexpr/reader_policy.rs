@@ -194,6 +194,27 @@ impl DialectReaderPolicy {
             // offset 0 keeps a stray `#!` anywhere else the reader error it
             // has always been.
             Dialect::EmacsLisp if pos == 0 && bytes.starts_with(b"#!") => Some(2),
+            // A Common Lisp script starts `#!/usr/bin/env sbcl --script` or
+            // `#!/usr/bin/cl -sp asdf -E main`, and the implementation running
+            // it skips that line: `sbcl --script f` runs a file whose first
+            // line is a shebang and `sbcl --eval '(load "f")'` on the same
+            // file signals a reader error, so the skip is what `--script`
+            // *means*. CLISP's `-script` and CCL's `--load` do the same.
+            //
+            // Offset 0 only, exactly as the Emacs Lisp and Hy arms are and for
+            // the same reason: the skip is a property of the first line of the
+            // stream, and a `#!` anywhere else stays the reader error CLHS
+            // 2.4.8 makes it, since `!` has no dispatch function.
+            //
+            // Reading it as a line comment rather than stripping the line
+            // keeps every later byte offset unchanged, which matters because
+            // every rewrite in this workspace is a span replacement over the
+            // original string.
+            //
+            // Without this, 8 of 10046 real Common Lisp files from the nix
+            // store failed to parse on their first byte, including ASDF's own
+            // `tools/cl-source-registry-cache.lisp`.
+            Dialect::CommonLisp if pos == 0 && bytes.starts_with(b"#!") => Some(2),
             // Hy strips a shebang the same way, and under exactly the same
             // restriction. `HyReader.parse` peeks the first two characters of
             // the *stream* and, when `skip_shebang` is set, consumes to the
@@ -312,6 +333,70 @@ impl DialectReaderPolicy {
         Delimiter::from_open(byte).is_some() || Delimiter::from_close(byte).is_some()
     }
 
+    /// Whether a bracket pair this dialect does not use as a delimiter is an
+    /// ordinary symbol constituent rather than a stray-delimiter error.
+    ///
+    /// Common Lisp, on the standard's own authority. CLHS Figure 2-7 gives
+    /// `[`, `]`, `{` and `}` the *constituent* syntax type, and 2.4.2 lists
+    /// them among the characters "reserved to the user" -- they are not
+    /// delimiters, they are symbol characters, and real code relies on it.
+    /// SBCL reads `whitespace[2]p`, `[rsp]`, `$*byte[]` and
+    /// `print-mov[dq]-opcode` as single symbols; so does every other
+    /// conforming implementation, because there is nothing implementation
+    /// defined about it.
+    ///
+    /// Without this, `is_atom_boundary` split each of those at its bracket
+    /// and the parser then met a `[` where no form could start, so the file
+    /// failed to parse outright -- and a file that does not parse gets none
+    /// of this tool's lint rules. Over a 10046-file deduplicated Common Lisp
+    /// corpus from the nix store this was 27 files, the single largest
+    /// failure cluster, and it included SBCL's own `src/code/reader.lisp`,
+    /// `src/compiler/x86-64/c-call.lisp` and `contrib/sb-cover/cover.lisp`.
+    ///
+    /// ### Why this widens rather than terminates
+    ///
+    /// The new atom extent is a strict superset of the old one for every
+    /// input: the boundary test loses cases, never gains them, so a token
+    /// that used to be one token cannot become two. Nothing re-emitted can
+    /// acquire a separator it did not have, which is the shape of corruption
+    /// this reader has shipped four times.
+    ///
+    /// ### Why Scheme and Emacs Lisp are deliberately not here
+    ///
+    /// Both would gain only `{` and `}`, since [`Self::allows_delimiter`]
+    /// already gives them `[` and `]`. Emacs Lisp's case is clear on the
+    /// source -- `read0`'s terminator test is `strchr ("\"';#()[]`,", c)`,
+    /// which has no brace, so `a{b}` really is one symbol there. Scheme's is
+    /// not: R7RS 7.1.1 *reserves* `{` and `}` rather than assigning them a
+    /// type, Guile's reader treats them as constituents and Chez signals on
+    /// them. Neither has been measured against its own reader the way this
+    /// was against SBCL, and a brace is rare enough in both that the change
+    /// would be an unmeasured rider on a measured fix. Each is worth doing
+    /// on its own evidence.
+    pub(super) const fn unused_brackets_are_constituents(self) -> bool {
+        matches!(self.dialect, Dialect::CommonLisp)
+    }
+
+    /// Whether `byte` ends the token before it because it delimits a list.
+    ///
+    /// The dialect-blind [`Self::is_raw_delimiter`] answers for all three
+    /// bracket pairs at once. That is right for the dialects that use all
+    /// three and wrong for the ones that do not, so the dialects opted into
+    /// [`Self::unused_brackets_are_constituents`] narrow it to the pairs
+    /// [`Self::allows_delimiter`] actually admits.
+    pub(super) const fn is_token_delimiter(self, byte: u8) -> bool {
+        let delimiter = match Delimiter::from_open(byte) {
+            Some(delimiter) => Some(delimiter),
+            None => Delimiter::from_close(byte),
+        };
+        match delimiter {
+            None => false,
+            Some(delimiter) => {
+                !self.unused_brackets_are_constituents() || self.allows_delimiter(delimiter)
+            }
+        }
+    }
+
     /// Whether a backtick opens a long string in this dialect.
     ///
     /// Janet is the only one. Its `root` state sends every backtick to the
@@ -379,7 +464,7 @@ impl DialectReaderPolicy {
     pub(super) fn is_atom_boundary(self, bytes: &[u8], pos: usize) -> bool {
         bytes.get(pos).is_none_or(|byte| {
             self.is_whitespace(*byte)
-                || Self::is_raw_delimiter(*byte)
+                || self.is_token_delimiter(*byte)
                 // Dialect first: `self.dialect` is loop-invariant across the
                 // per-byte calls this makes for every atom in the document, so
                 // for the nine dialects without long strings the test folds
@@ -1145,6 +1230,81 @@ impl DialectReaderPolicy {
         }
     }
 
+    /// Scheme's `#`-dispatch table.
+    ///
+    /// [`Self::classify_racket`] below records that Racket used to share this
+    /// function and that the sharing was itself the defect. It also names the
+    /// debt this arm pays off: "`#'`, `` #` ``, `#,`, `#,@` are R6RS lexical
+    /// syntax that Guile, Chez and Chicken all accept, so Scheme has a real gap
+    /// here too, but closing it is a change to a *different* dialect's reader
+    /// that needs its own Scheme corpus audit rather than a rider on this one."
+    ///
+    /// That audit was run. Over 6185 content-deduplicated files from the source
+    /// trees of seven Scheme implementations — Gerbil, Sagittarius, Gauche,
+    /// Chibi, Guile, Cyclone and Chez — **2253 (36.4%) failed to parse, and
+    /// 2135 of those failures (94.8%) were an `UnsupportedReaderDispatch` on
+    /// `#`**. A file that does not parse is a file no command in this workspace
+    /// can say anything about, so this capped every Scheme lint rule at
+    /// two-thirds of its corpus. Guile's own `read` was the oracle: it accepts
+    /// 3979 of those files, and over the subset both readers accept, the spans
+    /// `inspect outline` reports already agreed with Guile's data — the reader
+    /// was not reading Scheme *wrongly*, it was refusing too much of it.
+    ///
+    /// | source | reading | handled by | corpus files |
+    /// |---|---|---|---|
+    /// | `#;` | datum comment | this arm | — |
+    /// | `#(…)` | vector | [`ReaderPrefix::HashLiteral`] | — |
+    /// | `#\c` | character | `character_literal_prefix_width` | — |
+    /// | `#t` `#f` `#e` `#i` `#b` `#o` `#d` `#x` | booleans, exactness, radix | scan as plain atoms | — |
+    /// | `#!fold-case` `#!r6rs` `#!eof` | reader directives | scan as plain atoms | — |
+    /// | `#0=` `#0#` | datum label and reference | [`classify_numeric_dispatch`] | — |
+    /// | `##name` | Gambit namespace-qualified identifier | this arm | 1045 |
+    /// | `#:name` | keyword | scans as a plain atom | 299 |
+    /// | `#vu8(…)` `#u8(…)` `#f64(…)` | R6RS / SRFI-4 homogeneous vector | [`scheme_uniform_vector_width`] | 262 |
+    /// | `#'x` `` #`x `` `#,x` `#,@x` | R6RS `syntax` / `quasisyntax` / `unsyntax` | this arm | 195 |
+    /// | `#"…"` | bytevector (R6RS, Racket) / interpolated string (Gauche) | [`ReaderPrefix::HashLiteral`] | 90 |
+    /// | `#%name` `#3%name` | Chez primitive reference | scans as a plain atom | 14 |
+    /// | `#*"…"` | bytevector from a string literal | this arm | 21 |
+    /// | `#/re/` `#[a-z]` `#{sym}` `#<<TAG` `#36rff` `#?=` | implementation-specific | refused loudly | 205 |
+    ///
+    /// ### Why the keyword arm was dead code
+    ///
+    /// The `#:` arm carried `if matches!(self.dialect, Dialect::Racket)`, and
+    /// this function is only ever reached through `Dialect::Scheme` — Racket
+    /// has had its own table since it stopped sharing this one. So the guard
+    /// could never fire, and `#:use-module` fell through to the refusal at the
+    /// bottom. That single dead guard is **289 of Guile's 304 failures**, which
+    /// is why Guile — the implementation whose reader is the oracle here —
+    /// scored worst of the seven at 27.6%.
+    ///
+    /// ### `##name` and `#%name` are identifiers, not dispatches
+    ///
+    /// Both return `None` for the reason [`Self::classify_racket`] gives for
+    /// `#%app`: the token is handed whole to the atom scanner, which already
+    /// stops in the right place because neither `#` nor `%` is an atom
+    /// boundary. `##car` is how Gambit — and therefore Gerbil, and Chicken and
+    /// Cyclone with `##core#lambda` — spells a namespace-qualified identifier;
+    /// `#%$tlc-next` and `#3%vector-copy` are how Chez spells a reference to a
+    /// primitive at a given safety level. Neither is a reader macro, so there
+    /// is no extent to get wrong: the change is a strict widening of one token,
+    /// which is the shape that cannot corrupt by splitting.
+    ///
+    /// Guile's reader rejects `##car`, so the oracle cannot adjudicate that
+    /// arm. It rests on Gambit's documented namespace syntax and on the fact
+    /// that the alternative is not "read it correctly" but "fail the file".
+    ///
+    /// ### What stays refused, and why refusing is the right answer
+    ///
+    /// `#/regexp/` (Gauche, Sagittarius; 133 files), `#[char-set]` (Gauche; 37),
+    /// `#{sym}#` (Guile) and `#{sym}` (Chez; 23 between them), `#<<TAG` (Gambit;
+    /// 10) and Gauche's `#36r` and `#?=` all need a *scan* to find their end,
+    /// not a fixed width, and each one's terminator is escape-sensitive or
+    /// spelled differently by different implementations — Guile closes a symbol
+    /// escape with `}#` and Chez with `}`. Getting such a scan wrong does not
+    /// fail the file; it silently claims the wrong bytes, which is the failure
+    /// mode this reader has shipped four times. A loud refusal is strictly
+    /// better than a guessed extent, so they keep it until one of them earns
+    /// its own audit.
     fn classify_scheme(self, bytes: &[u8], pos: usize) -> Option<ReaderMacro> {
         let byte = *bytes.get(pos)?;
         let next = bytes.get(pos + 1).copied();
@@ -1167,6 +1327,12 @@ impl DialectReaderPolicy {
                 payload_forms: 1,
             });
         }
+        // `#%name` and `#3%name` before the table: the digit run would
+        // otherwise reach the `_` arm and be refused, and `#%` shares the arm
+        // so the two spellings cannot drift apart.
+        if is_scheme_primitive_reference(bytes, pos) {
+            return None;
+        }
         // `#\` at end of input is a truncated character literal, not the
         // character literal for nothing. Reading it as a complete atom made
         // the formatter non-idempotent: it appends a trailing newline, the
@@ -1174,11 +1340,27 @@ impl DialectReaderPolicy {
         // appends another. Common Lisp, Emacs Lisp and Clojure already reject
         // it through their own escape rules; this makes Scheme and Racket
         // agree rather than being the two that do not.
-        if next == Some(b'\\') && bytes.get(pos + 2).is_none() {
+        if next == Some(b'\\') && third.is_none() {
             return Some(ReaderMacro::UnsupportedDispatch { width: 1 });
         }
         match next {
-            Some(b'(') => prefix(ReaderPrefix::HashLiteral, 1),
+            // `#(1 2)` is a vector and `#"…"` a bytevector in R6RS and Racket,
+            // an interpolated string in Gauche. All three are one dispatch byte
+            // glued to the literal after it, which is what `HashLiteral`
+            // spells, and keeping the payload visible rather than opaque
+            // matters: `#(a b)` really does contain data a rule may want to
+            // read. Brackets are deliberately absent — `#[a-z]` is Gauche's
+            // char-set literal, not a bracketed vector.
+            Some(b'(' | b'"') => prefix(ReaderPrefix::HashLiteral, 1),
+            // `#*"…"` is a bytevector written from a string literal (Gauche,
+            // Sagittarius). The `"` is required: `#*` alone has no meaning, and
+            // claiming it did would consume whatever followed as a payload.
+            // `MultiDatum` rather than `HashLiteral` because the dispatch is
+            // two bytes and `HashLiteral` re-emits itself as one.
+            Some(b'*') if third == Some(b'"') => Some(ReaderMacro::MultiDatum {
+                width: 2,
+                payload_forms: 1,
+            }),
             Some(
                 b'\\' | b't' | b'T' | b'f' | b'F' | b'b' | b'B' | b'o' | b'O' | b'd' | b'D' | b'x'
                 | b'X' | b'e' | b'E' | b'i' | b'I',
@@ -1239,8 +1421,14 @@ impl DialectReaderPolicy {
                 width: 2 + usize::from(third == Some(b'@')),
                 payload_forms: 1,
             }),
-            // What is deliberately *not* here: `##name` (Gambit's namespaced
-            // identifiers, 257 failures), `#/re/` `#"str"` `#[char-set]`
+            // `##name`: Gambit's namespace-qualified identifier, and with it
+            // Gerbil's whole runtime and Chicken/Cyclone's `##core#lambda`.
+            // Guile's reader rejects `##car`, so the oracle cannot adjudicate
+            // this arm; it rests on Gambit's documented namespace syntax and
+            // on the fact that the alternative is not "read it correctly" but
+            // "fail the file".
+            Some(b'#') => None,
+            // What is deliberately *not* here: `#/re/` `#"str"` `#[char-set]`
             // (Gauche, 68 between them) and `#{sym}#` (Guile's extended
             // symbols, 3). Guile's reader rejects every one of them, so they
             // are not Scheme — they are per-implementation extensions that
@@ -1953,6 +2141,25 @@ const RACKET_HASH_SPELLINGS: [&[u8]; 4] = [b"hasheqv", b"hashalw", b"hasheq", b"
 /// `read-struct`, `read-hash` and `read-vector` each accept `(`, `[` and `{`.
 fn opens_sequence(bytes: &[u8], pos: usize) -> bool {
     matches!(bytes.get(pos), Some(b'(' | b'[' | b'{'))
+}
+
+/// Whether a Chez Scheme primitive reference — `#%name`, `#2%name`, `#3%name` —
+/// starts at `pos`.
+///
+/// Chez's reader sends `#%` to `read-symbol` and the digit form to the same
+/// place after recording the safety level, so all three are *identifiers*:
+/// `#3%vector-copy` names the unsafe primitive `vector-copy`. Returning `None`
+/// for them hands the token to the atom scanner, which stops in the right place
+/// because neither `#` nor `%` is an atom boundary.
+///
+/// The digit run must be tested here rather than in the caller's `match next`,
+/// because `next` is the first *digit* for `#3%foo` and the `%` for `#%foo`.
+fn is_scheme_primitive_reference(bytes: &[u8], pos: usize) -> bool {
+    let mut cursor = pos + 1;
+    while matches!(bytes.get(cursor), Some(byte) if byte.is_ascii_digit()) {
+        cursor += 1;
+    }
+    bytes.get(cursor) == Some(&b'%')
 }
 
 /// Whether a `#rx`/`#px` payload starts at `pos`: a string, or a byte string.

@@ -3636,32 +3636,35 @@ fn racket_string_terminates_the_token_before_it() {
     }
 }
 
-/// Which Racket-only dispatch forms Scheme still refuses.
+/// Which of the forms Racket gained are Racket's alone, and which Scheme
+/// shares.
 ///
-/// This began as `scheme_reader_is_unchanged_by_the_racket_split`, pinning
-/// that the Racket split left Scheme byte-identical. Four entries have since
-/// moved out of the refusal list below and into
-/// [`scheme_reads_r6rs_syntax_quotation`]: `#'`, `` #` ``, `#,` and `#,@` are
-/// R6RS 4.3.5 lexical syntax, the old doc comment flagged them as a *known
-/// gap* awaiting "its own Scheme corpus audit", and that audit has now been
-/// done — Guile 2.2.7's own `read` accepts all four, and refusing them cost
-/// 23 files of a 2356-file corpus. They were moved rather than deleted: the
-/// list below is still the load-bearing claim that Scheme is not Racket.
+/// This test was written when Racket was split out of `classify_scheme`, and it
+/// pinned every one of those forms as still refused for Scheme. Four of them
+/// were pinned as a *known gap* rather than an intended reading, and the
+/// comment said so: "`#'`, `` #` ``, `#,` and `#,@` are R6RS lexical syntax
+/// that Guile, Chez and Chicken all accept, so this pins a known gap; closing
+/// it is a change to Scheme's reader needing its own Scheme corpus audit."
 ///
-/// Everything remaining is genuinely Racket-only, verified by feeding each
-/// spelling to Guile 2.2.7, which rejects every one.
+/// That audit has been run — 6185 deduplicated files from seven Scheme
+/// implementations, with Guile's own `read` as the oracle — so those four move
+/// here from the refused list below, along with `#"…"`. See
+/// [`DialectReaderPolicy::classify_scheme`] for the measurements. Everything
+/// still in the refused list is genuinely Racket-only, and stays refused.
 #[test]
 fn scheme_still_refuses_racket_only_dispatch() {
     for input in [
-        "(f #\"bytes\")",
         "(f #rx\"a\")",
         "(f #px\"a\")",
         "(f #hash((a . 1)))",
         "(f #s(pt 1))",
         "(f #&x)",
+        // `#{sym}` is Chez's gensym syntax and `#{sym}#` Guile's symbol escape
+        // — two different terminators for the same opener, which is why
+        // Scheme refuses both rather than guessing an extent.
         "(f #{1})",
-        // `#[` is a vector in Racket but not in Scheme: `classify_scheme`'s
-        // dispatch table admits `#(` alone.
+        // `#[` is a vector in Racket, and Gauche's char-set literal in Scheme.
+        // `classify_scheme`'s dispatch table admits `#(` alone.
         "(f #[1 2])",
         "(f #3(0))",
         "#<<END\nx\nEND\n",
@@ -3671,6 +3674,32 @@ fn scheme_still_refuses_racket_only_dispatch() {
             "{input} should still be refused for Scheme"
         );
     }
+    // R6RS 4.3.5's `syntax`/`quasisyntax`/`unsyntax` and the bytevector
+    // string. These four moved out of the list above; the audit their old
+    // comment asked for found `#'` alone in 184 corpus files.
+    for (input, children) in [
+        ("(f #'x)", 2usize),
+        ("(f #`x)", 2),
+        ("(f #,x)", 2),
+        ("(f #,@x)", 2),
+        ("(f #\"bytes\")", 2),
+    ] {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::Scheme)
+            .unwrap_or_else(|error| panic!("{input}: {error}"));
+        assert_eq!(
+            tree.root_view().children[0].children.len(),
+            children,
+            "{input}"
+        );
+    }
+    // `#'x` keeps its child visible to rename and every lint rule, which is
+    // the whole reason it is a `ReaderPrefix` and the other three are not.
+    let input = "(f #'target)";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::Scheme).expect("valid");
+    assert_eq!(
+        tree.root_view().children[0].children[1].span.slice(input),
+        "#'target"
+    );
     // `#u8(…)` is R7RS and stays; Racket's own `read-dispatch` has no `#\u`
     // clause, so it is refused there (pinned above) and kept here.
     let input = "(f #u8(1 2))";
@@ -3854,26 +3883,80 @@ fn scheme_reads_guile_nil_but_not_every_hash_n() {
 
 /// What Scheme deliberately still refuses, and why it is not a gap.
 ///
-/// Each of these is a *per-implementation* extension: Gambit's namespaced
-/// `##car`, Gauche's `#/re/`, `#"interpolated"` and `#[char-set]`, Guile's
-/// `#{extended symbol}#`. Between them they are every remaining failure
-/// cluster in the corpus (349 of 2352 files). They are refused on purpose —
-/// Guile's reader rejects the Gauche and Gambit spellings and vice versa, so
-/// admitting them into one `Dialect::Scheme` would make this reader accept a
-/// language no implementation actually reads. Separating them needs a
-/// per-implementation flavour of the dialect, which is a larger change.
+/// Each of these is a *per-implementation* extension: Gauche's `#/re/` and
+/// `#[char-set]`, Guile's `#{extended symbol}#`. Guile's reader rejects the
+/// Gauche spellings and Gauche rejects Guile's, so admitting them into one
+/// `Dialect::Scheme` would make this reader accept a language no
+/// implementation actually reads. Separating them needs a per-implementation
+/// flavour of the dialect, which is a larger change.
+///
+/// Gambit's `##name` and Gauche's `#"interpolated"` used to be refused here
+/// too; see [`scheme_reads_gambit_namespace_qualified_identifiers`] and
+/// [`scheme_still_refuses_racket_only_dispatch`] for why they moved.
 #[test]
 fn scheme_refuses_per_implementation_extensions() {
-    for input in [
-        "(##car x)",
-        "(f #/re/)",
-        "(f #\"interpolated ~x\")",
-        "(f #[a-z])",
-        "(f #{sym}#)",
-    ] {
+    for input in ["(f #/re/)", "(f #[a-z])", "(f #{sym}#)"] {
         assert!(
             SyntaxTree::parse_with_dialect(input, Dialect::Scheme).is_err(),
             "{input} is implementation-specific and must still refuse"
+        );
+    }
+}
+
+/// `##name` is Gambit's namespace-qualified identifier, and with it Gerbil's
+/// whole runtime and Chicken/Cyclone's `##core#lambda`. Guile's reader
+/// rejects `##car`, so the oracle cannot adjudicate this arm; it rests on
+/// Gambit's documented namespace syntax and on the fact that the alternative
+/// is not "read it correctly" but "fail the file". Chez's `#%name` /
+/// `#3%name` primitive references are pinned alongside it, since both are
+/// identifiers handed whole to the atom scanner rather than reader macros.
+#[test]
+fn scheme_reads_gambit_namespace_qualified_identifiers() {
+    for (input, children, second) in [
+        ("(f ##car)", 2usize, "##car"),
+        ("(f ##core#lambda)", 2, "##core#lambda"),
+        ("(f #%$tlc-next)", 2, "#%$tlc-next"),
+        ("(f #3%vector-copy)", 2, "#3%vector-copy"),
+        ("(f #2%apply)", 2, "#2%apply"),
+    ] {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::Scheme)
+            .unwrap_or_else(|error| panic!("{input}: {error}"));
+        let form = &tree.root_view().children[0];
+        assert_eq!(form.children.len(), children, "{input}");
+        assert_eq!(form.children[1].span.slice(input), second, "{input}");
+    }
+}
+
+/// `##` does not leak into dialects that never asked for it, and does not
+/// regress the dialects that already read it their own way.
+///
+/// Four of the nine already read `##car` as an ordinary token before this
+/// change: Clojure because `##Inf`/`##NaN` are its symbolic values, Fennel
+/// because `#` is its `hashfn` shorthand, and LFE and Hy through their own
+/// tables. Asserting a refusal for them would fail on behaviour this change
+/// never touched.
+#[test]
+fn scheme_hash_hash_stays_scoped_to_scheme() {
+    for dialect in [
+        Dialect::CommonLisp,
+        Dialect::EmacsLisp,
+        Dialect::Carp,
+        // Racket reads `##car` as `#` dispatching on `#`, which is its own
+        // "bad syntax" — the same refusal, through a different table.
+        Dialect::Racket,
+        // Janet's `#` is a line comment, so `##car)` comments out the closing
+        // paren and the list never closes. A different error, still an error.
+        Dialect::Janet,
+    ] {
+        assert!(
+            SyntaxTree::parse_with_dialect("(f ##car)", dialect).is_err(),
+            "{dialect:?} should not have gained Gambit's `##`"
+        );
+    }
+    for dialect in [Dialect::Clojure, Dialect::Lfe, Dialect::Hy, Dialect::Fennel] {
+        assert!(
+            SyntaxTree::parse_with_dialect("(f ##car)", dialect).is_ok(),
+            "{dialect:?} read `##car` before this change and must still"
         );
     }
 }
