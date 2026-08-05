@@ -361,7 +361,47 @@ const _: () = assert!(RULE_COUNT == 358);
 // leaves the file untouched. But `pedantic` and `all` both still delete, so a
 // tag would only move the deletion behind flags users routinely pass. Only
 // `ReportOnly` withholds it at every preset.
-const _: () = assert!(fixable_count() == 104);
+//
+// And down by 4, to 100: `leftover-step-call`, `leftover-time-benchmark-call`,
+// `leftover-trace-call` and `leftover-format-debug-marker` follow their two
+// siblings. Measured over 31,634 SHA-256-deduplicated files / 1.108 GB, seed
+// 20260805, stratified over replacement-kind and span-size tercile: step
+// **50 of 50 false**, trace **19 of 19** (a census, not a sample),
+// format-debug-marker **6 of 6**, time **40 of 50**.
+//
+// **The byte-delta oracle that convicted `leftover-inspect-call` finds nothing
+// here: zero files cut below half, for every one of the five.** An unwrap costs
+// about seven bytes. Gating on it would have cleared all five. The damage is
+// semantic, and only adjudication finds it -- ACL2's `m1.lisp` loses 28 bytes,
+// 0.4%, and still parses, while `(equal s (step s))` becomes `(equal s s)`, a
+// halt predicate rewritten to unconditionally true, and
+// `(run (cdr sched) (step s))` becomes `(run (cdr sched) s)`, a machine that
+// never advances.
+//
+// Two mechanisms beyond the package-level rebinding that broke
+// `leftover-inspect-call`. Package-*qualified* heads are matched literally, so
+// `MILAWA::BREAK`, `l:trace` and `M1::STEP` all hit. And `binding_position`
+// models `let` and a `defun` lambda list but not `dolist`, CFFI's
+// `with-foreign-object`, ACL2's `define` parameter lists, `b*`, or `:instance`
+// hint pairs -- so `(dolist (time times) (use time))` loses its loop variable
+// and still parses. `format-debug-marker` has its own cause: the word-boundary
+// check is one-sided, so `debugger`, `debug-vregs` and `DEBUG_ASDF_TEST` match;
+// its worst case deletes a 638-byte user-facing ACL2 error message asking the
+// user to report a bug. A trailing boundary kills only 2 of its 6, so
+// narrowing was measured and rejected.
+//
+// `leftover-break-call` is deliberately kept `Fixable`. Its position analysis
+// suppresses 46 of 51 findings, three of the five survivors are defensible
+// leftovers, and 40% is not the 97-100% that justified the other demotions.
+//
+// One judgement call, recorded because it is contestable: `time`'s 80% counts
+// `(time ...)` in `bench.lisp` / `timetest.lsp` / `test-performance/` as false,
+// on the ground that the timing report is what those files exist to produce --
+// the same "the call is the program's effect" reading that settled
+// `leftover-print-debug`. Reject that reading and `time` is 12%, its six
+// binding-form corruptions, and a narrowing candidate instead. The other three
+// demotions do not depend on it.
+const _: () = assert!(fixable_count() == 100);
 // 164 (through PR #82) + 31 of this branch's 37 rules. The other 6 are
 // `Severity::Error`: `when-unless-implicit-nil-misused` and the five
 // `lint-safety` rules that report an exploitable defect rather than a risk —

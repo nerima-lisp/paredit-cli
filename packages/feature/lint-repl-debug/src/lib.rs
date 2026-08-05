@@ -8,6 +8,8 @@ pub mod leftover_print_debug;
 pub mod leftover_step_call;
 pub mod leftover_time_benchmark_call;
 pub mod leftover_trace_call;
+#[cfg(test)]
+mod report_only_tests;
 pub mod support;
 
 // One module per rule: the root's REGISTRY names each rule's META and RULE
