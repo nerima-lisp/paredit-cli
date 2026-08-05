@@ -343,7 +343,12 @@ fn uses_the_input_dialect_for_reader_syntax_during_removal() {
     let text = "(defun el-reader () [?\\)])\n";
     let form = "(defun el-reader () [?\\)])";
     assert!(SyntaxTree::parse_with_dialect(text, Dialect::EmacsLisp).is_ok());
-    assert!(SyntaxTree::parse_with_dialect(text, Dialect::CommonLisp).is_err());
+    // `[`, `]` and `?` are Common Lisp constituent characters and `\)` a
+    // single-escaped `)`, so this also parses as Common Lisp -- just as a
+    // symbol-heavy form rather than a character literal in a vector. The
+    // point of this test is that removal reads `text` with the *input*
+    // dialect (Emacs Lisp) rather than either reader's opinion of it.
+    assert!(SyntaxTree::parse_with_dialect(text, Dialect::CommonLisp).is_ok());
     let mut item = definition(text, form, "el-reader", DefinitionCategory::Function);
     item.package = None;
     let request = RemoveUnusedDefinitionsRequest {

@@ -848,7 +848,7 @@ impl<'a> Parser<'a> {
                 }
                 self.close_list()?;
             }
-            byte if DialectReaderPolicy::is_raw_delimiter(byte) => {
+            byte if self.policy.is_token_delimiter(byte) => {
                 return Err(self.raw_delimiter_error());
             }
             b'"' => self.atom_string_with_prefixes(prefixes)?,
@@ -1030,7 +1030,7 @@ impl<'a> Parser<'a> {
                                 position: self.pos.get(),
                             });
                         }
-                        byte if DialectReaderPolicy::is_raw_delimiter(byte) => {
+                        byte if self.policy.is_token_delimiter(byte) => {
                             return Err(self.raw_delimiter_error());
                         }
                         b'"' => self.skip_string()?,

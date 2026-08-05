@@ -417,12 +417,14 @@ mod tests {
     /// as clean.
     #[test]
     fn a_non_clojure_dialect_is_reported_as_unmodelled() {
-        // `[` is not readable as Common Lisp at all, so the Clojure spelling
-        // cannot even be parsed as one. The Common Lisp shape closest to it
-        // still reaches no finding.
+        // `[`, `]`, `{` and `}` are constituent characters in Common Lisp, not
+        // delimiters, so the Clojure spelling still parses as Common Lisp —
+        // just as a run of ordinary symbols rather than a `defn` this rule
+        // recognizes. The Common Lisp shape closest to it still reaches no
+        // finding.
         assert!(
             SyntaxTree::parse_with_dialect("(defn f [x] {:pre [true]} x)", Dialect::CommonLisp)
-                .is_err()
+                .is_ok()
         );
 
         let tree =

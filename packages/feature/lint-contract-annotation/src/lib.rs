@@ -350,22 +350,22 @@ mod engine_pass_tests {
     }
 
     /// The Clojure rule, the other way round. It has no dual-syntax source: it
-    /// needs a `[…]` parameter vector and a `{…}` condition map, and neither
-    /// the Common Lisp nor the Scheme reader accepts those. So its silence
-    /// elsewhere is pinned two ways — the Clojure spelling is not readable at
-    /// all as those dialects, and every reader that *does* accept the bytes
-    /// reaches no finding.
+    /// needs a `[…]` parameter vector and a `{…}` condition map, which neither
+    /// the Scheme reader nor Common Lisp's own `let`/`defn` grammar has a
+    /// binding-vector or map-literal reading for. Common Lisp's reader does
+    /// still accept the bytes — `[`, `]`, `{` and `}` are CLHS-constituent
+    /// characters, not delimiters, so the trigger source reads as a run of
+    /// ordinary symbols rather than failing outright — which is exactly why
+    /// it joins the "whichever reader accepts these bytes must still find
+    /// nothing" loop below instead of a dialect it cannot even parse as.
     #[test]
     fn the_clojure_only_rule_fires_on_clojure_and_on_nothing_else() {
         for (rule, source) in CLOJURE_TRIGGERS {
             assert_eq!(fired(source, Dialect::Clojure), vec![rule]);
-            assert!(
-                !parses_as(source, Dialect::CommonLisp),
-                "{rule}'s trigger must not even read as Common Lisp"
-            );
             // Whichever of the remaining readers accept these bytes must still
             // find nothing; the ones that reject them cannot report either.
             for dialect in [
+                Dialect::CommonLisp,
                 Dialect::Racket,
                 Dialect::Scheme,
                 Dialect::EmacsLisp,
