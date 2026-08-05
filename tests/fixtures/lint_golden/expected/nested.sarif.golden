@@ -3348,7 +3348,7 @@
               "id": "leftover-trace-call",
               "properties": {
                 "category": "suspicious",
-                "fixable": true,
+                "fixable": false,
                 "severity": "warning",
                 "tags": []
               },
@@ -3384,7 +3384,7 @@
               "id": "leftover-time-benchmark-call",
               "properties": {
                 "category": "suspicious",
-                "fixable": true,
+                "fixable": false,
                 "severity": "warning",
                 "tags": []
               },
@@ -3396,7 +3396,7 @@
               "id": "leftover-step-call",
               "properties": {
                 "category": "suspicious",
-                "fixable": true,
+                "fixable": false,
                 "severity": "warning",
                 "tags": []
               },
@@ -3420,7 +3420,7 @@
               "id": "leftover-format-debug-marker",
               "properties": {
                 "category": "suspicious",
-                "fixable": true,
+                "fixable": false,
                 "severity": "warning",
                 "tags": []
               },

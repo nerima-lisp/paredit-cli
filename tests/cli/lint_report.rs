@@ -1137,8 +1137,14 @@ fn cli_lint_list_rules_marks_fixability() {
     // different reason -- `pedantic` and `all` both still delete, so a tag only
     // hides the deletion behind flags users routinely pass, and only
     // `ReportOnly` withholds it at every preset.
+    // And by 4, to 100: `leftover-step-call`, `leftover-time-benchmark-call`,
+    // `leftover-trace-call` and `leftover-format-debug-marker` follow their two
+    // siblings to `ReportOnly`. All four are untagged, so once again both
+    // totals move together. `leftover-break-call` is the one member of the
+    // family deliberately kept `Fixable`, at a measured 40% rather than the
+    // 97-100% of the rest -- so this number does not move by 5.
     assert_eq!(
-        fixable_count, 104,
+        fixable_count, 100,
         "the fixable rules the default preset admits"
     );
 
