@@ -523,7 +523,12 @@ mod tests {
     fn parses_reader_syntax_with_the_input_dialect() {
         let text = "(defun el-reader () [?\\)])\n";
         assert!(SyntaxTree::parse_with_dialect(text, Dialect::EmacsLisp).is_ok());
-        assert!(SyntaxTree::parse_with_dialect(text, Dialect::CommonLisp).is_err());
+        // `[`, `]` and `?` are Common Lisp constituent characters and `\)` a
+        // single-escaped `)`, so this also parses as Common Lisp -- just as a
+        // symbol-heavy form rather than a character literal in a vector. The
+        // point of this test is that removal reads `text` with the *input*
+        // dialect (Emacs Lisp) rather than either reader's opinion of it.
+        assert!(SyntaxTree::parse_with_dialect(text, Dialect::CommonLisp).is_ok());
         let files = vec![parsed_file("reader.el", Dialect::EmacsLisp, text)];
 
         let reports = collect_unused_definition_candidates(&files).expect("report must build");

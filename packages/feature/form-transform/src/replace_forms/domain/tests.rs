@@ -128,7 +128,14 @@ fn supports_each_known_dialect_with_its_reader_semantics() {
 fn dialect_specific_reader_semantics_do_not_leak() {
     assert!(SyntaxTree::parse_with_dialect(r"(list #\))", Dialect::Clojure).is_err());
     assert!(SyntaxTree::parse_with_dialect(r"[?\)]", Dialect::EmacsLisp).is_ok());
-    assert!(SyntaxTree::parse_with_dialect(r"[?\)]", Dialect::CommonLisp).is_err());
+    // `[`, `]` and `?` are constituent characters in Common Lisp (CLHS 2.4.2),
+    // not delimiters, and `\)` is a single-escaped `)` -- so this reads as one
+    // ordinary symbol rather than failing. It happens to *also* parse in
+    // Emacs Lisp, just as a different construct (a vector containing the
+    // character literal for `)`); that difference in what it means, not
+    // whether it parses, is what keeps Emacs Lisp's reader semantics from
+    // leaking into Common Lisp's.
+    assert!(SyntaxTree::parse_with_dialect(r"[?\)]", Dialect::CommonLisp).is_ok());
     assert!(
         SyntaxTree::parse_with_dialect(r#"(vector #inst "2020-01-01")"#, Dialect::CommonLisp)
             .is_err()

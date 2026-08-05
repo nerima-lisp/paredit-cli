@@ -274,15 +274,21 @@ mod engine_pass_tests {
     }
 
     /// `future-promise-never-realized` has no dual-syntax source at all: it
-    /// requires a `[…]` binding vector, and the Common Lisp reader rejects `[`
-    /// outright rather than parsing it as a list. So its Common Lisp silence is
-    /// pinned two ways — the Clojure spelling is not readable as Common Lisp,
-    /// and the Common Lisp `let` spelling that *is* head-matched by the rule's
-    /// `HeadFilter::Heads` reaches no finding.
+    /// requires a `[…]` binding vector, which Common Lisp has no `let` syntax
+    /// for. `[` and `]` are constituent characters in Common Lisp (CLHS
+    /// 2.4.2), not delimiters, so the Clojure spelling still *parses* as
+    /// Common Lisp — just not as anything shaped like the `let` this rule
+    /// looks for, since `[f` and `]` read as ordinary symbols rather than
+    /// opening and closing a binding form. So its Common Lisp silence is
+    /// pinned two ways — the Clojure spelling does not produce a finding once
+    /// read as Common Lisp, and the Common Lisp `let` spelling that *is*
+    /// head-matched by the rule's `HeadFilter::Heads` reaches no finding
+    /// either.
     #[test]
     fn the_clojure_only_future_rule_is_silent_on_common_lisp() {
         let clojure = "(let [f (future (risky))] (other-work))";
-        assert!(SyntaxTree::parse_with_dialect(clojure, Dialect::CommonLisp).is_err());
+        assert!(SyntaxTree::parse_with_dialect(clojure, Dialect::CommonLisp).is_ok());
+        assert_eq!(fired(clojure, Dialect::CommonLisp), Vec::<&str>::new());
 
         let common_lisp = "(let ((f (future (risky)))) (other-work))";
         assert_eq!(fired(common_lisp, Dialect::CommonLisp), Vec::<&str>::new());
