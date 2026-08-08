@@ -41,11 +41,14 @@ impl Formatter {
                     // `compact_node` only measures the argument's own text.
                     let is_last_child = position + 1 == node.children.len();
                     let max_width = self.effective_max_width(tree, node_id);
-                    let inline = self.compact_node(tree, *child, child_start).filter(|inline| {
-                        !is_last_child
-                            || child_start.saturating_add(UnicodeWidthStr::width(inline.as_str()))
-                                < max_width
-                    });
+                    let inline = self
+                        .compact_node(tree, *child, child_start)
+                        .filter(|inline| {
+                            !is_last_child
+                                || child_start
+                                    .saturating_add(UnicodeWidthStr::width(inline.as_str()))
+                                    < max_width
+                        });
                     if let Some(inline) = inline {
                         output.push(' ');
                         let col = Self::last_line_width(output);
