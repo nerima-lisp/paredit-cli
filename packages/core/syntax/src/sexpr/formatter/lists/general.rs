@@ -34,17 +34,23 @@ impl Formatter {
                     // If the first argument fits inline on the head line,
                     // align subsequent siblings under it. Otherwise break
                     // to one column past the opening delimiter.
-                    let child_start =
-                        Self::last_line_width(output).saturating_add(1);
-                    if let Some(inline) =
-                        self.compact_node(tree, *child, child_start)
-                    {
+                    let child_start = Self::last_line_width(output).saturating_add(1);
+                    // When this argument is also the last child, the list's
+                    // own closing delimiter lands right after it on the same
+                    // line, so it must be charged against the budget too —
+                    // `compact_node` only measures the argument's own text.
+                    let is_last_child = position + 1 == node.children.len();
+                    let max_width = self.effective_max_width(tree, node_id);
+                    let inline = self.compact_node(tree, *child, child_start).filter(|inline| {
+                        !is_last_child
+                            || child_start.saturating_add(UnicodeWidthStr::width(inline.as_str()))
+                                < max_width
+                    });
+                    if let Some(inline) = inline {
                         output.push(' ');
                         let col = Self::last_line_width(output);
                         output.push_str(&inline);
-                        if head_line_count
-                            .is_some_and(|hl| output.lines().count() == hl)
-                        {
+                        if head_line_count.is_some_and(|hl| output.lines().count() == hl) {
                             first_arg_column = Some(col);
                         }
                     } else {
@@ -54,8 +60,7 @@ impl Formatter {
                     }
                 }
                 _ => {
-                    let element_column = first_arg_column
-                        .unwrap_or(base_column.saturating_add(1));
+                    let element_column = first_arg_column.unwrap_or(base_column.saturating_add(1));
                     Self::break_to_column(element_column, output);
                     self.format_node(tree, *child, depth + 1, output);
                 }

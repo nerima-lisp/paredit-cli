@@ -1144,7 +1144,7 @@ impl Formatter {
     /// resolves every style generically, rather than special-casing
     /// `General`, so a future phase that teaches another style to compact
     /// gets a working width profile for free.
-    fn effective_max_width(&self, tree: &SyntaxTree, node_id: NodeId) -> usize {
+    pub(super) fn effective_max_width(&self, tree: &SyntaxTree, node_id: NodeId) -> usize {
         let Some(head) = self.head_text(tree, node_id) else {
             return self.max_width;
         };
