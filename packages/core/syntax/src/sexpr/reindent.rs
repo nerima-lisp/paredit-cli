@@ -31,37 +31,87 @@ use super::types::{ByteOffset, ByteSpan, NodeId};
 /// The count is what `lisp-indent-function` calls the form's "number of
 /// distinguished arguments": `defun` has two (name and lambda list), `when` has
 /// one (the test), `progn` has none.
-const BODY_FORMS: [(&str, usize); 30] = [
+const BODY_FORMS: [(&str, usize); 70] = [
+    // ── Definition forms ──
     ("defun", 2),
     ("defmacro", 2),
     ("defmethod", 2),
     ("defgeneric", 2),
     ("defclass", 3),
     ("define-condition", 3),
+    // ── Lambda ──
     ("lambda", 1),
+    ("named-lambda", 2),
+    // ── Binding forms ──
     ("let", 1),
     ("let*", 1),
     ("flet", 1),
     ("labels", 1),
+    ("generic-flet", 1),
+    ("generic-labels", 1),
     ("macrolet", 1),
+    ("compiler-macrolet", 1),
     ("symbol-macrolet", 1),
+    ("handler-bind", 1),
+    ("restart-bind", 1),
+    // ── Control flow ──
     ("when", 1),
     ("unless", 1),
+    ("block", 1),
+    ("catch", 1),
+    ("unwind-protect", 1),
+    ("eval-when", 1),
+    ("locally", 1),
+    // ── Iteration ──
     ("dolist", 1),
     ("dotimes", 1),
     ("do", 2),
     ("do*", 2),
+    ("prog", 2),
+    ("prog*", 2),
+    // ── Clause forms ──
     ("case", 1),
     ("ecase", 1),
+    ("ccase", 1),
     ("typecase", 1),
     ("etypecase", 1),
+    ("ctypecase", 1),
+    ("handler-case", 1),
+    // ── progn-like ──
+    ("progn", 0),
+    ("prog1", 1),
+    ("prog2", 2),
+    // ── with-* macros ──
     ("with-open-file", 1),
+    ("with-open-stream", 1),
+    ("with-input-from-string", 1),
+    ("with-output-to-string", 1),
+    ("with-hash-table-iterator", 1),
+    ("with-package-iterator", 1),
     ("with-slots", 2),
     ("with-accessors", 2),
+    ("with-compilation-unit", 1),
+    ("with-standard-io-syntax", 1),
+    ("with-condition-restarts", 2),
+    // ── Value binding ──
     ("multiple-value-bind", 2),
     ("destructuring-bind", 2),
-    ("handler-case", 1),
-    ("progn", 0),
+    ("multiple-value-call", 1),
+    ("multiple-value-prog1", 1),
+    ("progv", 2),
+    // ── Emacs Lisp ──
+    ("defvar", 2),
+    ("defconst", 2),
+    ("defcustom", 2),
+    ("defgroup", 2),
+    ("defalias", 2),
+    ("defvaralias", 2),
+    ("save-excursion", 0),
+    ("save-restriction", 0),
+    ("save-current-buffer", 0),
+    ("track-mouse", 0),
+    ("while", 1),
+    ("condition-case", 2),
 ];
 
 /// How many distinguished arguments `head` takes before its body, or `None`

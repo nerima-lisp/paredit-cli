@@ -25,6 +25,11 @@ pub(super) enum ListStyle {
     Loop,
     HeadBody,
     If,
+    /// `if` in Common Lisp: the test is on the head line and all branches
+    /// (then, else) align at the same distinguished column (two indent
+    /// steps from the form's opening delimiter — the equivalent of Emacs
+    /// `common-lisp-indent-function`'s `(&rest nil)` for `if`).
+    IfAligned,
     /// `(defn name [params]` with the body indented below, falling back to only
     /// the name on the head line when a docstring, attribute map, or multi-arity
     /// clause list follows it.
@@ -86,6 +91,7 @@ pub const STYLE_NAMES: &[&str] = &[
     "one-argument-body",
     "two-argument-body",
     "if-then-else",
+    "if-aligned",
     "cond-clauses",
     "case-clauses",
     "head-body",
@@ -103,6 +109,7 @@ pub(super) fn style_from_name(name: &str) -> Option<ListStyle> {
         "one-argument-body" => Some(ListStyle::OneArgumentBody),
         "two-argument-body" => Some(ListStyle::TwoArgumentBody),
         "if-then-else" => Some(ListStyle::If),
+        "if-aligned" => Some(ListStyle::IfAligned),
         "cond-clauses" => Some(ListStyle::CondClauses),
         "case-clauses" => Some(ListStyle::CaseClauses),
         "head-body" => Some(ListStyle::HeadBody),
@@ -129,6 +136,7 @@ impl Formatter {
         }
         match self.dialect {
             Dialect::Clojure => Self::clojure_style_for_head(head),
+            Dialect::EmacsLisp => Self::elisp_style_for_head(head),
             _ => Self::common_lisp_style_for_head(head),
         }
     }
@@ -155,6 +163,38 @@ impl Formatter {
         }
     }
 
+    /// Emacs Lisp dialect routing: recognizes Elisp-specific operators that
+    /// differ from Common Lisp conventions.  Falls back to the CL table for
+    /// everything else.
+    fn elisp_style_for_head(head: &str) -> ListStyle {
+        let normalized_head = normalize_common_lisp_operator_head(head);
+        match normalized_head.to_ascii_lowercase().as_str() {
+            // def* forms with 'defun indent → name on head line, body indented
+            "defvar"
+            | "defconst"
+            | "defcustom"
+            | "defgroup"
+            | "defalias"
+            | "defvaralias"
+            | "define-derived-mode"
+            | "define-minor-mode" => ListStyle::DefinitionNameBody,
+            // progn-like (indent 0) → all children at body-indent
+            "save-excursion" | "save-restriction" | "save-current-buffer" | "track-mouse" => {
+                ListStyle::HeadBody
+            }
+            // indent 1 → one arg on head line, body indented
+            "while" => ListStyle::OneArgumentBody,
+            // indent 2 → two-component special (then at +4, else at +2)
+            "condition-case" => ListStyle::TwoArgumentBody,
+            // if in Elisp: test at +4 distinguished, then/else at body
+            "if" => ListStyle::If,
+            // Elisp-specific clause forms
+            "pcase" => ListStyle::CaseClauses,
+            "cl-loop" => ListStyle::Loop,
+            _ => Self::common_lisp_style_for_head(head),
+        }
+    }
+
     fn common_lisp_style_for_head(head: &str) -> ListStyle {
         if let Some(operator) = CommonLispOperator::from_head(head) {
             match operator {
@@ -163,6 +203,22 @@ impl Formatter {
                 }
                 CommonLispOperator::Lambda => return ListStyle::Lambda,
                 CommonLispOperator::DefineSymbolMacro => return ListStyle::DefinitionNameBody,
+                CommonLispOperator::Defvar
+                | CommonLispOperator::Defconstant
+                | CommonLispOperator::Defparameter
+                | CommonLispOperator::Defglobal
+                | CommonLispOperator::Defstruct
+                | CommonLispOperator::DefineCondition => {
+                    return ListStyle::DefinitionNameBody;
+                }
+                CommonLispOperator::Defpackage
+                | CommonLispOperator::InPackage
+                | CommonLispOperator::Provide
+                | CommonLispOperator::Require
+                | CommonLispOperator::UsePackage
+                | CommonLispOperator::Import => {
+                    return ListStyle::General;
+                }
                 operator if operator.is_asdf_system_definition() => {
                     return ListStyle::SystemDefinition;
                 }
@@ -190,7 +246,7 @@ impl Formatter {
         let normalized_head = normalize_common_lisp_operator_head(head);
         match normalized_head.to_ascii_lowercase().as_str() {
             "named-lambda" => ListStyle::NamedLambda,
-            "if" => ListStyle::If,
+            "if" => ListStyle::IfAligned,
             "when"
             | "unless"
             | "with-open-file"
@@ -207,11 +263,22 @@ impl Formatter {
             "case" | "ccase" | "ecase" | "typecase" | "ctypecase" | "etypecase" => {
                 ListStyle::CaseClauses
             }
-            "progn" | "prog1" | "prog2" | "tagbody" | "defpackage" | "locally" => {
-                ListStyle::HeadBody
-            }
+            "progn" | "prog1" | "prog2" | "tagbody" | "locally" => ListStyle::HeadBody,
             "declare" | "declaim" | "proclaim" => ListStyle::Declaration,
-            "setq" | "psetq" | "setf" | "psetf" => ListStyle::PairAssignment,
+            "setq" | "psetq" | "setf" | "psetf" | "multiple-value-setq" | "multiple-value-setf" => {
+                ListStyle::PairAssignment
+            }
+            "multiple-value-call"
+            | "multiple-value-prog1"
+            | "pprint-logical-block"
+            | "with-compilation-unit"
+            | "with-standard-io-syntax"
+            | "return-from"
+            | "throw" => ListStyle::OneArgumentBody,
+            "progv" | "with-condition-restarts" | "print-unreadable-object" => {
+                ListStyle::TwoArgumentBody
+            }
+            "generic-flet" | "generic-labels" => ListStyle::LocalFunctions,
             _ => ListStyle::General,
         }
     }

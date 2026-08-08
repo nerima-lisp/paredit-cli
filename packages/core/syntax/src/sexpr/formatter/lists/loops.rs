@@ -12,12 +12,12 @@ impl Formatter {
     ) {
         let node = tree.node(node_id);
         let delimiter = self.list_delimiter(node);
+        let base_column = Self::last_line_width(output);
         output.push(delimiter.open());
         self.format_node(tree, node.children[0], depth + 1, output);
-        // Clauses line up under the first one, one column past the head as
-        // actually written — not past its byte length, which is not a column
-        // count for a non-ASCII head.
-        let continuation_column = Self::last_line_width(output).saturating_add(1);
+        // Emacs default `lisp-loop-keyword-indentation`: keywords and
+        // body forms at six columns from the opening delimiter.
+        let continuation_column = base_column.saturating_add(6);
 
         let mut position = 1;
         let mut conditional_clause_open = false;

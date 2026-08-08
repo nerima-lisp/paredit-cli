@@ -765,7 +765,10 @@ fn preserves_string_that_contains_a_semicolon() {
     let tree = SyntaxTree::parse(input).expect("valid");
     assert_eq!(
         Formatter::new(2).format(&tree),
-        "(defvar path \";not-a-comment\")\n"
+        // `defvar` uses `DefinitionNameBody` (name on head line, value at
+        // body).  The semicolon inside the string is preserved — it is never
+        // mistaken for a comment.
+        "(defvar path\n  \";not-a-comment\")\n"
     );
 }
 
@@ -1372,15 +1375,14 @@ fn clojure_layouts_do_not_leak_into_other_dialects() {
         "(defn greet [first-name last-name] (log first-name) (str first-name \" \" last-name))";
     let tree = SyntaxTree::parse_with_dialect(input, Dialect::Clojure).expect("valid Clojure");
 
-    // Outside Clojure `defn` has no layout of its own, so this is the plain
-    // list layout: every element lines up under `defn`, one column past the
-    // opening delimiter.
+    // Outside Clojure `defn` has no layout of its own, so the plain list
+    // layout applies: `greet` stays on the head line because it fits, and
+    // subsequent elements align under it (Emacs convention for general lists).
     let common_lisp_layout = concat!(
-        "(defn\n",
-        " greet\n",
-        " [first-name last-name]\n",
-        " (log first-name)\n",
-        " (str first-name \" \" last-name))\n"
+        "(defn greet\n",
+        "      [first-name last-name]\n",
+        "      (log first-name)\n",
+        "      (str first-name \" \" last-name))\n"
     );
     assert_eq!(Formatter::new(2).format(&tree), common_lisp_layout);
     assert_eq!(
@@ -2133,14 +2135,9 @@ fn trim_trailing_whitespace_false_keeps_a_comments_trailing_spaces() {
     assert!(untrimmed.contains("space   \n"));
 }
 
-/// A form hugged onto its operator's line, then forced to break internally,
-/// indents its body from the column its own opening delimiter landed on.
-///
-/// Nothing in the existing suite exercised this: every other hugged form is
-/// short enough to stay inline, so the body indentation derived from nesting
-/// depth was never compared against a form that did not start its own line.
-/// Derived from depth, `(unless p ...)` landed at column 6 — three columns
-/// *left* of the `(multiple-value-bind` that contains it.
+/// Common Lisp `if` aligns all branches at the same distinguished column
+/// (two indent steps from the form's opening delimiter), matching Emacs
+/// `common-lisp-indent-function`'s `(&rest nil)` convention for `if`.
 #[test]
 fn indents_a_hugged_form_that_breaks_from_the_column_it_landed_on() {
     let input = "(if (consp value) (multiple-value-bind (copy p) (gethash value copies) (unless p (setf copy value))) value)";
@@ -2148,12 +2145,11 @@ fn indents_a_hugged_form_that_breaks_from_the_column_it_landed_on() {
     assert_eq!(
         Formatter::new(2).format(&tree),
         concat!(
-            "(if (consp value) (multiple-value-bind (copy p) (gethash value copies)\n",
-            //                 ^ column 18: the `multiple-value-bind` list opens here,
-            //                   so its body belongs at column 20.
-            "                    (unless p\n",
-            "                      (setf copy value)))\n",
-            "  value)\n",
+            "(if (consp value)\n",
+            "    (multiple-value-bind (copy p) (gethash value copies)\n",
+            "      (unless p\n",
+            "        (setf copy value)))\n",
+            "    value)\n",
         )
     );
 }
@@ -2176,8 +2172,8 @@ fn aligns_defclass_slots_in_one_column() {
     );
 }
 
-/// The same alignment for `define-condition`, whose slot list has the same
-/// shape.
+/// `define-condition` uses `DefinitionNameBody`: the name is on the head
+/// line and everything else (supers, slot list, options) is at body-indent.
 #[test]
 fn aligns_define_condition_slots_in_one_column() {
     let input = "(define-condition parse-failure (error) ((offset :initarg :offset :reader parse-failure-offset) (message :initarg :message :reader parse-failure-message)) (:report report-parse-failure))";
@@ -2185,7 +2181,8 @@ fn aligns_define_condition_slots_in_one_column() {
     assert_eq!(
         Formatter::new(2).format(&tree),
         concat!(
-            "(define-condition parse-failure (error)\n",
+            "(define-condition parse-failure\n",
+            "  (error)\n",
             "  ((offset :initarg :offset :reader parse-failure-offset)\n",
             "   (message :initarg :message :reader parse-failure-message))\n",
             "  (:report report-parse-failure))\n",
@@ -2250,10 +2247,10 @@ fn binding_continuation_columns_count_display_width_not_bytes() {
     );
 }
 
-/// The same for a form hugged onto a line that already carries wide
-/// characters: `(setf` opens at display column 14, so its second pair lines
-/// up under the first at column 20. Counting the preceding `(適合 値)` in
-/// bytes would have overshot by four columns.
+/// Common Lisp `if` branches at the same distinguished column inside a CJK
+/// context. `setf`'s second pair (`別変数`) aligns under the first (`変数`)
+/// by display column — counting bytes would overshoot because `適合 値` is
+/// 6 display columns but 9 UTF-8 bytes.
 #[test]
 fn a_hugged_form_starts_at_its_display_column_not_its_byte_offset() {
     let input = "(if (適合 値) (setf 変数 (compute-first alpha) 別変数 (compute-second beta)) nil)";
@@ -2261,9 +2258,10 @@ fn a_hugged_form_starts_at_its_display_column_not_its_byte_offset() {
     assert_eq!(
         Formatter::new(2).format(&tree),
         concat!(
-            "(if (適合 値) (setf 変数 (compute-first alpha)\n",
-            "                    別変数 (compute-second beta))\n",
-            "  nil)\n",
+            "(if (適合 値)\n",
+            "    (setf 変数 (compute-first alpha)\n",
+            "          別変数 (compute-second beta))\n",
+            "    nil)\n",
         )
     );
 }

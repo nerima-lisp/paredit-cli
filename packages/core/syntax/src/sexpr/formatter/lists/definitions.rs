@@ -177,21 +177,67 @@ impl Formatter {
     ) {
         let node = tree.node(node_id);
         let delimiter = self.list_delimiter(node);
-        let body_column = self.add_indent(Self::last_line_width(output));
+        let base_column = Self::last_line_width(output);
+        let body_column = self.add_indent(base_column);
+        let distinguished_column = self.add_indent(body_column);
         output.push(delimiter.open());
 
         for (position, child) in node.children.iter().enumerate() {
-            if position <= prefix_len {
+            if position < prefix_len {
                 if position > 0 {
                     output.push(' ');
                 }
                 self.format_inline_or_node(tree, *child, depth + 1, output);
+            } else if position == prefix_len {
+                // The distinguished argument: stays on the head line
+                // when it fits, breaks to distinguished_column (+4) when
+                // it does not.
+                output.push(' ');
+                let col = Self::last_line_width(output);
+                if let Some(inline) = self.compact_node(tree, *child, col) {
+                    output.push_str(&inline);
+                } else {
+                    Self::break_to_column(distinguished_column, output);
+                    self.format_node(tree, *child, depth + 1, output);
+                }
             } else {
                 Self::break_to_column(body_column, output);
                 self.format_node(tree, *child, depth + 1, output);
             }
         }
 
+        output.push(delimiter.close());
+    }
+
+    /// `if` in Common Lisp: the test shares the head line and all branches
+    /// (then, else) align at the same distinguished column — two indent
+    /// steps from the form's opening delimiter.
+    pub(in crate::sexpr::formatter) fn format_if_aligned(
+        &self,
+        tree: &SyntaxTree,
+        node_id: NodeId,
+        depth: usize,
+        output: &mut String,
+    ) {
+        let node = tree.node(node_id);
+        let delimiter = self.list_delimiter(node);
+        let base_column = Self::last_line_width(output);
+        let body_column = self.add_indent(base_column);
+        let branch_column = self.add_indent(body_column);
+        output.push(delimiter.open());
+        for (position, child) in node.children.iter().enumerate() {
+            match position {
+                0 => self.format_node(tree, *child, depth + 1, output),
+                1 => {
+                    output.push(' ');
+                    self.format_inline_or_node(tree, *child, depth + 1, output);
+                }
+                _ => {
+                    Self::break_to_column(branch_column, output);
+                    self.format_node(tree, *child, depth + 1, output);
+                }
+            }
+        }
         output.push(delimiter.close());
     }
 
