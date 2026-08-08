@@ -170,13 +170,18 @@ impl Formatter {
         let normalized_head = normalize_common_lisp_operator_head(head);
         match normalized_head.to_ascii_lowercase().as_str() {
             // def* forms with 'defun indent → name on head line, body indented
-            "defvar" | "defconst" | "defcustom" | "defgroup" | "defalias"
-            | "defvaralias" | "define-derived-mode" | "define-minor-mode" => {
-                ListStyle::DefinitionNameBody
-            }
+            "defvar"
+            | "defconst"
+            | "defcustom"
+            | "defgroup"
+            | "defalias"
+            | "defvaralias"
+            | "define-derived-mode"
+            | "define-minor-mode" => ListStyle::DefinitionNameBody,
             // progn-like (indent 0) → all children at body-indent
-            "save-excursion" | "save-restriction" | "save-current-buffer"
-            | "track-mouse" => ListStyle::HeadBody,
+            "save-excursion" | "save-restriction" | "save-current-buffer" | "track-mouse" => {
+                ListStyle::HeadBody
+            }
             // indent 1 → one arg on head line, body indented
             "while" => ListStyle::OneArgumentBody,
             // indent 2 → two-component special (then at +4, else at +2)
@@ -258,15 +263,18 @@ impl Formatter {
             "case" | "ccase" | "ecase" | "typecase" | "ctypecase" | "etypecase" => {
                 ListStyle::CaseClauses
             }
-            "progn" | "prog1" | "prog2" | "tagbody" | "locally" => {
-                ListStyle::HeadBody
-            }
+            "progn" | "prog1" | "prog2" | "tagbody" | "locally" => ListStyle::HeadBody,
             "declare" | "declaim" | "proclaim" => ListStyle::Declaration,
-            "setq" | "psetq" | "setf" | "psetf" | "multiple-value-setq"
-            | "multiple-value-setf" => ListStyle::PairAssignment,
-            "multiple-value-call" | "multiple-value-prog1" | "pprint-logical-block"
-            | "with-compilation-unit" | "with-standard-io-syntax"
-            | "return-from" | "throw" => ListStyle::OneArgumentBody,
+            "setq" | "psetq" | "setf" | "psetf" | "multiple-value-setq" | "multiple-value-setf" => {
+                ListStyle::PairAssignment
+            }
+            "multiple-value-call"
+            | "multiple-value-prog1"
+            | "pprint-logical-block"
+            | "with-compilation-unit"
+            | "with-standard-io-syntax"
+            | "return-from"
+            | "throw" => ListStyle::OneArgumentBody,
             "progv" | "with-condition-restarts" | "print-unreadable-object" => {
                 ListStyle::TwoArgumentBody
             }

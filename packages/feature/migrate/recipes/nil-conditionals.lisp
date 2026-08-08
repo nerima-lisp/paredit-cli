@@ -19,24 +19,25 @@
 ;;;     `(when test a b)' is equivalent and shorter, but splicing a `progn'
 ;;;     body out is a restructuring rather than a rename. `paredit refactor
 ;;;     flatten-progn' does it, with its own review.
-(defmigration
- nil-conditionals
- :description
- "one-armed `if' with a nil else-branch to `when' and `unless'"
- :dialects
- (common-lisp emacs-lisp)
- :steps
- ((:query
-   (if (not ?test) ?then
-     nil)
-   :rewrite
-   (unless ?test
-     ?then)
-   :note
-   "first, so the general step below cannot claim a negated test")
-  (:query
-   (if ?test ?then
-     nil)
-   :rewrite
-   (when ?test
-     ?then))))
+(defmigration nil-conditionals
+              :description
+              "one-armed `if' with a nil else-branch to `when' and `unless'"
+              :dialects
+              (common-lisp emacs-lisp)
+              :steps
+              ((:query
+                (if (not ?test)
+                    ?then
+                    nil)
+                :rewrite
+                (unless ?test
+                  ?then)
+                :note
+                "first, so the general step below cannot claim a negated test")
+               (:query
+                (if ?test
+                    ?then
+                    nil)
+                :rewrite
+                (when ?test
+                  ?then))))

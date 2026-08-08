@@ -298,7 +298,9 @@ fn cli_format_paredit_toml_wins_over_editorconfig_on_the_same_key() {
         .arg("source.lisp")
         .assert()
         .success()
-        .stdout(predicate::eq("(if a\n                b\n                c)\n"));
+        .stdout(predicate::eq(
+            "(if a\n                b\n                c)\n",
+        ));
 }
 
 #[test]
