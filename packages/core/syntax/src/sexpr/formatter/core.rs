@@ -921,6 +921,9 @@ impl Formatter {
                         ListStyle::If => {
                             self.format_prefix_body(tree, node_id, depth, 2, output);
                         }
+                        ListStyle::IfAligned => {
+                            self.format_if_aligned(tree, node_id, depth, output);
+                        }
                         ListStyle::ClojureDefinition => {
                             self.format_clojure_definition(tree, node_id, depth, output);
                         }

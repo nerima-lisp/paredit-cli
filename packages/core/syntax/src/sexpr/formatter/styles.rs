@@ -25,6 +25,11 @@ pub(super) enum ListStyle {
     Loop,
     HeadBody,
     If,
+    /// `if` in Common Lisp: the test is on the head line and all branches
+    /// (then, else) align at the same distinguished column (two indent
+    /// steps from the form's opening delimiter — the equivalent of Emacs
+    /// `common-lisp-indent-function`'s `(&rest nil)` for `if`).
+    IfAligned,
     /// `(defn name [params]` with the body indented below, falling back to only
     /// the name on the head line when a docstring, attribute map, or multi-arity
     /// clause list follows it.
@@ -86,6 +91,7 @@ pub const STYLE_NAMES: &[&str] = &[
     "one-argument-body",
     "two-argument-body",
     "if-then-else",
+    "if-aligned",
     "cond-clauses",
     "case-clauses",
     "head-body",
@@ -103,6 +109,7 @@ pub(super) fn style_from_name(name: &str) -> Option<ListStyle> {
         "one-argument-body" => Some(ListStyle::OneArgumentBody),
         "two-argument-body" => Some(ListStyle::TwoArgumentBody),
         "if-then-else" => Some(ListStyle::If),
+        "if-aligned" => Some(ListStyle::IfAligned),
         "cond-clauses" => Some(ListStyle::CondClauses),
         "case-clauses" => Some(ListStyle::CaseClauses),
         "head-body" => Some(ListStyle::HeadBody),
@@ -218,7 +225,7 @@ impl Formatter {
         let normalized_head = normalize_common_lisp_operator_head(head);
         match normalized_head.to_ascii_lowercase().as_str() {
             "named-lambda" => ListStyle::NamedLambda,
-            "if" => ListStyle::If,
+            "if" => ListStyle::IfAligned,
             "when"
             | "unless"
             | "with-open-file"

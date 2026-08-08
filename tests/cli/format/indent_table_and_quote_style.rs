@@ -20,8 +20,8 @@ fn cli_format_indent_table_flag_retargets_a_symbol_onto_a_style() {
     let file = dir.join(Path::new("source.lisp"));
     fs::write(&file, "(if a b c)\n").expect("write fixture");
 
-    // `if` never inlines by default (`ListStyle::If` always shows its
-    // structure), so this is past the compiled-in width regardless.
+    // `if` never inlines by default (`ListStyle::IfAligned` always shows
+    // its structure with all branches at the same distinguished column).
     paredit()
         .arg("edit")
         .arg("format")
@@ -29,7 +29,7 @@ fn cli_format_indent_table_flag_retargets_a_symbol_onto_a_style() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::eq("(if a b\n  c)\n"));
+        .stdout(predicate::eq("(if a\n    b\n    c)\n"));
 
     // `--indent-table if=general` retargets `if` onto the plain-call layout,
     // so a short `if` form inlines like any other call.
@@ -58,7 +58,7 @@ fn cli_format_indent_table_config_key_reaches_the_command() {
         .arg("source.lisp")
         .assert()
         .success()
-        .stdout(predicate::eq("(if a b\n  c)\n"));
+        .stdout(predicate::eq("(if a\n    b\n    c)\n"));
 
     fs::write(
         root.join("paredit.toml"),

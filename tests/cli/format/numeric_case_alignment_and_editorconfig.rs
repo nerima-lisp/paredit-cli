@@ -254,7 +254,7 @@ fn cli_format_editorconfig_indent_size_reaches_the_command() {
         .arg("source.lisp")
         .assert()
         .success()
-        .stdout(predicate::eq("(if a b\n    c)\n"));
+        .stdout(predicate::eq("(if a\n        b\n        c)\n"));
 }
 
 #[test]
@@ -298,7 +298,7 @@ fn cli_format_paredit_toml_wins_over_editorconfig_on_the_same_key() {
         .arg("source.lisp")
         .assert()
         .success()
-        .stdout(predicate::eq("(if a b\n        c)\n"));
+        .stdout(predicate::eq("(if a\n                b\n                c)\n"));
 }
 
 #[test]
@@ -314,7 +314,7 @@ fn cli_format_with_no_editorconfig_behaves_exactly_as_before() {
         .arg("source.lisp")
         .assert()
         .success()
-        .stdout(predicate::eq("(if a b\n  c)\n"));
+        .stdout(predicate::eq("(if a\n    b\n    c)\n"));
 }
 
 // --- FR-015: `format.insert-final-newline` / `format.trim-trailing-whitespace` ---
