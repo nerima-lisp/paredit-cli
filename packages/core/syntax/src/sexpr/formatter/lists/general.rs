@@ -14,17 +14,54 @@ impl Formatter {
     ) {
         let node = tree.node(node_id);
         let delimiter = self.list_delimiter(node);
-        // Every element lines up under the first one, which lands one column
-        // past the opening delimiter. Indenting the rest by `indent` instead
-        // put them `indent - 1` columns right of their own first sibling.
-        let element_column = Self::last_line_width(output).saturating_add(1);
+        let base_column = Self::last_line_width(output);
         output.push(delimiter.open());
+
+        // When the first argument shares the head's line, subsequent
+        // arguments align under it (Emacs `lisp-indent-function` default).
+        // Otherwise every argument lands one column past the opening
+        // delimiter — the same fallback `reindent.rs` uses.
+        let mut first_arg_column: Option<usize> = None;
+        let mut head_line_count: Option<usize> = None;
+
         for (position, child) in node.children.iter().enumerate() {
-            if position > 0 {
-                Self::break_to_column(element_column, output);
+            match position {
+                0 => {
+                    self.format_node(tree, *child, depth + 1, output);
+                    head_line_count = Some(output.lines().count());
+                }
+                1 => {
+                    // If the first argument fits inline on the head line,
+                    // align subsequent siblings under it. Otherwise break
+                    // to one column past the opening delimiter.
+                    let child_start =
+                        Self::last_line_width(output).saturating_add(1);
+                    if let Some(inline) =
+                        self.compact_node(tree, *child, child_start)
+                    {
+                        output.push(' ');
+                        let col = Self::last_line_width(output);
+                        output.push_str(&inline);
+                        if head_line_count
+                            .is_some_and(|hl| output.lines().count() == hl)
+                        {
+                            first_arg_column = Some(col);
+                        }
+                    } else {
+                        let element_column = base_column.saturating_add(1);
+                        Self::break_to_column(element_column, output);
+                        self.format_node(tree, *child, depth + 1, output);
+                    }
+                }
+                _ => {
+                    let element_column = first_arg_column
+                        .unwrap_or(base_column.saturating_add(1));
+                    Self::break_to_column(element_column, output);
+                    self.format_node(tree, *child, depth + 1, output);
+                }
             }
-            self.format_node(tree, *child, depth + 1, output);
         }
+
         output.push(delimiter.close());
     }
 

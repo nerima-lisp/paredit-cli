@@ -129,6 +129,7 @@ impl Formatter {
         }
         match self.dialect {
             Dialect::Clojure => Self::clojure_style_for_head(head),
+            Dialect::EmacsLisp => Self::elisp_style_for_head(head),
             _ => Self::common_lisp_style_for_head(head),
         }
     }
@@ -152,6 +153,33 @@ impl Formatter {
             ClojureIndentStyle::Body(prefix) => ListStyle::ClojurePrefixBody(prefix),
             ClojureIndentStyle::HeadBody => ListStyle::ClojurePrefixBody(0),
             ClojureIndentStyle::Call => ListStyle::General,
+        }
+    }
+
+    /// Emacs Lisp dialect routing: recognizes Elisp-specific operators that
+    /// differ from Common Lisp conventions.  Falls back to the CL table for
+    /// everything else.
+    fn elisp_style_for_head(head: &str) -> ListStyle {
+        let normalized_head = normalize_common_lisp_operator_head(head);
+        match normalized_head.to_ascii_lowercase().as_str() {
+            // def* forms with 'defun indent → name on head line, body indented
+            "defvar" | "defconst" | "defcustom" | "defgroup" | "defalias"
+            | "defvaralias" | "define-derived-mode" | "define-minor-mode" => {
+                ListStyle::DefinitionNameBody
+            }
+            // progn-like (indent 0) → all children at body-indent
+            "save-excursion" | "save-restriction" | "save-current-buffer"
+            | "track-mouse" => ListStyle::HeadBody,
+            // indent 1 → one arg on head line, body indented
+            "while" => ListStyle::OneArgumentBody,
+            // indent 2 → two-component special (then at +4, else at +2)
+            "condition-case" => ListStyle::TwoArgumentBody,
+            // if in Elisp: test at +4 distinguished, then/else at body
+            "if" => ListStyle::If,
+            // Elisp-specific clause forms
+            "pcase" => ListStyle::CaseClauses,
+            "cl-loop" => ListStyle::Loop,
+            _ => Self::common_lisp_style_for_head(head),
         }
     }
 
@@ -211,7 +239,15 @@ impl Formatter {
                 ListStyle::HeadBody
             }
             "declare" | "declaim" | "proclaim" => ListStyle::Declaration,
-            "setq" | "psetq" | "setf" | "psetf" => ListStyle::PairAssignment,
+            "setq" | "psetq" | "setf" | "psetf" | "multiple-value-setq"
+            | "multiple-value-setf" => ListStyle::PairAssignment,
+            "multiple-value-call" | "multiple-value-prog1" | "pprint-logical-block"
+            | "with-compilation-unit" | "with-standard-io-syntax"
+            | "return-from" | "throw" => ListStyle::OneArgumentBody,
+            "progv" | "with-condition-restarts" | "print-unreadable-object" => {
+                ListStyle::TwoArgumentBody
+            }
+            "generic-flet" | "generic-labels" => ListStyle::LocalFunctions,
             _ => ListStyle::General,
         }
     }

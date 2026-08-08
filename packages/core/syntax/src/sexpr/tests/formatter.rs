@@ -1372,15 +1372,14 @@ fn clojure_layouts_do_not_leak_into_other_dialects() {
         "(defn greet [first-name last-name] (log first-name) (str first-name \" \" last-name))";
     let tree = SyntaxTree::parse_with_dialect(input, Dialect::Clojure).expect("valid Clojure");
 
-    // Outside Clojure `defn` has no layout of its own, so this is the plain
-    // list layout: every element lines up under `defn`, one column past the
-    // opening delimiter.
+    // Outside Clojure `defn` has no layout of its own, so the plain list
+    // layout applies: `greet` stays on the head line because it fits, and
+    // subsequent elements align under it (Emacs convention for general lists).
     let common_lisp_layout = concat!(
-        "(defn\n",
-        " greet\n",
-        " [first-name last-name]\n",
-        " (log first-name)\n",
-        " (str first-name \" \" last-name))\n"
+        "(defn greet\n",
+        "      [first-name last-name]\n",
+        "      (log first-name)\n",
+        "      (str first-name \" \" last-name))\n"
     );
     assert_eq!(Formatter::new(2).format(&tree), common_lisp_layout);
     assert_eq!(
