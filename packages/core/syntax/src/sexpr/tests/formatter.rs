@@ -765,7 +765,10 @@ fn preserves_string_that_contains_a_semicolon() {
     let tree = SyntaxTree::parse(input).expect("valid");
     assert_eq!(
         Formatter::new(2).format(&tree),
-        "(defvar path \";not-a-comment\")\n"
+        // `defvar` uses `DefinitionNameBody` (name on head line, value at
+        // body).  The semicolon inside the string is preserved — it is never
+        // mistaken for a comment.
+        "(defvar path\n  \";not-a-comment\")\n"
     );
 }
 
@@ -2169,8 +2172,8 @@ fn aligns_defclass_slots_in_one_column() {
     );
 }
 
-/// The same alignment for `define-condition`, whose slot list has the same
-/// shape.
+/// `define-condition` uses `DefinitionNameBody`: the name is on the head
+/// line and everything else (supers, slot list, options) is at body-indent.
 #[test]
 fn aligns_define_condition_slots_in_one_column() {
     let input = "(define-condition parse-failure (error) ((offset :initarg :offset :reader parse-failure-offset) (message :initarg :message :reader parse-failure-message)) (:report report-parse-failure))";
@@ -2178,7 +2181,8 @@ fn aligns_define_condition_slots_in_one_column() {
     assert_eq!(
         Formatter::new(2).format(&tree),
         concat!(
-            "(define-condition parse-failure (error)\n",
+            "(define-condition parse-failure\n",
+            "  (error)\n",
             "  ((offset :initarg :offset :reader parse-failure-offset)\n",
             "   (message :initarg :message :reader parse-failure-message))\n",
             "  (:report report-parse-failure))\n",

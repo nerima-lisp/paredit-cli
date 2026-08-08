@@ -198,6 +198,22 @@ impl Formatter {
                 }
                 CommonLispOperator::Lambda => return ListStyle::Lambda,
                 CommonLispOperator::DefineSymbolMacro => return ListStyle::DefinitionNameBody,
+                CommonLispOperator::Defvar
+                | CommonLispOperator::Defconstant
+                | CommonLispOperator::Defparameter
+                | CommonLispOperator::Defglobal
+                | CommonLispOperator::Defstruct
+                | CommonLispOperator::DefineCondition => {
+                    return ListStyle::DefinitionNameBody;
+                }
+                CommonLispOperator::Defpackage
+                | CommonLispOperator::InPackage
+                | CommonLispOperator::Provide
+                | CommonLispOperator::Require
+                | CommonLispOperator::UsePackage
+                | CommonLispOperator::Import => {
+                    return ListStyle::General;
+                }
                 operator if operator.is_asdf_system_definition() => {
                     return ListStyle::SystemDefinition;
                 }
@@ -242,7 +258,7 @@ impl Formatter {
             "case" | "ccase" | "ecase" | "typecase" | "ctypecase" | "etypecase" => {
                 ListStyle::CaseClauses
             }
-            "progn" | "prog1" | "prog2" | "tagbody" | "defpackage" | "locally" => {
+            "progn" | "prog1" | "prog2" | "tagbody" | "locally" => {
                 ListStyle::HeadBody
             }
             "declare" | "declaim" | "proclaim" => ListStyle::Declaration,
