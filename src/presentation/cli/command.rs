@@ -1230,6 +1230,8 @@ pub(super) enum Command {
     Serve(crate::presentation::serve::ServeArgs),
     /// Interactively browse one file's tree; prints the last selected --path on exit.
     Tui(crate::presentation::tui::TuiArgs),
+    /// Interactively edit one file in a terminal.
+    Editor(crate::presentation::editor::EditorArgs),
     /// Print a shell completion script to stdout.
     Completions {
         /// Shell to generate a completion script for.

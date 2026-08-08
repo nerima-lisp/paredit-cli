@@ -30,6 +30,7 @@ paredit lsp                        # Language Server Protocol server over stdio
 paredit mcp                        # Model Context Protocol server over stdio (agents)
 paredit serve                      # resident analysis server over HTTP/JSON-RPC
 paredit tui <file>                 # interactively browse a file's tree; prints --path on exit
+paredit editor <file>              # interactively edit one file in a terminal
 paredit completions <shell>        # shell completion scripts (bash/zsh/fish/...)
 ```
 

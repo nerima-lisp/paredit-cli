@@ -86,6 +86,7 @@ fn capabilities_reports_the_canonical_namespaces_and_meta_commands() {
             "mcp",
             "serve",
             "tui",
+            "editor",
             "completions"
         ]
     );

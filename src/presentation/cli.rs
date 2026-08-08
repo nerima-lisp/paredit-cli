@@ -221,15 +221,15 @@ pub fn run() -> ExitCode {
     let plain_language = cli.plain_language;
     let explain_error = cli.explain_error;
 
-    // The protocol servers own their own exit status, and are therefore taken
-    // before dispatch. A session normally ends with the client closing the
-    // pipe, and routing that through the `Result` path below would report every
-    // clean shutdown as an error.
+    // The protocol servers and interactive sessions own their own exit status,
+    // and are therefore taken before dispatch. A session normally ends with
+    // the client closing the pipe or the editor restoring the terminal.
     let command = match cli.command {
         Command::Lsp(args) => return crate::presentation::lsp::lsp(args),
         Command::Mcp(args) => return crate::presentation::mcp::mcp(args),
         Command::Serve(args) => return crate::presentation::serve::serve(args),
         Command::Tui(args) => return crate::presentation::tui::tui(args),
+        Command::Editor(args) => return crate::presentation::editor::editor(args),
         command => command,
     };
 

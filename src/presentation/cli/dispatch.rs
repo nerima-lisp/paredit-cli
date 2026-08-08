@@ -1363,7 +1363,11 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
         // Handled in `run`, before dispatch, because they own their exit
         // status: a closed pipe is how a protocol session normally ends, and
         // `tui`'s own `q` quit is not this process failing either.
-        Command::Lsp(_) | Command::Mcp(_) | Command::Serve(_) | Command::Tui(_) => {
+        Command::Lsp(_)
+        | Command::Mcp(_)
+        | Command::Serve(_)
+        | Command::Tui(_)
+        | Command::Editor(_) => {
             unreachable!("the protocol servers and tui are dispatched from run")
         }
         Command::Completions { shell } => {
