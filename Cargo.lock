@@ -643,7 +643,7 @@ checksum = "d6790f58c7ff633d8771f42965289203411a5e5c68388703c06e14f24770b41e"
 
 [[package]]
 name = "paredit-cli"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "assert_cmd",
  "blake3",
@@ -742,7 +742,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-core-cli"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "blake3",
  "cap-std",
@@ -763,7 +763,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-core-config"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-syntax",
  "serde_json",
@@ -772,7 +772,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-core-edit"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-semantics",
  "paredit-core-syntax",
@@ -782,7 +782,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-core-jsonrpc"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "serde_json",
  "thiserror",
@@ -790,7 +790,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-core-lint-engine"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-safety",
  "paredit-core-semantics",
@@ -801,7 +801,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-core-safety"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "blake3",
  "paredit-core-syntax",
@@ -812,7 +812,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-core-semantics"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-syntax",
  "proptest",
@@ -821,7 +821,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-core-syntax"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "proptest",
  "thiserror",
@@ -830,7 +830,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-core-workspace"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "blake3",
  "cap-std",
@@ -843,7 +843,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-binding"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -860,7 +860,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-change-summary"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -871,7 +871,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-code-metrics"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -881,7 +881,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-conditional-conversion"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -895,7 +895,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-data-report"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -905,11 +905,11 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-editor"
-version = "1.5.0"
+version = "1.6.0"
 
 [[package]]
 name = "paredit-feature-emacs-lisp"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-semantics",
@@ -918,7 +918,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-external-check"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -930,7 +930,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-extract"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -944,7 +944,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-form-transform"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -959,7 +959,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-function-parameter"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -974,7 +974,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-generate"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -986,7 +986,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-inline"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1001,7 +1001,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-binding-analysis"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-semantics",
@@ -1010,7 +1010,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-build-system"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1021,7 +1021,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-call-shape"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1032,7 +1032,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-carp-idiom"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
@@ -1040,7 +1040,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-clojure-depth"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1051,7 +1051,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-clojure-idiom"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1062,7 +1062,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-compile-time"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1073,7 +1073,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-concurrency"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1084,7 +1084,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-condition-depth"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
@@ -1092,7 +1092,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-condition-system"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1103,7 +1103,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-conditional"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1118,7 +1118,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-contract-annotation"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1129,7 +1129,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-control-flow"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1144,7 +1144,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-convention"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
@@ -1152,7 +1152,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-custom"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
@@ -1161,7 +1161,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-data-structure"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-cli",
  "paredit-core-lint-engine",
@@ -1172,7 +1172,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-destructive-sequence"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
@@ -1180,7 +1180,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-documentation"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
@@ -1188,7 +1188,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-elisp-depth"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
@@ -1196,7 +1196,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-elisp-idiom"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
@@ -1204,7 +1204,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-fennel-janet-depth"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
@@ -1212,7 +1212,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-fennel-janet-idiom"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
@@ -1220,7 +1220,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-form-shape"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1236,7 +1236,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-generic-dispatch"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
@@ -1244,7 +1244,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-hy-depth"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
@@ -1252,7 +1252,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-hy-lfe-idiom"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
@@ -1260,7 +1260,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-introspection"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1271,7 +1271,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-iteration-flow"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1282,7 +1282,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-lfe-carp-depth"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
@@ -1290,7 +1290,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-loop-facility"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
@@ -1298,7 +1298,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-macro-authoring"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-cli",
  "paredit-core-lint-engine",
@@ -1308,7 +1308,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-numeric"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1323,7 +1323,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-object-system"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1334,7 +1334,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-package-hygiene"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1345,7 +1345,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-pathname-io"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
@@ -1353,7 +1353,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-performance"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
@@ -1361,7 +1361,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-portability"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
@@ -1369,7 +1369,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-racket-depth"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-cli",
  "paredit-core-lint-engine",
@@ -1379,7 +1379,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-repl-debug"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1393,7 +1393,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-safety"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
@@ -1401,7 +1401,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-scheme-idiom"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1415,7 +1415,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-sequence"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1430,7 +1430,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-string-char"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1445,7 +1445,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-testing"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1456,7 +1456,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-type-declaration"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
@@ -1464,7 +1464,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lisp-analysis"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1475,7 +1475,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-migrate"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1486,7 +1486,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-package"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1501,7 +1501,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-project-analysis"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1518,7 +1518,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-project-inventory"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1528,7 +1528,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-query"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1538,7 +1538,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-refactor-workflow"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "blake3",
  "cap-std",
@@ -1560,7 +1560,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-remove-unused"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1578,7 +1578,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-rename"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1593,7 +1593,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-schema-check"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1604,7 +1604,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-selector"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1614,7 +1614,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-semantic-report"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
@@ -1625,7 +1625,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-similarity"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "blake3",
  "clap",
@@ -1640,7 +1640,7 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-structural-diff"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "blake3",
  "clap",
