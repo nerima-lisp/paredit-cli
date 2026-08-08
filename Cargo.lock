@@ -666,6 +666,7 @@ dependencies = [
  "paredit-feature-code-metrics",
  "paredit-feature-conditional-conversion",
  "paredit-feature-data-report",
+ "paredit-feature-editor",
  "paredit-feature-emacs-lisp",
  "paredit-feature-external-check",
  "paredit-feature-extract",
@@ -901,6 +902,10 @@ dependencies = [
  "paredit-core-syntax",
  "serde_json",
 ]
+
+[[package]]
+name = "paredit-feature-editor"
+version = "1.5.0"
 
 [[package]]
 name = "paredit-feature-emacs-lisp"

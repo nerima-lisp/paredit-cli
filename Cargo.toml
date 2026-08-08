@@ -102,6 +102,7 @@ paredit-core-safety = { path = "packages/core/safety" }
 
 paredit-feature-binding = { path = "packages/feature/binding" }
 paredit-feature-change-summary = { path = "packages/feature/change-summary" }
+paredit-feature-editor = { path = "packages/feature/editor" }
 paredit-feature-function-parameter = { path = "packages/feature/function-parameter" }
 paredit-feature-package = { path = "packages/feature/package" }
 paredit-feature-remove-unused = { path = "packages/feature/remove-unused" }
