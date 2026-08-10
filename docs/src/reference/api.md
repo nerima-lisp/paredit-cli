@@ -30,13 +30,18 @@ rather than on source:
 - `paredit completions <shell>` prints shell completion scripts for bash,
   zsh, fish, elvish, and powershell.
 
-Four more top-level commands sit outside `inspect`/`edit`/`refactor`
+Five more top-level commands sit outside `inspect`/`edit`/`refactor`
 entirely — long-running or interactive processes rather than one-shot
 reports or edits: `paredit lsp` and `paredit serve` (see
 [Integrations](../guide/integrations.md)), `paredit mcp` (see
-[Agent interface](../guide/agents.md)), and `paredit tui`, an interactive tree
+[Agent interface](../guide/agents.md)), `paredit tui`, an interactive tree
 browser that prints a `--path` on exit (see
-[Browsing interactively](selectors.md#browsing-interactively-paredit-tui)).
+[Browsing interactively](selectors.md#browsing-interactively-paredit-tui)),
+and `paredit editor <file>`, a terminal-native editing session for one file —
+arrow keys and Enter/Backspace/Delete to edit, Ctrl-S to save, Ctrl-Z/Ctrl-Y
+to undo/redo, and Ctrl-Q/Ctrl-C/Escape to quit. It creates `<file>` on first
+save if it does not exist yet, and refuses to start unless both stdin and
+stdout are a terminal.
 
 Run `paredit <namespace> --help` for the authoritative list on your installed
 version, and `paredit <namespace> <command> --help` for each command's
