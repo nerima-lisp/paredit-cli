@@ -102,10 +102,11 @@ fn print_text<F: Finding>(
             );
             continue;
         }
+        let path_str = terminal_safe(&report.path.display()).to_string();
         for finding in &report.findings {
             let mut row = vec![
                 finding.kind().to_owned(),
-                terminal_safe(&report.path.display()).to_string(),
+                path_str.clone(),
                 report.line_of(finding).to_string(),
             ];
             row.extend(

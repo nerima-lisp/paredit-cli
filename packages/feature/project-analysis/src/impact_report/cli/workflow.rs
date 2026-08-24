@@ -6,7 +6,9 @@ use crate::impact_report::usecase::{
     evaluate_impact_report_policy, impact_risks, impact_status_counts, summarize_impact_reports,
 };
 use paredit_core_cli::args::DialectArg;
-use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::{
+    analyze_files_raw, note_partial_file_failures, read_input_dialect_and_tree, total_file_failure,
+};
 use paredit_core_cli::{CliResult, CommandResult};
 use paredit_core_syntax::sexpr::SymbolName;
 use std::path::PathBuf;
@@ -53,17 +55,20 @@ pub fn collect_impact_reports(
     dialect_override: Option<DialectArg>,
     symbol: &SymbolName,
 ) -> CliResult<Vec<ImpactReportFile>> {
-    let mut sources = Vec::with_capacity(files.len());
-
-    for file in files {
+    let analysis = analyze_files_raw(files, |file| {
         let (_input, dialect, tree) =
             read_input_dialect_and_tree(Some(file.clone()), dialect_override)?;
-        sources.push(ImpactReportSource {
+        CliResult::Ok(ImpactReportSource {
             path: file.clone(),
             dialect,
             tree,
-        });
+        })
+    });
+    if analysis.is_total_failure() {
+        return Err(total_file_failure(analysis.failed).into());
     }
+    note_partial_file_failures(&analysis.failed);
+    let sources = analysis.succeeded;
 
     Ok(build_impact_reports(sources, symbol)?)
 }

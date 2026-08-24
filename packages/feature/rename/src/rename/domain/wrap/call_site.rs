@@ -9,7 +9,7 @@ pub fn wrap_call_site_from_view(
     view: &ExpressionView,
     dialect: Dialect,
     input: &str,
-    path: String,
+    path: impl FnOnce() -> String,
     function: &SymbolName,
     wrapper: &SymbolName,
     template: Option<&WrapFunctionCallTemplate>,
@@ -24,7 +24,7 @@ pub fn wrap_call_site_from_view(
         None => format!("({} {})", wrapper.as_str(), text),
     };
     Some(WrapFunctionCallSite {
-        path,
+        path: path(),
         span: view.content_span,
         replacement,
         text,

@@ -44,6 +44,7 @@ fn file_with_dialect(
         definitions,
         atoms: tree.atom_occurrences(),
         text: text.to_owned(),
+        root_view: tree.root_view(),
     }
 }
 

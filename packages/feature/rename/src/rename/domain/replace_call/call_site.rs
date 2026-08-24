@@ -10,7 +10,7 @@ pub fn replace_call_site_from_view(
     view: &ExpressionView,
     dialect: Dialect,
     input: &str,
-    path: String,
+    path: impl FnOnce() -> String,
     from: &SymbolName,
     to: &SymbolName,
 ) -> Option<ReplaceFunctionCallSite> {
@@ -23,7 +23,7 @@ pub fn replace_call_site_from_view(
     let head_span = view.children.first().map(|child| child.span)?;
 
     Some(ReplaceFunctionCallSite {
-        path,
+        path: path(),
         head_span,
         span: view.span,
         replacement: to.as_str().to_owned(),

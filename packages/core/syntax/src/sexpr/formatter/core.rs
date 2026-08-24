@@ -607,7 +607,9 @@ impl Formatter {
             } => {
                 let leading = leading
                     .iter()
-                    .map(|&comment| self.render_comment_text(&comments[comment].text, 0))
+                    .map(|&comment| {
+                        self.render_comment_text(comments[comment].span.slice(&tree.source), 0)
+                    })
                     .collect();
 
                 let mut body = String::new();
@@ -620,8 +622,9 @@ impl Formatter {
                 }
                 let body_last_line_width = Self::last_line_width(&body);
 
-                let trailing =
-                    trailing.map(|comment| self.render_comment_text(&comments[comment].text, 0));
+                let trailing = trailing.map(|comment| {
+                    self.render_comment_text(comments[comment].span.slice(&tree.source), 0)
+                });
 
                 RenderedItem::Form {
                     leading,
@@ -633,7 +636,9 @@ impl Formatter {
             TopLevelItem::Comments(indices) => RenderedItem::Comments(
                 indices
                     .iter()
-                    .map(|&comment| self.render_comment_text(&comments[comment].text, 0))
+                    .map(|&comment| {
+                        self.render_comment_text(comments[comment].span.slice(&tree.source), 0)
+                    })
                     .collect(),
             ),
         }

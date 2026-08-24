@@ -1,4 +1,4 @@
-use paredit_core_cli::CommandResult;
+use paredit_core_cli::{CliResult, CommandResult};
 
 use crate::package_conflict_report::cli::args::PackageConflictReportArgs;
 use crate::package_conflict_report::cli::render::print_package_conflict_report;
@@ -6,15 +6,20 @@ use crate::package_conflict_report::usecase::{
     PackageConflictPolicyOptions, analyze_package_conflicts, collect_declared_package_identifiers,
     evaluate_package_conflict_policy,
 };
-use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::{
+    analyze_files_raw, note_partial_file_failures, read_input_dialect_and_tree, total_file_failure,
+};
 
 pub fn package_conflict_report(args: PackageConflictReportArgs) -> CommandResult {
-    let mut declared = Vec::new();
-
-    for file in &args.files {
+    let analysis = analyze_files_raw(&args.files, |file| {
         let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        declared.extend(collect_declared_package_identifiers(file, dialect, &tree)?);
+        CliResult::Ok(collect_declared_package_identifiers(file, dialect, &tree)?)
+    });
+    if analysis.is_total_failure() {
+        return Err(total_file_failure(analysis.failed).into());
     }
+    note_partial_file_failures(&analysis.failed);
+    let declared: Vec<_> = analysis.succeeded.into_iter().flatten().collect();
 
     let summary = analyze_package_conflicts(&declared);
     let policy = evaluate_package_conflict_policy(

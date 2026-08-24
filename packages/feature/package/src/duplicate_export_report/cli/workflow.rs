@@ -6,21 +6,24 @@ use crate::duplicate_export_report::usecase::{
     DuplicateExportPolicyOptions, collect_duplicate_exports, evaluate_duplicate_export_policy,
     summarize_duplicate_exports,
 };
-use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{
+    analyze_files, expand_input_files, note_partial_file_failures, total_file_failure,
+};
 
 pub fn duplicate_export_report(args: DuplicateExportReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
-    let mut defpackage_count = 0;
-    let mut duplicates = Vec::new();
-
-    for file in &files {
-        let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let (file_defpackage_count, file_duplicates) =
-            collect_duplicate_exports(file, dialect, &tree)?;
-        defpackage_count += file_defpackage_count;
-        duplicates.extend(file_duplicates);
+    let analysis = analyze_files(&files, args.dialect, |file, dialect, tree, _input| {
+        collect_duplicate_exports(file, dialect, tree)
+    });
+    if analysis.is_total_failure() {
+        return Err(total_file_failure(analysis.failed).into());
     }
+    note_partial_file_failures(&analysis.failed);
+    let (defpackage_counts, duplicate_lists): (Vec<_>, Vec<_>) =
+        analysis.succeeded.into_iter().unzip();
+    let defpackage_count: usize = defpackage_counts.into_iter().sum();
+    let duplicates: Vec<_> = duplicate_lists.into_iter().flatten().collect();
 
     let summary = summarize_duplicate_exports(defpackage_count, duplicates);
     let policy = evaluate_duplicate_export_policy(

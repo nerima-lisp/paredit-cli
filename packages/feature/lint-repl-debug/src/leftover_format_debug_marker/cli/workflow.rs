@@ -1,4 +1,4 @@
-use paredit_core_cli::CommandResult;
+use paredit_core_cli::{CliResult, CommandResult};
 
 use crate::leftover_format_debug_marker::cli::args::LeftoverFormatDebugMarkerReportArgs;
 use crate::leftover_format_debug_marker::cli::render::print_leftover_format_debug_marker_report;
@@ -6,23 +6,27 @@ use crate::leftover_format_debug_marker::usecase::{
     LeftoverFormatDebugMarkerPolicyOptions, collect_leftover_format_debug_marker,
     evaluate_leftover_format_debug_marker_policy, summarize_leftover_format_debug_marker,
 };
-use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{
+    analyze_files_raw, expand_input_files, note_partial_file_failures, read_input_dialect_and_tree,
+    total_file_failure,
+};
 
 pub fn leftover_format_debug_marker_report(
     args: LeftoverFormatDebugMarkerReportArgs,
 ) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
-    let mut scanned_form_count = 0;
-    let mut violations = Vec::new();
-
-    for file in &files {
+    let analysis = analyze_files_raw(&files, |file| {
         let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let (file_form_count, file_violations) =
-            collect_leftover_format_debug_marker(file, dialect, &tree)?;
-        scanned_form_count += file_form_count;
-        violations.extend(file_violations);
+        CliResult::Ok(collect_leftover_format_debug_marker(file, dialect, &tree)?)
+    });
+    if analysis.is_total_failure() {
+        return Err(total_file_failure(analysis.failed).into());
     }
+    note_partial_file_failures(&analysis.failed);
+    let (form_counts, violation_lists): (Vec<_>, Vec<_>) = analysis.succeeded.into_iter().unzip();
+    let scanned_form_count: usize = form_counts.into_iter().sum();
+    let violations: Vec<_> = violation_lists.into_iter().flatten().collect();
 
     let summary = summarize_leftover_format_debug_marker(scanned_form_count, violations);
     let policy = evaluate_leftover_format_debug_marker_policy(

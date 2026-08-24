@@ -1,4 +1,4 @@
-use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::{analyze_files, note_partial_file_failures, total_file_failure};
 use paredit_core_cli::{CliResult, CommandResult};
 use std::collections::BTreeSet;
 use std::fs;
@@ -13,13 +13,16 @@ use paredit_core_workspace::workspace::{WorkspaceDiscoveryOptions, discover_work
 
 pub fn complexity_report(args: ComplexityReportArgs) -> CommandResult {
     let files = expand_complexity_report_inputs(&args.files, args.dialect)?;
-    let mut reports = Vec::with_capacity(files.len());
 
-    for file in &files {
-        let (_input, dialect, tree) =
-            read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        reports.push(build_complexity_report(file.clone(), dialect, &tree)?);
+    // A file that will not parse is reported, not fatal — see `query find`.
+    let analysis = analyze_files(&files, args.dialect, |file, dialect, tree, _| {
+        build_complexity_report(file.clone(), dialect, tree)
+    });
+    if analysis.is_total_failure() {
+        return Err(total_file_failure(analysis.failed).into());
     }
+    note_partial_file_failures(&analysis.failed);
+    let reports = analysis.succeeded;
 
     let policy = evaluate_complexity_report_policy(
         ComplexityReportPolicyOptions::new(args.fail_on_max_depth),

@@ -6,7 +6,9 @@ use crate::duplicate_report::usecase::{
     collect_replacement_plan_batches,
 };
 use paredit_core_cli::CliResult;
-use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::{
+    analyze_files_raw, note_partial_file_failures, read_input_dialect_and_tree, total_file_failure,
+};
 
 pub fn duplicate_report(args: DuplicateReportArgs) -> CliResult<()> {
     ensure_thresholds(args.min_group_size, args.min_node_count)?;
@@ -53,10 +55,25 @@ fn collect_duplicate_candidate_groups(
     min_node_count: usize,
     min_group_size: usize,
 ) -> CliResult<DuplicateCandidateGroups> {
-    let mut candidates = DuplicateCandidateAccumulator::new(min_node_count);
-
-    for file in discover_duplicate_report_files(roots)? {
+    let files = discover_duplicate_report_files(roots)?;
+    // The read and parse of each file are independent, but `add_source`
+    // itself is not: it appends to a shared candidate map in call order, and
+    // that order becomes the order occurrences are reported within a
+    // duplicate group. Only the read+parse step runs in parallel; `finish`'s
+    // fold below stays a plain sequential loop over `analysis.succeeded`,
+    // which preserves input order regardless of which file's read finished
+    // first.
+    let analysis = analyze_files_raw(&files, |file| {
         let (_input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), dialect)?;
+        CliResult::Ok((tree, file.clone(), dialect))
+    });
+    if analysis.is_total_failure() {
+        return Err(total_file_failure(analysis.failed).into());
+    }
+    note_partial_file_failures(&analysis.failed);
+
+    let mut candidates = DuplicateCandidateAccumulator::new(min_node_count);
+    for (tree, file, dialect) in analysis.succeeded {
         candidates.add_source(tree, file, dialect)?;
     }
 

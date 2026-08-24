@@ -949,6 +949,109 @@ where
     analyze(file, resolved, &tree, &input)
 }
 
+/// [`analyze_files`]'s scheduling — parallel above the same worker threshold,
+/// serial below it, largest-file-first claim order, every failure kept, same
+/// [`FileAnalysis`]/[`FileFailure`] result shape — with no assumption at all
+/// about what "read" or "parse" mean for one file. The caller's `process`
+/// closure owns the whole per-file step, read included.
+///
+/// [`analyze_files`] reads through this crate's own ambient-authority path
+/// (`read_input_dialect_and_tree`), which is right for the common case —
+/// files a workspace walk already discovered — but wrong for a caller with
+/// its own containment guarantee to enforce on top of an arbitrary path list,
+/// e.g. a `--root`-confined, symlink-refusing, TOCTOU-guarded read, as
+/// `refactor-workflow`'s checkpoint and manifest commands already have and
+/// must not lose by routing through a helper that reads for them. Handing the
+/// whole step to the caller means this function never has an
+/// ambient-authority read to bypass in the first place — a caller that needs
+/// dialect detection or Lisp parsing does that inside `process` too, using
+/// [`read_input_dialect_and_tree`] or [`parse_document`] directly.
+pub fn analyze_files_raw<T, E, F>(files: &[PathBuf], process: F) -> FileAnalysis<T>
+where
+    T: Send,
+    E: std::error::Error + Send,
+    F: Fn(&PathBuf) -> Result<T, E> + Sync,
+{
+    let workers = worker_count(files.len());
+    let results: Vec<Result<T, E>> = if workers <= 1 {
+        files.iter().map(&process).collect()
+    } else {
+        analyze_in_parallel_raw(files, &process, workers)
+    };
+
+    let mut analysis = FileAnalysis {
+        succeeded: Vec::with_capacity(results.len()),
+        failed: Vec::new(),
+    };
+    for (file, result) in files.iter().zip(results) {
+        match result {
+            Ok(value) => analysis.succeeded.push(value),
+            Err(error) => analysis.failed.push(FileFailure {
+                file: file.clone(),
+                message: crate::error::error_chain(&error),
+            }),
+        }
+    }
+    analysis
+}
+
+/// [`analyze_in_parallel`] for [`analyze_files_raw`].
+fn analyze_in_parallel_raw<T, E, F>(
+    files: &[PathBuf],
+    process: &F,
+    workers: usize,
+) -> Vec<Result<T, E>>
+where
+    T: Send,
+    E: Send,
+    F: Fn(&PathBuf) -> Result<T, E> + Sync,
+{
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let claim_order = claim_order_by_descending_size(files);
+    let cursor = AtomicUsize::new(0);
+    let claim_order = &claim_order;
+    let cursor = &cursor;
+
+    let claimed: Vec<Vec<(usize, Result<T, E>)>> = std::thread::scope(|scope| {
+        let handles = (0..workers)
+            .map(|_| {
+                scope.spawn(move || {
+                    let mut mine = Vec::new();
+                    loop {
+                        let position = cursor.fetch_add(1, Ordering::Relaxed);
+                        let Some(&index) = claim_order.get(position) else {
+                            break;
+                        };
+                        mine.push((index, process(&files[index])));
+                    }
+                    mine
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let mut claimed = Vec::with_capacity(workers);
+        for handle in handles {
+            match handle.join() {
+                Ok(mine) => claimed.push(mine),
+                Err(payload) => std::panic::resume_unwind(payload),
+            }
+        }
+        claimed
+    });
+
+    let mut slots: Vec<Option<Result<T, E>>> = files.iter().map(|_| None).collect();
+    for mine in claimed {
+        for (index, result) in mine {
+            slots[index] = Some(result);
+        }
+    }
+    slots
+        .into_iter()
+        .map(|slot| slot.expect("every index is claimed exactly once"))
+        .collect()
+}
+
 /// How many workers to use for `count` files.
 ///
 /// A thread costs more than parsing a handful of small files, so a short list

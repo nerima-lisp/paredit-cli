@@ -1,4 +1,4 @@
-use paredit_core_cli::CommandResult;
+use paredit_core_cli::{CliResult, CommandResult};
 
 use crate::giant_conditional_form::cli::args::GiantConditionalFormReportArgs;
 use crate::giant_conditional_form::cli::render::print_giant_conditional_form_report;
@@ -6,18 +6,26 @@ use crate::giant_conditional_form::usecase::{
     GiantConditionalFormPolicyOptions, collect_giant_conditional_form,
     evaluate_giant_conditional_form_policy, summarize_giant_conditional_form,
 };
-use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{
+    analyze_files_raw, expand_input_files, note_partial_file_failures, read_input_dialect_and_tree,
+    total_file_failure,
+};
 
 pub fn giant_conditional_form_report(args: GiantConditionalFormReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
+    let analysis = analyze_files_raw(&files, |file| {
+        let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+        CliResult::Ok(collect_giant_conditional_form(file, dialect, &tree)?)
+    });
+    if analysis.is_total_failure() {
+        return Err(total_file_failure(analysis.failed).into());
+    }
+    note_partial_file_failures(&analysis.failed);
+
     let mut scanned_form_count = 0;
     let mut violations = Vec::new();
-
-    for file in &files {
-        let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let (file_form_count, file_violations) =
-            collect_giant_conditional_form(file, dialect, &tree)?;
+    for (file_form_count, file_violations) in analysis.succeeded {
         scanned_form_count += file_form_count;
         violations.extend(file_violations);
     }
