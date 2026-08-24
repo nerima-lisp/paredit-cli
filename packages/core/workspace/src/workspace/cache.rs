@@ -384,7 +384,15 @@ fn read_entry(entry: &Value) -> Option<CachedDiscovery> {
 }
 
 /// Below this many entries, a thread costs more than the stats it would save.
-const PARALLEL_VALIDATION_THRESHOLD: usize = 8;
+///
+/// Each item here is one `fs::metadata` call, or for a directory one
+/// `fs::read_dir(...).count()` — cheap enough that thread setup can dominate
+/// the work it was meant to parallelize. `benches/cache_dir.rs`'s
+/// `cache-dir/warm/128` arm (8 directories, the previous threshold) measured
+/// threading at that count as ~37% *slower* than the serial path; `warm/1024`
+/// (64 directories) measured a ~28% win. This constant sits at the larger,
+/// confirmed-safe end rather than guessing at the crossover between them.
+const PARALLEL_VALIDATION_THRESHOLD: usize = 64;
 
 fn directories_are_unchanged(entry: &Value) -> bool {
     let Some(directories) = entry["directories"].as_array() else {
