@@ -93,9 +93,9 @@ The crate is not published to a package registry, so pin the tag — or a
 reviewed commit — in whichever channel you use:
 
 ```sh
-nix run github:nerima-lisp/paredit-cli/v1.6.0 -- --help
-nix profile install github:nerima-lisp/paredit-cli/v1.6.0
-cargo install --git https://github.com/nerima-lisp/paredit-cli --tag v1.6.0 --locked
+nix run github:nerima-lisp/paredit-cli/v1.6.1 -- --help
+nix profile install github:nerima-lisp/paredit-cli/v1.6.1
+cargo install --git https://github.com/nerima-lisp/paredit-cli --tag v1.6.1 --locked
 ```
 
 Release notes must call out anything that affects automation: new or
