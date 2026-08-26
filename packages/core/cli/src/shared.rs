@@ -1,7 +1,8 @@
 use crate::error::{ArgumentError, CliError, CliResult, IoRefusal};
 use std::collections::BTreeSet;
 use std::fmt::{self, Display, Write};
-use std::path::PathBuf;
+use std::num::NonZeroUsize;
+use std::path::{Path as FsPath, PathBuf};
 
 use crate::args::{CompactSelectorArgs, DialectArg, EditTargetArgs, SelectorArgs, SourceInput};
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
@@ -787,10 +788,10 @@ pub fn analyze_files<T, E, F>(
 where
     T: Send,
     E: std::error::Error + From<CliError> + Send,
-    F: Fn(&PathBuf, Dialect, &SyntaxTree, &SourceInput) -> Result<T, E> + Sync,
+    F: Fn(&FsPath, Dialect, &SyntaxTree, &SourceInput) -> Result<T, E> + Sync,
 {
     let workers = worker_count(files.len());
-    let results: Vec<Result<T, E>> = if workers <= 1 {
+    let results: Vec<Result<T, E>> = if workers.get() == 1 {
         files
             .iter()
             .map(|file| analyze_one(file, dialect, &analyze))
@@ -851,12 +852,12 @@ fn analyze_in_parallel<T, E, F>(
     files: &[PathBuf],
     dialect: Option<DialectArg>,
     analyze: &F,
-    workers: usize,
+    workers: NonZeroUsize,
 ) -> Vec<Result<T, E>>
 where
     T: Send,
     E: From<CliError> + Send,
-    F: Fn(&PathBuf, Dialect, &SyntaxTree, &SourceInput) -> Result<T, E> + Sync,
+    F: Fn(&FsPath, Dialect, &SyntaxTree, &SourceInput) -> Result<T, E> + Sync,
 {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -864,12 +865,17 @@ where
     let cursor = AtomicUsize::new(0);
     let claim_order = &claim_order;
     let cursor = &cursor;
+    let expected_per_worker = files.len().div_ceil(workers.get());
 
     let claimed: Vec<Vec<(usize, Result<T, E>)>> = std::thread::scope(|scope| {
-        let handles = (0..workers)
+        let handles = (0..workers.get())
             .map(|_| {
                 scope.spawn(move || {
-                    let mut mine = Vec::new();
+                    // Dynamic scheduling deliberately makes the exact share
+                    // unknowable. The even-share lower estimate reserves no
+                    // more than one spare slot per worker while avoiding the
+                    // allocator growth path for the common balanced case.
+                    let mut mine = Vec::with_capacity(expected_per_worker);
                     loop {
                         let position = cursor.fetch_add(1, Ordering::Relaxed);
                         let Some(&index) = claim_order.get(position) else {
@@ -882,7 +888,7 @@ where
             })
             .collect::<Vec<_>>();
 
-        let mut claimed = Vec::with_capacity(workers);
+        let mut claimed = Vec::with_capacity(workers.get());
         for handle in handles {
             match handle.join() {
                 Ok(mine) => claimed.push(mine),
@@ -926,19 +932,20 @@ fn claim_order_by_descending_size(files: &[PathBuf]) -> Vec<usize> {
         .map(|file| std::fs::metadata(file).map_or(0, |metadata| metadata.len()))
         .collect::<Vec<_>>();
     let mut order = (0..files.len()).collect::<Vec<_>>();
-    // Stable, so equal-sized files are claimed in input order. The report does
-    // not depend on the schedule, but a schedule that moves between runs of the
+    // The index is the tie-breaker, so equal-sized files are claimed in input
+    // order without stable sort's auxiliary allocation. The report does not
+    // depend on the schedule, but a schedule that moves between runs of the
     // same tree makes a wall-clock measurement of it unreadable.
-    order.sort_by_key(|&index| std::cmp::Reverse(sizes[index]));
+    order.sort_unstable_by_key(|&index| (std::cmp::Reverse(sizes[index]), index));
     order
 }
 
-fn analyze_one<T, E, F>(file: &PathBuf, dialect: Option<DialectArg>, analyze: &F) -> Result<T, E>
+fn analyze_one<T, E, F>(file: &FsPath, dialect: Option<DialectArg>, analyze: &F) -> Result<T, E>
 where
     E: From<CliError>,
-    F: Fn(&PathBuf, Dialect, &SyntaxTree, &SourceInput) -> Result<T, E>,
+    F: Fn(&FsPath, Dialect, &SyntaxTree, &SourceInput) -> Result<T, E>,
 {
-    let (input, resolved, tree) = read_input_dialect_and_tree(Some(file.clone()), dialect)?;
+    let (input, resolved, tree) = read_input_dialect_and_tree(Some(file.to_path_buf()), dialect)?;
     analyze(file, resolved, &tree, &input)
 }
 
@@ -947,16 +954,18 @@ where
 /// A thread costs more than parsing a handful of small files, so a short list
 /// stays serial. `--jobs` is the caller's override and 0 means "as many as the
 /// machine has".
-fn worker_count(count: usize) -> usize {
+fn worker_count(count: usize) -> NonZeroUsize {
     const PARALLEL_THRESHOLD: usize = 8;
 
     if count < PARALLEL_THRESHOLD {
-        return 1;
+        return NonZeroUsize::MIN;
     }
-    paredit_core_safety::limits::effective_jobs_or_available()
-        .get()
-        .min(count)
-        .max(1)
+    NonZeroUsize::new(
+        paredit_core_safety::limits::effective_jobs_or_available()
+            .get()
+            .min(count),
+    )
+    .expect("parallel threshold makes the worker count non-zero")
 }
 
 /// Restates this invocation's bounds in the traversal's own vocabulary.
@@ -1197,7 +1206,7 @@ mod tests {
         let files = size_skewed_files("skew-heavy-first", COUNT, 0);
         // With one worker nothing else runs to open the gate, so the serial
         // path waits on itself.
-        let parallel = worker_count(files.len()) > 1;
+        let parallel = worker_count(files.len()).get() > 1;
         let gate = Gate::new();
         let completion = Mutex::new(Vec::new());
 
@@ -1239,7 +1248,7 @@ mod tests {
     fn the_largest_file_finishing_first_does_not_move_it_up_the_report() {
         const COUNT: usize = 24;
         let files = size_skewed_files("skew-heavy-last", COUNT, COUNT - 1);
-        let parallel = worker_count(files.len()) > 1;
+        let parallel = worker_count(files.len()).get() > 1;
         let gate = Gate::new();
         let completion = Mutex::new(Vec::new());
 

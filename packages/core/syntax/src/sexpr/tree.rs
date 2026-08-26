@@ -963,26 +963,37 @@ impl SyntaxTree {
         if offset > self.source.len() {
             return Err(not_found());
         }
-        let offset = ByteOffset::new(offset);
-        let mut best = None;
-        for id in 1..self.nodes.len() {
-            let node_id = NodeId::new(id);
-            let node = self.node(node_id);
-            if node.span.contains(offset) {
-                match best {
-                    None => best = Some(node_id),
-                    Some(best_id) if node.span.len() < self.node(best_id).span.len() => {
-                        best = Some(node_id);
-                    }
-                    _ => {}
-                }
+        self.innermost_node_at_offset(ByteOffset::new(offset))
+            .map(|node_id| Selection {
+                tree: self,
+                node_id,
+            })
+            .ok_or_else(not_found)
+    }
+
+    /// The smallest non-root node whose span contains `offset`, if any.
+    ///
+    /// Child spans are nested inside their parent, and sibling spans are
+    /// ordered and do not overlap. Binary-searching each sibling slice and
+    /// following the sole possible branch avoids scanning unrelated nodes and
+    /// needs no traversal stack.
+    pub(in crate::sexpr) fn innermost_node_at_offset(&self, offset: ByteOffset) -> Option<NodeId> {
+        let mut children = self.node(NodeId::ROOT).children.as_slice();
+        let mut innermost = None;
+
+        while let Some(candidate_index) = children
+            .partition_point(|&node_id| self.node(node_id).span.start() <= offset)
+            .checked_sub(1)
+        {
+            let node_id = children[candidate_index];
+            if !self.node(node_id).span.contains(offset) {
+                break;
             }
+            innermost = Some(node_id);
+            children = self.node(node_id).children.as_slice();
         }
-        best.map(|node_id| Selection {
-            tree: self,
-            node_id,
-        })
-        .ok_or_else(not_found)
+
+        innermost
     }
 
     // A full `ExpressionPath` is only built when an atom is found. Enter/leave
@@ -1117,6 +1128,16 @@ impl SyntaxTree {
     pub(in crate::sexpr) fn node(&self, node_id: NodeId) -> &Node {
         &self.nodes[node_id.get()]
     }
+
+    /// Returns `child`'s position in `parent` without scanning wide sibling lists.
+    ///
+    /// The parser allocates node IDs in source order and appends each completed
+    /// form to its parent's children, so every children slice is strictly
+    /// increasing by `NodeId`. Keeping that ordering implicit in the arena lets
+    /// navigation stay logarithmic without adding a per-node child-index field.
+    pub(in crate::sexpr) fn child_position(&self, parent: NodeId, child: NodeId) -> Option<usize> {
+        self.node(parent).children.binary_search(&child).ok()
+    }
 }
 
 impl<'a> Selection<'a> {
@@ -1194,10 +1215,7 @@ impl<'a> Selection<'a> {
         while let Some(parent_id) = self.tree.node(current).parent {
             let position = self
                 .tree
-                .node(parent_id)
-                .children
-                .iter()
-                .position(|id| *id == current)
+                .child_position(parent_id, current)
                 .expect("a node is listed among its own parent's children");
             indexes.push(position);
             current = parent_id;

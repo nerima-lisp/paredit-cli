@@ -238,8 +238,8 @@ impl SyntaxTree {
         if let Some(distinguished) = head_text.and_then(body_form_distinguished) {
             let position = node
                 .children
-                .iter()
-                .position(|child| self.node(*child).span.start().get() == content);
+                .binary_search_by_key(&content, |child| self.node(*child).span.start().get())
+                .ok();
             return Some(match position {
                 Some(index) if index >= 1 && index <= distinguished => base + indent * 2,
                 _ => base + indent,

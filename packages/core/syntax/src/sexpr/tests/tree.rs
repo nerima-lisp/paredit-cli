@@ -1,4 +1,12 @@
+use proptest::prelude::*;
+
 use super::*;
+
+fn nested_sexpr() -> impl Strategy<Value = String> {
+    "[a-z]{1,8}".prop_recursive(6, 128, 8, |inner| {
+        prop::collection::vec(inner, 0..8).prop_map(|children| format!("({})", children.join(" ")))
+    })
+}
 
 #[test]
 fn source_round_trips_the_exact_parsed_text() {
@@ -78,6 +86,101 @@ fn offsets_inside_the_document_still_select() {
         "(alpha (beta gamma))"
     );
     assert!(tree.select_at(input.len()).is_err());
+}
+
+#[test]
+fn branch_descent_matches_a_full_node_scan_at_every_offset() {
+    for input in [
+        "(alpha (beta gamma))",
+        "#+sbcl (guarded (nested value)) tail",
+        "'(quoted (list value)) #'function #(vector items)",
+        "(message \"text with (delimiters)\") ; comment\n(next)",
+    ] {
+        let tree = SyntaxTree::parse(input).expect("valid");
+        for raw_offset in 0..=input.len() {
+            let offset = ByteOffset::new(raw_offset);
+            let expected = (1..tree.nodes.len())
+                .map(NodeId::new)
+                .filter(|&node_id| tree.node(node_id).span.contains(offset))
+                .min_by_key(|&node_id| tree.node(node_id).span.len());
+            let actual = tree
+                .select_at(raw_offset)
+                .ok()
+                .map(|selection| selection.node_id);
+
+            assert_eq!(actual, expected, "input {input:?} at offset {raw_offset}");
+        }
+    }
+}
+
+#[test]
+fn branch_descent_handles_a_wide_sibling_slice() {
+    let input = (0..4_096)
+        .map(|index| format!("symbol{index}"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let tree = SyntaxTree::parse(&input).expect("valid");
+
+    for raw_offset in (0..input.len()).step_by(97) {
+        let offset = ByteOffset::new(raw_offset);
+        let expected = (1..tree.nodes.len())
+            .map(NodeId::new)
+            .filter(|&node_id| tree.node(node_id).span.contains(offset))
+            .min_by_key(|&node_id| tree.node(node_id).span.len());
+        let actual = tree
+            .select_at(raw_offset)
+            .ok()
+            .map(|selection| selection.node_id);
+
+        assert_eq!(actual, expected, "offset {raw_offset}");
+    }
+}
+
+#[test]
+fn sibling_ids_are_strictly_increasing_and_binary_searchable() {
+    let input = "(outer (nested a b) c) top-level #(vector items)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+
+    for parent in (0..tree.nodes.len()).map(NodeId::new) {
+        let children = &tree.node(parent).children;
+        assert!(
+            children.windows(2).all(|pair| pair[0] < pair[1]),
+            "children of {parent:?} are not strictly ordered: {children:?}"
+        );
+        for (expected, &child) in children.iter().enumerate() {
+            assert_eq!(tree.child_position(parent, child), Some(expected));
+        }
+    }
+}
+
+proptest! {
+    #[test]
+    fn branch_descent_matches_a_full_node_scan_for_generated_trees(
+        forms in prop::collection::vec(nested_sexpr(), 1..12),
+    ) {
+        let input = forms.join("\n");
+        let tree = SyntaxTree::parse(&input).expect("generated input parses");
+
+        for raw_offset in 0..=input.len() {
+            let offset = ByteOffset::new(raw_offset);
+            let expected = (1..tree.nodes.len())
+                .map(NodeId::new)
+                .filter(|&node_id| tree.node(node_id).span.contains(offset))
+                .min_by_key(|&node_id| tree.node(node_id).span.len());
+            let actual = tree
+                .select_at(raw_offset)
+                .ok()
+                .map(|selection| selection.node_id);
+
+            prop_assert_eq!(
+                actual,
+                expected,
+                "input {:?} at offset {}",
+                input,
+                raw_offset,
+            );
+        }
+    }
 }
 
 #[test]

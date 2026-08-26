@@ -441,15 +441,11 @@ impl Edit {
             return Err(StructureError::ConvoluteCommentsOutside.into());
         }
 
-        let inner_position = middle
-            .children
-            .iter()
-            .position(|child| *child == selection.node_id)
+        let inner_position = tree
+            .child_position(middle_id, selection.node_id)
             .ok_or(StructureError::NotDirectChildOfEnclosing)?;
-        let middle_position = outer
-            .children
-            .iter()
-            .position(|child| *child == middle_id)
+        let middle_position = tree
+            .child_position(outer_id, middle_id)
             .ok_or(StructureError::EnclosingNotDirectChildOfOuter)?;
 
         let middle_before = &middle.children[..inner_position];
@@ -627,14 +623,14 @@ fn list_delimiter_offsets(node: &Node) -> SexprResult<(usize, usize)> {
 pub(in crate::sexpr) fn next_sibling(tree: &SyntaxTree, node_id: NodeId) -> Option<NodeId> {
     let parent = tree.node(node_id).parent?;
     let siblings = &tree.node(parent).children;
-    let position = siblings.iter().position(|id| *id == node_id)?;
+    let position = tree.child_position(parent, node_id)?;
     siblings.get(position + 1).copied()
 }
 
 pub(in crate::sexpr) fn previous_sibling(tree: &SyntaxTree, node_id: NodeId) -> Option<NodeId> {
     let parent = tree.node(node_id).parent?;
     let siblings = &tree.node(parent).children;
-    let position = siblings.iter().position(|id| *id == node_id)?;
+    let position = tree.child_position(parent, node_id)?;
     position
         .checked_sub(1)
         .and_then(|previous| siblings.get(previous).copied())

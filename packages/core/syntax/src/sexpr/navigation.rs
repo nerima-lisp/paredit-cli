@@ -81,7 +81,7 @@ impl<'a> Selection<'a> {
 fn sibling(tree: &SyntaxTree, node_id: NodeId, offset: isize) -> Option<NodeId> {
     let parent = tree.node(node_id).parent?;
     let siblings = &tree.node(parent).children;
-    let position = siblings.iter().position(|id| *id == node_id)?;
+    let position = tree.child_position(parent, node_id)?;
     let target = position.checked_add_signed(offset)?;
     siblings.get(target).copied()
 }
@@ -241,20 +241,7 @@ impl SyntaxTree {
 
     /// The smallest non-root node whose span contains `offset`, if any.
     pub(in crate::sexpr) fn innermost_node_at(&self, offset: usize) -> Option<NodeId> {
-        let offset = ByteOffset::new(offset);
-        let mut best: Option<NodeId> = None;
-        for index in 1..self.nodes.len() {
-            let node_id = NodeId::new(index);
-            let node = self.node(node_id);
-            if !node.span.contains(offset) {
-                continue;
-            }
-            match best {
-                Some(current) if self.node(current).span.len() <= node.span.len() => {}
-                _ => best = Some(node_id),
-            }
-        }
-        best
+        self.innermost_node_at_offset(ByteOffset::new(offset))
     }
 
     /// The innermost list that encloses `offset`, starting the walk at `node_id`.

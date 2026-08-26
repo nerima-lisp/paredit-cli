@@ -36,7 +36,7 @@ use criterion::{
     BenchmarkId, Criterion, SamplingMode, Throughput, criterion_group, criterion_main,
 };
 use paredit_core_syntax::dialect::Dialect;
-use paredit_core_syntax::sexpr::SyntaxTree;
+use paredit_core_syntax::sexpr::{ExpressionPath, SyntaxTree};
 
 /// Target document sizes, in mebibytes.
 ///
@@ -176,6 +176,37 @@ fn benchmark_parse_scaling(c: &mut Criterion) {
     group.finish();
 }
 
+fn benchmark_wide_sibling_path(c: &mut Criterion) {
+    let mut group = c.benchmark_group("wide-sibling-path");
+
+    for width in [1_024, 65_536] {
+        let mut source = String::with_capacity(width * 2 + 2);
+        source.push('(');
+        for _ in 0..width {
+            source.push_str("x ");
+        }
+        source.push(')');
+
+        let tree = SyntaxTree::parse(&source).expect("the generated fixture is valid");
+        let path = ExpressionPath::from_indexes(vec![0, width - 1]);
+        let selection = tree
+            .select_path(&path)
+            .expect("the final sibling exists in the generated fixture");
+        assert_eq!(selection.path(), path);
+
+        group.throughput(Throughput::Elements(width as u64));
+        group.bench_with_input(
+            BenchmarkId::from_parameter(width),
+            &selection,
+            |bencher, selection| {
+                bencher.iter(|| black_box(selection.path()));
+            },
+        );
+    }
+
+    group.finish();
+}
+
 /// Enough samples for the confidence interval to be narrower than the gate's
 /// threshold — see the same function in `benches/similarity_report.rs`.
 ///
@@ -195,6 +226,6 @@ fn criterion_config() -> Criterion {
 criterion_group! {
     name = benches;
     config = criterion_config();
-    targets = benchmark_parse_scaling
+    targets = benchmark_parse_scaling, benchmark_wide_sibling_path
 }
 criterion_main!(benches);

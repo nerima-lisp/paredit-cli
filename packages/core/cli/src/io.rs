@@ -6,9 +6,10 @@ use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::fs;
 use std::io::{self, ErrorKind, IsTerminal, Read, Seek, SeekFrom, Write};
+use std::num::NonZeroUsize;
 use std::path::{Path as FsPath, PathBuf};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 use crate::error::{ArgumentError, CliError, CliResult, IoRefusal, WriteTargetError};
 
@@ -725,40 +726,51 @@ fn validate_write_inputs<'a>(
 
 /// The index of the first member of `files` whose content does not reparse.
 ///
-/// "First" is by input order, never by which thread noticed first: the parses
-/// run concurrently but each worker writes only its own pre-indexed slice, and
-/// the verdicts are read back in input order afterwards. A batch with two
-/// unparsable members therefore names the earlier one for every worker count,
-/// which is what the serial `?` this replaces did.
+/// "First" is by input order, never by which thread noticed first. Workers
+/// publish failures through an atomic minimum, so a batch with two unparsable
+/// members names the earlier one for every worker count, which is what the
+/// serial `?` this replaces did.
 ///
-/// The partitioning is the same one [`super::analyze_files`] uses — contiguous
-/// chunks over `std::thread::scope`, sized by `super::worker_count`, no
-/// work-stealing and so no lock on the hot path. This parse is a pure
-/// correctness guard duplicating work the transform already did, so on a batch
-/// `fix` across hundreds of files it was the one remaining serial parse of
-/// every byte being written.
-fn first_unparsable_index(files: &[(&PathBuf, &String)], workers: usize) -> Option<usize> {
-    if workers <= 1 || files.is_empty() {
+/// A shared cursor dynamically assigns the longest remaining content, matching
+/// [`super::analyze_files`]. This prevents a large member from pinning one
+/// static chunk while the other workers go idle. Once a failure is known,
+/// members after it in input order are skipped because they cannot change the
+/// result; lower indices still run and can lower the atomic minimum.
+fn first_unparsable_index(files: &[(&PathBuf, &String)], workers: NonZeroUsize) -> Option<usize> {
+    if workers.get() == 1 || files.is_empty() {
         return files
             .iter()
             .position(|(_, content)| SyntaxTree::parse(content).is_err());
     }
 
-    let mut unparsable = vec![false; files.len()];
-    let per_worker = files.len().div_ceil(workers);
+    let mut claim_order = (0..files.len()).collect::<Vec<_>>();
+    claim_order.sort_unstable_by_key(|&index| (std::cmp::Reverse(files[index].1.len()), index));
+    let cursor = AtomicUsize::new(0);
+    let first_unparsable = AtomicUsize::new(files.len());
+    let claim_order = &claim_order;
+    let cursor = &cursor;
+    let first_unparsable = &first_unparsable;
     std::thread::scope(|scope| {
-        for (chunk_index, slots) in unparsable.chunks_mut(per_worker).enumerate() {
-            let start = chunk_index * per_worker;
+        for _ in 0..workers.get().min(files.len()) {
             scope.spawn(move || {
-                for (offset, slot) in slots.iter_mut().enumerate() {
-                    let (_, content) = files[start + offset];
-                    *slot = SyntaxTree::parse(content).is_err();
+                loop {
+                    let position = cursor.fetch_add(1, Ordering::Relaxed);
+                    let Some(&index) = claim_order.get(position) else {
+                        break;
+                    };
+                    if index >= first_unparsable.load(Ordering::Relaxed) {
+                        continue;
+                    }
+                    if SyntaxTree::parse(files[index].1).is_err() {
+                        first_unparsable.fetch_min(index, Ordering::Relaxed);
+                    }
                 }
             });
         }
     });
 
-    unparsable.iter().position(|failed| *failed)
+    let index = first_unparsable.load(Ordering::Relaxed);
+    (index < files.len()).then_some(index)
 }
 
 /// The non-unix write path.
@@ -4530,6 +4542,7 @@ mod tests {
         let files = paths.iter().zip(contents.iter()).collect::<Vec<_>>();
 
         for workers in 1..=BATCH + 1 {
+            let workers = NonZeroUsize::new(workers).expect("positive test worker count");
             assert_eq!(
                 first_unparsable_index(&files, workers),
                 Some(FAILING),
@@ -4563,6 +4576,7 @@ mod tests {
         let files = paths.iter().zip(contents.iter()).collect::<Vec<_>>();
 
         for workers in 1..=BATCH + 1 {
+            let workers = NonZeroUsize::new(workers).expect("positive test worker count");
             assert_eq!(
                 first_unparsable_index(&files, workers),
                 Some(FAILING[0]),
@@ -4587,6 +4601,7 @@ mod tests {
         let files = paths.iter().zip(contents.iter()).collect::<Vec<_>>();
 
         for workers in 1..=BATCH + 4 {
+            let workers = NonZeroUsize::new(workers).expect("positive test worker count");
             assert_eq!(
                 first_unparsable_index(&files, workers),
                 None,
