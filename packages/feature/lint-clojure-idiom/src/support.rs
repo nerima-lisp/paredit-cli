@@ -31,7 +31,7 @@
 //! Two forms make this harder than the reader alone suggests, because they hold
 //! unevaluated code with **no prefix at all** — `case`'s test constants and
 //! `(comment …)`'s whole body. Both were found reporting false positives on
-//! real code; see [`ChildEvaluation`] and this package's README.
+//! real code; see `ChildEvaluation` and this package's README.
 //!
 //! # Cost
 //!
@@ -323,7 +323,7 @@ pub fn for_each_evaluated_subview_where(
 ///   visitor and again in its own `(quote …)` test.
 /// - **The stack is pre-sized**, so a function body does not grow it five times.
 ///
-/// The quote model is the *same* [`QuoteState`], not a second copy of it: that
+/// The quote model is the *same* `QuoteState`, not a second copy of it: that
 /// is the whole point of it living here, and a private re-derivation is the
 /// mistake this module's header is about.
 pub fn for_each_evaluated_call(
@@ -733,7 +733,7 @@ fn is_realization_barrier(node: &ExpressionView) -> bool {
 /// Whether `view` reaches one of `names` **without crossing an eager
 /// realizer**.
 ///
-/// This is [`mentions_any_symbol`] with the barrier described on
+/// This is `mentions_any_symbol` with the barrier described on
 /// [`EAGER_REALIZER_HEADS`]: a resource mentioned only underneath a `doall` is
 /// already in memory by the time the lazy wrapper is returned, so it does not
 /// make the wrapper a defect.

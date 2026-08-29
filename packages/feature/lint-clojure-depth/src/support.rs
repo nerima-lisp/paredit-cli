@@ -5,7 +5,7 @@
 //! # Evaluation context
 //!
 //! The quote machinery below (`QuoteState` — private — plus
-//! [`for_each_evaluated_subview_where`] and [`is_unevaluated_at`]) is a
+//! `for_each_evaluated_subview_where` and [`is_unevaluated_at`]) is a
 //! deliberate copy of `paredit-feature-lint-clojure-idiom`'s `support.rs`,
 //! semantics included. It is copied rather than depended on because a feature
 //! package must not depend on another feature package (§4.2), and it is copied
@@ -34,7 +34,7 @@
 //! [`is_unevaluated_at`] materializes the enclosing top-level form, so calling
 //! it on every head match would cost that form's size once per candidate.
 //!
-//! [`root_child_containing`] binary-searches the top level with
+//! `root_child_containing` binary-searches the top level with
 //! [`SyntaxTree::root_child_span`], which is an index into a slice and a field
 //! read. The obvious spelling — `select_path(&Path::root_child(i))?.span()` —
 //! heap-allocates a `Vec<ChildIndex>` *per probe*, so the search alone would

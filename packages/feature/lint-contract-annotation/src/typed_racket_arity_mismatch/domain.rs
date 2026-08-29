@@ -91,7 +91,7 @@ use crate::support::{
 /// Racket *alone*: `leftover-print-debug` and `self-recursive-tail-call` both
 /// name `Dialect::Racket`, but each does so inside a broad list of eight or ten
 /// dialects, and neither encodes anything Racket-specific. Both
-/// [`crate::typed_racket_arity_mismatch::rule::Rule::dialect_scope`] and
+/// `crate::typed_racket_arity_mismatch::rule::Rule::dialect_scope` and
 /// [`build_typed_racket_arity_mismatch_report`]'s `dialect_modelled` flag read
 /// this constant, so the engine's view and the report's claim cannot drift.
 pub const SCOPE: RuleDialectScope = RuleDialectScope::new(&[Dialect::Racket]);

@@ -16,7 +16,7 @@
 //!   body)` put their body at different indices, and CLHS 3.4.11 lets the
 //!   declaration section interleave declarations with one documentation string.
 //!   [`body_start`] and [`declaration_section_end`] are that geometry.
-//! - **A type lattice small enough to be right.** [`TypeExcludes`] answers only
+//! - **A type lattice small enough to be right.** `TypeExcludes` answers only
 //!   "can this type specifier definitely *not* contain this literal", and only
 //!   for atomic specifiers whose relationship to the modelled literals is
 //!   enumerable. Every compound specifier — `(or null string)` above all — is
@@ -590,7 +590,7 @@ impl<'a> TypeDeclaration<'a> {
 ///
 /// Both spellings: the long `(type fixnum x y)` and the abbreviated `(fixnum x
 /// y)`. An abbreviated specifier whose identifier is one of
-/// [`NON_TYPE_DECLARATION_IDENTIFIERS`] is not a type declaration, and neither
+/// `NON_TYPE_DECLARATION_IDENTIFIERS` is not a type declaration, and neither
 /// is one whose identifier is a `(…)` list — `((integer 0 10) x)` is not legal
 /// abbreviated syntax, only `(type (integer 0 10) x)` is.
 #[must_use]

@@ -598,7 +598,7 @@ impl SyntaxTree {
     /// zero with `(` — the shape essentially every top-level form in
     /// formatted Lisp source has — and re-parsing from there, so every
     /// problem in the document is visible in one pass. Bounded at
-    /// [`MAX_RECOVERED_ERRORS`] so a pathological input (a syntax error on
+    /// `MAX_RECOVERED_ERRORS` so a pathological input (a syntax error on
     /// every line) does a bounded amount of work and produces a bounded
     /// report rather than one entry per line of a huge file.
     ///

@@ -756,7 +756,7 @@ pub fn note_partial_file_failures(failures: &[FileFailure]) {
 ///
 /// - **Order is preserved.** Results come back in input order regardless of
 ///   which thread finished first, so the report's bytes do not depend on
-///   scheduling. Since [`claim_order_by_descending_size`] means the workers do
+///   scheduling. Since `claim_order_by_descending_size` means the workers do
 ///   not even *start* the files in input order, that is now an explicit
 ///   reassembly rather than a happy accident of the partitioning: each result
 ///   travels back paired with the index of the file it came from and is placed

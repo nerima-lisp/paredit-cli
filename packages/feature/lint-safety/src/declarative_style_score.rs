@@ -96,7 +96,7 @@ pub const META: RuleMeta = RuleMeta::new(
 
 /// The percentage (0-100) of `root`'s top-level forms that are purely
 /// declarative, and how many forms that count was taken over. `None` when the
-/// file has fewer than [`MIN_JUDGED_FORMS`] top-level forms — too few for a
+/// file has fewer than `MIN_JUDGED_FORMS` top-level forms — too few for a
 /// percentage to mean anything.
 #[must_use]
 pub fn declarative_score(root: &ExpressionView) -> Option<(u32, usize)> {

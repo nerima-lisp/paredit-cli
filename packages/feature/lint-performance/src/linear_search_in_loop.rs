@@ -7,7 +7,7 @@
 //! What makes the finding worth making is the word *same*: the collection must
 //! not depend on the loop. `(dolist (x xs) (member y x))` searches something
 //! different each round and cannot be hoisted, so it is not reported. That
-//! check — [`crate::shared::mentions_any`] against the loop's own variables —
+//! check — `crate::shared::mentions_any` against the loop's own variables —
 //! is the rule, and everything else is bookkeeping.
 //!
 //! Report-only: the rewrite introduces a new binding before the loop and

@@ -4,7 +4,7 @@
 //!
 //! # Quote semantics
 //!
-//! [`QuoteState`], [`for_each_evaluated_subview`],
+//! `QuoteState`, [`for_each_evaluated_subview`],
 //! [`for_each_evaluated_subview_where`] and [`is_unevaluated_at`] are copied
 //! from `paredit-feature-lint-condition-system`'s `support.rs` — tests included
 //! — deliberately as a copy rather than as a dependency: a lint feature package

@@ -341,22 +341,22 @@ rule	contains-on-non-associative	0
 rule	reference-type-operator-mismatch	0
 rule	macro-body-destroys-argument-form	0
 rule	macrolet-expander-captures-lexical-variable	0
-finding	redundant-quote	warning	suspicious	fixable=true	nested.lisp	840	quoting number 5 is redundant	redundant-quote/07bb8307b4864109/0
-finding	redundant-progn	warning	suspicious	fixable=true	nested.lisp	268	redundant progn: progn wraps a single form; it is equivalent to that form	redundant-progn/9715182cb9f63314/0
-finding	redundant-progn	warning	suspicious	fixable=true	nested.lisp	833	redundant progn: progn wraps a single form; it is equivalent to that form	redundant-progn/8d949e5fcf0552a8/0
-finding	redundant-progn	warning	suspicious	fixable=true	nested.lisp	907	redundant progn: progn wraps a single form; it is equivalent to that form	redundant-progn/d76c6d3cd567aa37/0
-finding	nested-progn	warning	suspicious	fixable=true	nested.lisp	520	progn with 2 forms is nested directly in another progn; splice its forms in	nested-progn/32d9beb078a330f2/0
-finding	nested-progn	warning	suspicious	fixable=true	nested.lisp	541	progn with 2 forms is nested directly in another progn; splice its forms in	nested-progn/92784ad7b319e3e5/0
-finding	nested-when	warning	suspicious	fixable=true	nested.lisp	321	when whose only body is a when merges by and; (when a (when b c)) is (when (and a b) c)	nested-when/01c713b3cc5714bd/0
-finding	nested-when	warning	suspicious	fixable=true	nested.lisp	333	when whose only body is a when merges by and; (when a (when b c)) is (when (and a b) c)	nested-when/47f3cc8d19ddaaf5/0
-finding	nested-unless	warning	suspicious	fixable=true	nested.lisp	412	unless whose only body is an unless merges by or; (unless a (unless b c)) is (unless (or a b) c)	nested-unless/835cbf88e8f4a683/0
-finding	nested-unless	warning	suspicious	fixable=true	nested.lisp	426	unless whose only body is an unless merges by or; (unless a (unless b c)) is (unless (or a b) c)	nested-unless/4f88eac26094a26d/0
-finding	nested-boolean	warning	suspicious	fixable=true	nested.lisp	768	and nested in a and flattens; its operands splice in	nested-boolean/f45659592901beaf/0
-finding	nested-boolean	warning	suspicious	fixable=true	nested.lisp	781	or nested in a or flattens; its operands splice in	nested-boolean/d0023e693387d698/0
-finding	nested-cxr	warning	suspicious	fixable=true	nested.lisp	592	nested car/cdr accessors combine into (cadr …)	nested-cxr/711a5272cecca21e/0
-finding	nested-cxr	warning	suspicious	fixable=true	nested.lisp	597	nested car/cdr accessors combine into (cddr …)	nested-cxr/3c85de2e7690aceb/0
-finding	redundant-body-progn	warning	suspicious	fixable=true	nested.lisp	503	progn with 3 forms is a defun body; splice its forms in	redundant-body-progn/cf5441812f2f8395/0
-finding	redundant-body-progn	warning	suspicious	fixable=true	nested.lisp	678	progn with 2 forms is a when body; splice its forms in	redundant-body-progn/656d6b2196b97388/0
-finding	empty-let	warning	suspicious	fixable=true	nested.lisp	899	let with no bindings is just progn; (let () body) is (progn body)	empty-let/dc954b1687c1363e/0
-finding	redundant-let-star	warning	suspicious	fixable=true	nested.lisp	881	let* with 1 binding is just let; sequential scope is unused	redundant-let-star/0f0bdbf55650550e/0
-finding	single-operand-boolean	warning	suspicious	fixable=true	nested.lisp	275	or has a single operand; (or X) is just X	single-operand-boolean/242e39c274656eed/0
+finding	redundant-quote	warning	suspicious	fixable=true	nested.lisp	863	quoting number 5 is redundant	redundant-quote/07bb8307b4864109/0
+finding	redundant-progn	warning	suspicious	fixable=true	nested.lisp	267	redundant progn: progn wraps a single form; it is equivalent to that form	redundant-progn/9715182cb9f63314/0
+finding	redundant-progn	warning	suspicious	fixable=true	nested.lisp	852	redundant progn: progn wraps a single form; it is equivalent to that form	redundant-progn/8d949e5fcf0552a8/0
+finding	redundant-progn	warning	suspicious	fixable=true	nested.lisp	936	redundant progn: progn wraps a single form; it is equivalent to that form	redundant-progn/d76c6d3cd567aa37/0
+finding	nested-progn	warning	suspicious	fixable=true	nested.lisp	523	progn with 2 forms is nested directly in another progn; splice its forms in	nested-progn/32d9beb078a330f2/0
+finding	nested-progn	warning	suspicious	fixable=true	nested.lisp	544	progn with 2 forms is nested directly in another progn; splice its forms in	nested-progn/92784ad7b319e3e5/0
+finding	nested-when	warning	suspicious	fixable=true	nested.lisp	324	when whose only body is a when merges by and; (when a (when b c)) is (when (and a b) c)	nested-when/01c713b3cc5714bd/0
+finding	nested-when	warning	suspicious	fixable=true	nested.lisp	336	when whose only body is a when merges by and; (when a (when b c)) is (when (and a b) c)	nested-when/47f3cc8d19ddaaf5/0
+finding	nested-unless	warning	suspicious	fixable=true	nested.lisp	415	unless whose only body is an unless merges by or; (unless a (unless b c)) is (unless (or a b) c)	nested-unless/835cbf88e8f4a683/0
+finding	nested-unless	warning	suspicious	fixable=true	nested.lisp	429	unless whose only body is an unless merges by or; (unless a (unless b c)) is (unless (or a b) c)	nested-unless/4f88eac26094a26d/0
+finding	nested-boolean	warning	suspicious	fixable=true	nested.lisp	787	and nested in a and flattens; its operands splice in	nested-boolean/f45659592901beaf/0
+finding	nested-boolean	warning	suspicious	fixable=true	nested.lisp	800	or nested in a or flattens; its operands splice in	nested-boolean/d0023e693387d698/0
+finding	nested-cxr	warning	suspicious	fixable=true	nested.lisp	611	nested car/cdr accessors combine into (cadr …)	nested-cxr/711a5272cecca21e/0
+finding	nested-cxr	warning	suspicious	fixable=true	nested.lisp	616	nested car/cdr accessors combine into (cddr …)	nested-cxr/3c85de2e7690aceb/0
+finding	redundant-body-progn	warning	suspicious	fixable=true	nested.lisp	506	progn with 3 forms is a defun body; splice its forms in	redundant-body-progn/cf5441812f2f8395/0
+finding	redundant-body-progn	warning	suspicious	fixable=true	nested.lisp	697	progn with 2 forms is a when body; splice its forms in	redundant-body-progn/656d6b2196b97388/0
+finding	empty-let	warning	suspicious	fixable=true	nested.lisp	922	let with no bindings is just progn; (let () body) is (progn body)	empty-let/dc954b1687c1363e/0
+finding	redundant-let-star	warning	suspicious	fixable=true	nested.lisp	904	let* with 1 binding is just let; sequential scope is unused	redundant-let-star/0f0bdbf55650550e/0
+finding	single-operand-boolean	warning	suspicious	fixable=true	nested.lisp	278	or has a single operand; (or X) is just X	single-operand-boolean/242e39c274656eed/0

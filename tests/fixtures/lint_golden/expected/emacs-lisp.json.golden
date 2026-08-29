@@ -36,8 +36,8 @@
       "rule": "elisp-unreachable-lexical-binding",
       "severity": "error",
       "span": {
-        "end": 932,
-        "start": 911
+        "end": 945,
+        "start": 924
       }
     },
     {
@@ -49,8 +49,8 @@
       "rule": "elisp-autoload-cookie-without-form",
       "severity": "error",
       "span": {
-        "end": 762,
-        "start": 748
+        "end": 775,
+        "start": 761
       }
     },
     {
@@ -62,8 +62,8 @@
       "rule": "elisp-autoload-cookie-without-form",
       "severity": "error",
       "span": {
-        "end": 984,
-        "start": 970
+        "end": 996,
+        "start": 982
       }
     },
     {
@@ -76,7 +76,7 @@
       "severity": "warning",
       "span": {
         "end": 342,
-        "start": 265
+        "start": 263
       }
     },
     {
@@ -89,7 +89,7 @@
       "severity": "warning",
       "span": {
         "end": 342,
-        "start": 265
+        "start": 263
       }
     },
     {
@@ -114,8 +114,8 @@
       "rule": "elisp-quoted-lambda",
       "severity": "error",
       "span": {
-        "end": 636,
-        "start": 621
+        "end": 649,
+        "start": 629
       }
     },
     {
@@ -140,8 +140,8 @@
       "rule": "elisp-condition-case-without-handler",
       "severity": "error",
       "span": {
-        "end": 736,
-        "start": 700
+        "end": 749,
+        "start": 713
       }
     }
   ],

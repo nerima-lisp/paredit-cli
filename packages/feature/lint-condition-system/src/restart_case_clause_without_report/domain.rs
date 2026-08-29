@@ -17,7 +17,7 @@
 //! For those, the bare name *is* the interface: a reader of the debugger's
 //! restart list already knows what `ABORT` does, and a handler invokes it by
 //! that name rather than by reading its report. Demanding a `:report` there
-//! flags idiomatic, correct code, so [`STANDARD_RESTARTS`] clauses are neither
+//! flags idiomatic, correct code, so `STANDARD_RESTARTS` clauses are neither
 //! flagged nor counted — they are not clauses this rule has an opinion about,
 //! so putting them in the denominator would understate the rate for the clauses
 //! it does.
@@ -169,7 +169,7 @@ pub fn examine_restart_case(
 
 /// Collects every `:report`-less restart clause in one file, with the number of
 /// restart clauses this rule has an opinion about as the denominator beside
-/// them — every clause scanned except the [`STANDARD_RESTARTS`] ones.
+/// them — every clause scanned except the `STANDARD_RESTARTS` ones.
 ///
 /// A dialect this rule does not model is reported as unmodelled rather than as
 /// clean: an empty finding list means "every restart here explains itself" for

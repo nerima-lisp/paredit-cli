@@ -1,5 +1,5 @@
 //! Inline lint-suppression directives: source comments that silence
-//! [`crate::domain::lint_report`] findings, the way `eslint-disable-next-line`
+//! `crate::domain::lint_report` findings, the way `eslint-disable-next-line`
 //! or `# noqa` do elsewhere.
 //!
 //! A directive is any Lisp comment containing one of three tokens:

@@ -57,7 +57,7 @@ fn cli_prints_definition_outline() {
     cmd.args(["inspect", "outline", "--file", "tests/fixtures/sample.el"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("0\t0..37\tdefun\ttrue"));
+        .stdout(predicate::str::contains("0\t0..39\tdefun\ttrue"));
 }
 
 #[test]

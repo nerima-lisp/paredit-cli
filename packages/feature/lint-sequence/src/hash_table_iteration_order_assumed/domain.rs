@@ -233,7 +233,7 @@ fn is_unordered_producer(view: &ExpressionView) -> bool {
 /// # Cost
 ///
 /// `car`, `first` and `nth` are dense in ordinary code, so the predicates are
-/// ordered cheapest-first: [`accessor_of`] (one byte switch and one string
+/// ordered cheapest-first: `accessor_of` (one byte switch and one string
 /// comparison), then the arity, then `is_paren_list` on the sequence operand —
 /// which rejects `(car xs)`, `(first row)` and `(nth i items)`, the shapes that
 /// actually occur, before anything reads a clause or compares a producer name.

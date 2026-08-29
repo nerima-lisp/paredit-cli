@@ -224,7 +224,7 @@ pub fn is_unevaluated_at(tree: &SyntaxTree, target: ByteSpan) -> bool {
 /// `(eq x "s")` has the bug the rule is named for, and the expansion is where it
 /// will bite.
 ///
-/// Hence `hard` alone rather than [`QuoteState::is_data`]. The two-counter state
+/// Hence `hard` alone rather than `QuoteState::is_data`. The two-counter state
 /// is what makes the distinction expressible at all: a single depth counter
 /// cannot tell `'(a ,(eq x "s"))` — still data, the comma is a literal comma —
 /// from `` `(a ,(eq x "s")) ``, which is code.
@@ -407,7 +407,7 @@ fn is_type_specifier_position(
 /// one-argument call to `eql` and never was.
 ///
 /// The verdict needs the candidate's *ancestors*, which no head-matched node
-/// carries, so this descends from the root exactly as [`quote_state_at`] does.
+/// carries, so this descends from the root exactly as `quote_state_at` does.
 /// The two questions are independent and both are asked only once a finding
 /// already exists, so ordinary code never reaches [`SyntaxTree::root_view`].
 ///
@@ -648,7 +648,7 @@ fn is_binding_position(
 /// reports as a four-argument `equal` call.
 ///
 /// The verdict needs the candidate's *ancestors*, which no head-matched node
-/// carries, so this descends from the root exactly as [`quote_state_at`] does,
+/// carries, so this descends from the root exactly as `quote_state_at` does,
 /// and — like every other guard here — is asked only once a finding already
 /// exists, so ordinary code never reaches [`SyntaxTree::root_view`].
 ///

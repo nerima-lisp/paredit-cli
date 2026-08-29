@@ -56,6 +56,23 @@ fn multi_clause_try_count(source: &str) -> usize {
     count
 }
 
+fn except_binding(clause: &str) -> &str {
+    let mut depth = 0;
+    for (index, character) in clause.char_indices() {
+        match character {
+            '[' => depth += 1,
+            ']' => {
+                depth -= 1;
+                if depth == 0 {
+                    return clause[..=index].trim();
+                }
+            }
+            _ => {}
+        }
+    }
+    clause.lines().next().unwrap_or("").trim()
+}
+
 #[test]
 fn the_clean_fixture_parses_and_offers_real_candidates() {
     // Without this the next test is a false clean: a fixture the reader
@@ -104,8 +121,7 @@ fn each_dangerous_shape_is_reported_at_its_own_clause() {
             let (finding, _) = outcome.into_parts();
             let start = finding.span.start().get();
             let end = finding.span.end().get().min(DANGEROUS.len());
-            // The first line of the reported clause identifies it.
-            DANGEROUS[start..end].lines().next().unwrap_or("").trim()
+            except_binding(&DANGEROUS[start..end])
         })
         .collect();
     reported.sort_unstable();

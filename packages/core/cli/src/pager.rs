@@ -10,7 +10,7 @@
 //! `println!` — lands in the pager without knowing it exists.
 //!
 //! Unix-only, like the rest of this crate's raw-fd and xattr code
-//! ([`crate::shared::io`]'s macOS ACL preservation is the other example):
+//! (`crate::shared::io`'s macOS ACL preservation is the other example):
 //! `dup2` and `/bin/sh` are POSIX, and there is no Windows pager convention
 //! to fall back to. `--paginate` is simply inert there.
 //!

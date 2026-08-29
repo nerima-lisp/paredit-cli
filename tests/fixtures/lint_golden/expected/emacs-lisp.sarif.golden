@@ -15,7 +15,7 @@
                   "byteLength": 92,
                   "byteOffset": 344,
                   "startColumn": 1,
-                  "startLine": 10
+                  "startLine": 9
                 }
               }
             }
@@ -65,9 +65,9 @@
                 },
                 "region": {
                   "byteLength": 21,
-                  "byteOffset": 911,
+                  "byteOffset": 924,
                   "startColumn": 1,
-                  "startLine": 36
+                  "startLine": 37
                 }
               }
             }
@@ -91,9 +91,9 @@
                 },
                 "region": {
                   "byteLength": 14,
-                  "byteOffset": 748,
+                  "byteOffset": 761,
                   "startColumn": 3,
-                  "startLine": 28
+                  "startLine": 29
                 }
               }
             }
@@ -117,7 +117,7 @@
                 },
                 "region": {
                   "byteLength": 14,
-                  "byteOffset": 970,
+                  "byteOffset": 982,
                   "startColumn": 1,
                   "startLine": 40
                 }
@@ -142,10 +142,10 @@
                   "uri": "emacs-lisp.el"
                 },
                 "region": {
-                  "byteLength": 77,
-                  "byteOffset": 265,
+                  "byteLength": 79,
+                  "byteOffset": 263,
                   "startColumn": 1,
-                  "startLine": 7
+                  "startLine": 5
                 }
               }
             }
@@ -155,7 +155,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "elisp-defcustom-missing-type/9fccc736d0e46b79/0",
-            "primaryLocationLineHash": "fnv1a64:cbbc553bbb93971f:0"
+            "primaryLocationLineHash": "fnv1a64:e39bd9440eeb4030:0"
           },
           "ruleId": "elisp-defcustom-missing-type"
         },
@@ -168,10 +168,10 @@
                   "uri": "emacs-lisp.el"
                 },
                 "region": {
-                  "byteLength": 77,
-                  "byteOffset": 265,
+                  "byteLength": 79,
+                  "byteOffset": 263,
                   "startColumn": 1,
-                  "startLine": 7
+                  "startLine": 5
                 }
               }
             }
@@ -181,7 +181,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "elisp-defcustom-missing-group/9fccc736d0e46b79/0",
-            "primaryLocationLineHash": "fnv1a64:d17a6c91b6493d32:0"
+            "primaryLocationLineHash": "fnv1a64:73bf40b3a41dad21:0"
           },
           "ruleId": "elisp-defcustom-missing-group"
         },
@@ -197,7 +197,7 @@
                   "byteLength": 4,
                   "byteOffset": 505,
                   "startColumn": 4,
-                  "startLine": 17
+                  "startLine": 16
                 }
               }
             }
@@ -207,7 +207,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "elisp-obsolete-cl-alias/cdece4ad70d57deb/0",
-            "primaryLocationLineHash": "fnv1a64:8123b7140348beab:0"
+            "primaryLocationLineHash": "fnv1a64:fb91529381e17321:0"
           },
           "ruleId": "elisp-obsolete-cl-alias"
         },
@@ -222,11 +222,11 @@
                   "replacements": [
                     {
                       "deletedRegion": {
-                        "byteLength": 15,
-                        "byteOffset": 621
+                        "byteLength": 20,
+                        "byteOffset": 629
                       },
                       "insertedContent": {
-                        "text": "(lambda (n) n)"
+                        "text": "(lambda (n)\n     n)"
                       }
                     }
                   ]
@@ -245,8 +245,8 @@
                   "uri": "emacs-lisp.el"
                 },
                 "region": {
-                  "byteLength": 15,
-                  "byteOffset": 621,
+                  "byteLength": 20,
+                  "byteOffset": 629,
                   "startColumn": 3,
                   "startLine": 21
                 }
@@ -258,7 +258,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "elisp-quoted-lambda/d01b8b8f281f7655/0",
-            "primaryLocationLineHash": "fnv1a64:e73bb58661019248:0"
+            "primaryLocationLineHash": "fnv1a64:04bacc6104a7cac8:0"
           },
           "ruleId": "elisp-quoted-lambda"
         },
@@ -274,7 +274,7 @@
                   "byteLength": 13,
                   "byteOffset": 418,
                   "startColumn": 3,
-                  "startLine": 12
+                  "startLine": 11
                 }
               }
             }
@@ -298,9 +298,9 @@
                 },
                 "region": {
                   "byteLength": 36,
-                  "byteOffset": 700,
+                  "byteOffset": 713,
                   "startColumn": 3,
-                  "startLine": 25
+                  "startLine": 26
                 }
               }
             }

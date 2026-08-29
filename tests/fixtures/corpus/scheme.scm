@@ -1,5 +1,4 @@
 ;;;; Scheme shapes: define-values, named let, syntax-rules, and block comments.
-
 (define-library (paredit corpus)
   (export walk fold-tree)
   (import (scheme base) (scheme write))

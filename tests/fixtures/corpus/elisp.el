@@ -1,28 +1,32 @@
 ;;; elisp.el --- Emacs Lisp corpus fixture  -*- lexical-binding: t; -*-
-
 ;;; Commentary:
-
 ;; Emacs Lisp reader syntax that differs from Common Lisp: `?a` characters,
 ;; `#'` in different positions, and docstrings in every definition form.
-
 ;;; Code:
-
 (require 'cl-lib)
 
-(defgroup paredit-corpus nil
+(defgroup paredit-corpus
+  nil
   "A corpus fixture."
-  :group 'tools
-  :prefix "paredit-corpus-")
+  :group
+  'tools
+  :prefix
+  "paredit-corpus-")
 
-(defcustom paredit-corpus-delay 0.5
+(defcustom paredit-corpus-delay
+  0.5
   "Seconds to wait."
-  :type 'number
-  :group 'paredit-corpus)
+  :type
+  'number
+  :group
+  'paredit-corpus)
 
-(defvar paredit-corpus--cache nil
+(defvar paredit-corpus--cache
+  nil
   "Internal cache.")
 
-(defconst paredit-corpus-characters (list ?\( ?\) ?\; ?\" ?\\ ?\s ?\n ?a)
+(defconst paredit-corpus-characters
+  (list ?\( ?\) ?\; ?\" ?\\ ?\s ?\n ?a)
   "Characters whose reader syntax embeds delimiters.")
 
 ;;;###autoload
@@ -36,7 +40,8 @@
         (push item result)))))
 
 (cl-defstruct (paredit-corpus-node (:constructor paredit-corpus-node-create))
-  name children)
+              name
+              children)
 
 (defun paredit-corpus-walk (node)
   "Walk NODE depth first."
@@ -47,4 +52,5 @@
     (_ (list node))))
 
 (provide 'elisp)
+
 ;;; elisp.el ends here

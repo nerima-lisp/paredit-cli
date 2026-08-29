@@ -166,7 +166,7 @@ fn conversion_for(target: &ExpressionView) -> Option<Conversion> {
 /// # Cost
 ///
 /// One `children.len()` rejects every transducer-arity call, and the
-/// `children.is_empty()` inside [`conversion_for`] rejects every call whose
+/// `children.is_empty()` inside `conversion_for` rejects every call whose
 /// target is anything but an empty literal — before any delimiter or prefix is
 /// read. `into` is not a dense head to begin with.
 pub fn examine(

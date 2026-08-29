@@ -366,7 +366,7 @@ fn mentions_define_condition(source: &str) -> bool {
 impl ConditionHierarchy {
     /// Reads every `define-condition` reachable as code in one file.
     ///
-    /// A whole-file walk, guarded by [`mentions_define_condition`] so that a
+    /// A whole-file walk, guarded by `mentions_define_condition` so that a
     /// file which defines no condition at all — the common case for the rules
     /// that consult the hierarchy, since a `(signal 'app-error …)` usually
     /// names a type defined in some *other* file — pays one byte scan instead.

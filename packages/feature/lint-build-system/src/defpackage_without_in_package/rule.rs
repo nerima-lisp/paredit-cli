@@ -23,14 +23,14 @@
 //! N−1 of them discarded.
 //!
 //! `WholeTree` collapses that to one call per file. It is free rather than
-//! merely cheaper, because [`collect_lint_pass`] materializes the root view
+//! merely cheaper, because `collect_lint_pass` materializes the root view
 //! unconditionally — `let root = tree.root_view();`, before the `whole_tree()`
 //! loop and before the walk — and hands that same view to every `WholeTree`
 //! rule. So this rule now borrows a view the dispatcher built anyway, where
 //! under `Heads` it called `root_view()` itself and rebuilt the entire document
 //! each time.
 //!
-//! [`collect_lint_pass`]: paredit_core_lint_engine::engine::dispatch
+//! `collect_lint_pass`: paredit_core_lint_engine::engine::dispatch
 //!
 //! Being dispatched on every file rather than only on files with a package
 //! declaration is what the guard pair in [`examine_file`] pays for, and it is

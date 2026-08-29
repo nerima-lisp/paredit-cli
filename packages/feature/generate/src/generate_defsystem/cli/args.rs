@@ -17,11 +17,11 @@ pub struct GenerateDefsystemArgs {
     /// with underscores turned into hyphens.
     #[arg(long)]
     pub name: Option<String>,
-    /// Write the generated form to <directory>/<name>.asd instead of only
+    /// Write the generated form to `<directory>/<name>.asd` instead of only
     /// printing a plan.
     #[arg(long)]
     pub write: bool,
-    /// With --write, overwrite <name>.asd if it already exists. Without it,
+    /// With --write, overwrite `<name>.asd` if it already exists. Without it,
     /// an existing file is left untouched and the command refuses.
     #[arg(long)]
     pub force: bool,

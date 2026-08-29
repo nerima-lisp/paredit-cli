@@ -8,7 +8,7 @@
 //!
 //! # Quote semantics
 //!
-//! [`QuoteState`] is copied from `paredit-feature-lint-condition-system`'s
+//! `QuoteState` is copied from `paredit-feature-lint-condition-system`'s
 //! `support.rs` (and its sibling copy in `paredit-feature-lint-testing`),
 //! tests included, deliberately as a copy rather than as a dependency: a lint
 //! feature package depending on another lint feature package would be a new

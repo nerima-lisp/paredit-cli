@@ -57,8 +57,8 @@
 //! variable walks its own subtree. The `clean/forms/*` benchmarks lint files
 //! with zero findings, so that first compare is all this rule costs there.
 //!
-//! [`mentions_a_byte_wide_bound`] is a *performance* device and not a
-//! correctness guard: [`read_loop`] independently rejects every form it
+//! `mentions_a_byte_wide_bound` is a *performance* device and not a
+//! correctness guard: `read_loop` independently rejects every form it
 //! rejects, so deleting the call site changes no finding — which a mutation run
 //! confirmed. It is pinned by a direct assertion on the predicate rather than
 //! through the rule's output, because there is no output to observe.

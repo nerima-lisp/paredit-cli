@@ -125,7 +125,7 @@ fn stdout_is_terminal() -> bool {
     *STDOUT_IS_TERMINAL.get_or_init(|| std::io::stdout().is_terminal())
 }
 
-/// Forces [`stdout_is_terminal`]'s cache to resolve now, before something
+/// Forces `stdout_is_terminal`'s cache to resolve now, before something
 /// else changes what fd 1 points at. A no-op once the cache already holds a
 /// value, which is exactly the "first check wins" contract callers need.
 pub fn prime_stdout_terminal_cache() {
@@ -201,7 +201,7 @@ impl Painter {
     }
 }
 
-/// Colorizes a [`crate::diff::unified_diff`] result for a terminal: green
+/// Colorizes a `crate::diff::unified_diff` result for a terminal: green
 /// `+` lines, red `-` lines, cyan hunk headers, bold file headers.
 ///
 /// Takes the finished diff text rather than folding into `unified_diff`

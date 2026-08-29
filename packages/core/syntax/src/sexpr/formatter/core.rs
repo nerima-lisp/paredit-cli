@@ -245,7 +245,7 @@ impl Formatter {
     }
 
     /// Overrides the inline-width budget [`Formatter::with_dialect`] set to
-    /// [`MAX_INLINE_WIDTH`].
+    /// `MAX_INLINE_WIDTH`.
     ///
     /// Re-clamps `indent` to the new width: an indent wider than the line
     /// budget could never fit an inline form regardless, and every existing
@@ -272,7 +272,7 @@ impl Formatter {
     /// compiled-in single space.
     ///
     /// `0` means auto: each contiguous run of adjacent, trailing-commented
-    /// top-level forms (see [`Self::trailing_comment_columns`] for exactly
+    /// top-level forms (see `Self::trailing_comment_columns` for exactly
     /// what breaks a run) aligns to one column past its own widest form,
     /// independently of every other run. Any other value is a fixed column
     /// every trailing comment in the document aligns to, run or no run — a

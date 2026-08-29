@@ -11,7 +11,7 @@
 //!
 //! Four dialects share the walk. Everything above the binder dispatch — scope
 //! stack, reference resolution, opacity, quasiquote depth — is written once;
-//! [`binders`], [`emacs_lisp`] and [`scheme`] differ only in which shape each
+//! `binders`, `emacs_lisp` and `scheme` differ only in which shape each
 //! head has.
 
 mod assignments;

@@ -11,7 +11,7 @@
 //!   name. Routing Emacs Lisp through the Common Lisp head normalizer folded
 //!   both distinctions away.
 //! * Whether a `let` binds lexically is decided by a *comment on line 1*, not
-//!   by the form. See [`header`].
+//!   by the form. See `header`.
 //! * The `cl-lib` and `subr-x` families spell familiar shapes differently
 //!   (`cl-flet`, `if-let*`, `pcase-let*`, `seq-let`) and add ones Common Lisp
 //!   has no counterpart for.

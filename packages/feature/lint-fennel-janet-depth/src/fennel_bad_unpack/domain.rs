@@ -54,7 +54,7 @@
 //! and confirmed by running it: `(select "#" (.. (table.unpack ["a" "b" "c"])))`
 //! is `3`, so nothing was dropped. `fennel-ls`'s own documentation example for
 //! this lint — ``(.. (unpack ["a" "b" "c"]))  ; Only concatenates "a"`` — is
-//! therefore incorrect as written for Fennel 1.6.1. [`PASSTHROUGH_UNARY`] is
+//! therefore incorrect as written for Fennel 1.6.1. `PASSTHROUGH_UNARY` is
 //! that measured exception list.
 //!
 //! Every other operator does truncate even at one argument, because it

@@ -26,7 +26,7 @@
 //!
 //! # Why the quote model cannot count down for Hy
 //!
-//! [`QuoteState`] is the two-counter model from
+//! `QuoteState` is the two-counter model from
 //! `packages/feature/lint-condition-system/src/support.rs` — `hard: bool` plus
 //! `quasi: u32`. A single `i32` depth counter is wrong and has shipped in this
 //! workspace as a false-positive source twice. A consolidation of the several

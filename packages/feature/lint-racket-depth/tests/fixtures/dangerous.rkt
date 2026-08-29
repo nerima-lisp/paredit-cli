@@ -9,9 +9,8 @@
 ;; racket-match-unreachable-clause: the `[_ 'other]` clause matches every
 ;; value, so `[(? string?) 'str]` below it can never run. `raco make` compiles
 ;; this without a word and `(classify "hi")` returns 'other.
-(define
- (classify value)
- (match value [(? number?) 'number] [_ 'other] [(? string?) 'string]))
+(define (classify value)
+        (match value [(? number?) 'number] [_ 'other] [(? string?) 'string]))
 
 ;; racket-begin0-single-form: with one form there is no sequence, so this is
 ;; exactly `(compute-total)`.
@@ -28,9 +27,8 @@
 ;; racket-for-comprehension-value-discarded: the list is built, filled and
 ;; dropped, because it is not the last form of the body. `for` does the same
 ;; iteration without allocating it.
-(define
- (report items)
- (for/list ([item (in-list items)]) (displayln item))
- 'done)
+(define (report items)
+        (for/list ([item (in-list items)]) (displayln item))
+        'done)
 
 (define (compute-total) 42)

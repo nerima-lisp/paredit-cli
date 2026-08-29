@@ -49,7 +49,7 @@
 //! and common idiom.
 //!
 //! What actually matters is whether the body reaches the compiler **at all**,
-//! which is [`EvalWhenSituations::reaches_the_compiler`].
+//! which is `EvalWhenSituations::reaches_the_compiler`.
 //!
 //! # Deliberate limits
 //!
