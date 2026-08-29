@@ -25,7 +25,35 @@
 //!
 //! Absolute nanoseconds from this machine are worthless: the audit ran with a
 //! load average above 10 and several sibling agents building in parallel. The
-//! assertions are all *ratios*, and the printed table is for the report.
+//! printed table is for the report.
+//!
+//! # What runs unattended
+//!
+//! Two things, both with enough headroom that machine load cannot decide them:
+//!
+//! - the **invocation counts**, which the head index and the dialect scope fix
+//!   before any `check` body runs, so they are identical idle and loaded;
+//! - the **gap to [`materializing::RULE`]**, which is four orders of magnitude
+//!   (measured 9,000x in release, 13,000x in dev) against a 10x floor. This is
+//!   the assertion that actually catches a guard moved above its domain check.
+//!
+//! The **per-call doubling ratio is a benchmark, not a test**, and is
+//! `#[ignore]`d — see [`ignored_bench_per_call_cost_does_not_grow_with_the_file`].
+//! It was asserted at `< 1.8` and failed a downstream `nix` build at 2.04 on
+//! untouched code. Two reasons it cannot be a gate:
+//!
+//! - the real rules cost 16-75 ns per call in a release build, so the ratio of
+//!   two such measurements is mostly scheduler noise;
+//! - doubling the file doubles the tree, so the traversal's working set stops
+//!   fitting in cache. That is constant work per call taking more time per
+//!   call, and it puts the idle-machine ratio at ~1.27 in release before any
+//!   contention — most of the budget spent on an effect that is not a
+//!   complexity change at all.
+//!
+//! The property it was reaching for is not lost: a `check` that materializes
+//! the document is what
+//! [`every_rule_stays_far_cheaper_than_a_materializing_one`] measures directly,
+//! against a control built to have that exact shape.
 
 use std::path::Path;
 use std::time::Duration;
@@ -315,68 +343,86 @@ fn every_rule_stays_far_cheaper_than_a_materializing_one() {
     );
 }
 
-/// Doubling the file must not change what one `check` call costs.
+/// Every rule is dispatched once per occurrence of one of its heads, and no
+/// more — so doubling the file doubles the dispatches rather than squaring
+/// them.
 ///
-/// This is deliberately expressed as **ns per call across two file sizes**
-/// rather than as a ratio of totals. Both say the same thing when the totals
-/// are large, but the totals here are not: at 27-160 ns per call the real
-/// rules are near the clock's resolution, so their totals swing with the
-/// scheduler while their per-call cost does not.
-///
-/// The property is exact. A rule whose `check` is O(depth) costs the same per
-/// call whatever the file size, so its ratio sits at 1. A rule that
-/// materializes the document inside `check` is O(file) per call, so doubling
-/// the file doubles its per-call cost — which is precisely what separates
-/// `reference-materializing` (measured at 2.2) from every rule in this
-/// package (measured at 0.5 to 1.3).
+/// **Counts, not wall clock.** The head index and the dialect scope decide
+/// these before any `check` body runs, so a loaded machine reports exactly
+/// what an idle one does. A rule invoked more often than its heads occur is
+/// one re-walking the document per match, which is the dispatch-side shape of
+/// the same defect [`every_rule_stays_far_cheaper_than_a_materializing_one`]
+/// catches on the cost side.
 #[test]
-fn a_rules_per_call_cost_does_not_grow_with_the_file() {
+fn each_rule_is_dispatched_once_per_head_occurrence() {
+    // Heads per repetition of the two fixtures, in `COST_ENTRIES` order:
+    //
+    //   fennel-bad-unpack                        9  DENSE_FENNEL
+    //   fennel-nested-associative-operator       5  DENSE_FENNEL
+    //   fennel-redundant-do                      7  `fn` `when` `let` `each`
+    //                                               `for` `while` `lambda`
+    //   janet-dead-branch-on-constant-condition  4  `when` `unless` `if` `if-not`
+    //   janet-unreachable-match-clause           1  `match`
+    //   reference-materializing                  1  `when`, Fennel only
+    const PER_REPETITION: [u64; 6] = [9, 5, 7, 4, 1, 1];
+
+    let counts = |repetitions: usize| -> Vec<u64> {
+        measure_once(repetitions)
+            .into_iter()
+            .map(|item| item.invocations)
+            .collect()
+    };
+
+    for repetitions in [200, 400] {
+        let observed = counts(repetitions);
+        let expected: Vec<u64> = PER_REPETITION
+            .iter()
+            .map(|per| per * repetitions as u64)
+            .collect();
+        assert_eq!(
+            observed, expected,
+            "invocations must equal head occurrences at {repetitions} \
+             repetitions; a rule dispatched more often than its heads occur is \
+             being handed nodes its head filter should have excluded"
+        );
+    }
+}
+
+/// The per-call doubling ratio, as a benchmark rather than a gate.
+///
+///     cargo test -p paredit-feature-lint-fennel-janet-depth --release \
+///       --lib -- --ignored --nocapture ignored_bench_per_call
+///
+/// A `check` that is O(depth) costs the same per call whatever the file size;
+/// one that materializes the document is O(file) per call, so doubling the
+/// file doubles it. That is the difference between `reference-materializing`
+/// and every rule here, and it is worth reading whenever a rule changes.
+///
+/// It is not worth failing a build on. See the module docs: at 16-75 ns per
+/// call in release the ratio is dominated by scheduler noise and by cache
+/// working-set growth, and asserting it at `< 1.8` broke a downstream `nix`
+/// build at 2.04 on code nobody had touched.
+#[test]
+#[ignore = "a benchmark: wall-clock ratios are unstable under parallel load"]
+fn ignored_bench_per_call_cost_does_not_grow_with_the_file() {
     let small = measure_both(200);
     let large = measure_both(400);
 
-    let ratio_of = |name: &str| -> f64 {
-        let find = |set: &[Measured]| -> f64 {
-            set.iter()
-                .find(|item| item.name == name)
-                .map(|item| item.per_call)
-                .expect("rule present")
-        };
-        find(&large) / find(&small).max(1.0)
+    let find = |set: &[Measured], name: &str| -> f64 {
+        set.iter()
+            .find(|item| item.name == name)
+            .map(|item| item.per_call)
+            .expect("rule present")
     };
 
     for entry in &COST_ENTRIES {
         let name = entry.meta().name().as_str();
-        if name == "reference-materializing" {
-            continue;
-        }
-        let ratio = ratio_of(name);
-        assert!(
-            ratio < 1.8,
-            "{name} cost {ratio:.2}x as much per call on a file twice the \
-             size; a `check` that is O(file) rather than O(depth) is the usual \
-             cause, and calling is_unevaluated_* before the domain check is \
-             how that happens"
+        let at_small = find(&small, name);
+        let at_large = find(&large, name);
+        eprintln!(
+            "{name}: {at_small:.0} ns/call @200 → {at_large:.0} ns/call @400, \
+             ratio {:.2}",
+            at_large / at_small.max(1e-9)
         );
     }
-
-    // The control. Without it the test above passes just as happily when the
-    // measurement is broken and every ratio is 1.
-    //
-    // Stated as an absolute magnitude rather than as the reference rule's own
-    // doubling ratio. The ratio is theoretically 2 but was observed between
-    // 1.48 and 2.96 across runs on this machine: taking the best of five
-    // samples pulls the *small* file's number down hardest, which compresses
-    // it. Six orders of magnitude between the two shapes is not compressible
-    // by any amount of scheduler noise.
-    let reference = large
-        .iter()
-        .find(|item| item.name == "reference-materializing")
-        .expect("rule present");
-    assert!(
-        reference.per_call > 100_000.0,
-        "the reference rule cost only {:.0} ns per call; it materializes the \
-         whole document on every one of them, so either the fixture stopped \
-         matching `when` or the measurement is not live",
-        reference.per_call
-    );
 }
