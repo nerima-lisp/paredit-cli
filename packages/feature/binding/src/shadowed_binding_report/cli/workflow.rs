@@ -16,7 +16,7 @@ pub fn shadowed_binding_report(args: ShadowedBindingReportArgs) -> CommandResult
     let files = expand_shadowed_binding_report_inputs(&args.files, args.dialect)?;
     // A file that will not parse is reported, not fatal — see `query find`.
     let analysis = analyze_files(&files, args.dialect, |file, dialect, tree, input| {
-        build_shadowed_binding_report(file.clone(), dialect, &input.text, tree)
+        build_shadowed_binding_report(file.to_path_buf(), dialect, &input.text, tree)
     });
     if analysis.is_total_failure() {
         return Err(total_file_failure(analysis.failed).into());

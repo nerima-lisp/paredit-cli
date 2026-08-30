@@ -24,7 +24,7 @@ pub fn remove_unused_definitions(args: RemoveUnusedDefinitionsArgs) -> CliResult
 
         CliResult::Ok((
             RemoveUnusedDefinitionInputFile {
-                path: file.clone(),
+                path: file.to_path_buf(),
                 dialect,
                 package,
                 definitions: definitions

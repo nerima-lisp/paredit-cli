@@ -31,7 +31,7 @@ pub fn generate_tests(args: GenerateTestsArgs) -> CliResult<()> {
             let report = build_test_map_report(file, dialect, tree);
             FileOutcome::Stubs(build_test_stubs(&report.findings))
         } else {
-            FileOutcome::SkippedDialect(file.clone())
+            FileOutcome::SkippedDialect(file.to_path_buf())
         })
     });
     // Generated test stubs are meant to cover every file passed in; silently

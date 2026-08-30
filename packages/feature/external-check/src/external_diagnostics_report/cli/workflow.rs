@@ -103,7 +103,7 @@ pub fn external_diagnostics_report(args: ExternalDiagnosticsReportArgs) -> Comma
         // contract every Common-Lisp-only report in this tool follows.
         if dialect != Dialect::CommonLisp {
             return CliResult::Ok(CompileOutcome::SkippedDialect(FileFindings::new(
-                file.clone(),
+                file.to_path_buf(),
                 dialect,
                 false,
                 tree.source(),
@@ -129,7 +129,7 @@ pub fn external_diagnostics_report(args: ExternalDiagnosticsReportArgs) -> Comma
             Ok(outcome) => outcome,
             Err(source) => {
                 return CliResult::Ok(CompileOutcome::RunFailed {
-                    path: file.clone(),
+                    path: file.to_path_buf(),
                     source,
                 });
             }
@@ -137,7 +137,7 @@ pub fn external_diagnostics_report(args: ExternalDiagnosticsReportArgs) -> Comma
 
         if let Some(transcript) = outcome.unparsed_transcript {
             return CliResult::Ok(CompileOutcome::Unreadable {
-                path: file.clone(),
+                path: file.to_path_buf(),
                 exit: outcome
                     .exit_code
                     .map_or_else(|| "signal".to_owned(), |code| code.to_string()),
@@ -145,7 +145,9 @@ pub fn external_diagnostics_report(args: ExternalDiagnosticsReportArgs) -> Comma
             });
         }
         if outcome.timed_out {
-            return CliResult::Ok(CompileOutcome::TimedOut { path: file.clone() });
+            return CliResult::Ok(CompileOutcome::TimedOut {
+                path: file.to_path_buf(),
+            });
         }
 
         let findings = outcome
@@ -161,7 +163,7 @@ pub fn external_diagnostics_report(args: ExternalDiagnosticsReportArgs) -> Comma
             .collect::<Vec<_>>();
 
         let report = FileFindings::new(
-            file.clone(),
+            file.to_path_buf(),
             dialect,
             true,
             tree.source(),

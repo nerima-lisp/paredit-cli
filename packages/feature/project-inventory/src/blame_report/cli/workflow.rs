@@ -14,7 +14,7 @@ pub fn blame_report(args: BlameReportArgs) -> CommandResult {
     let analysis = analyze_files(&files, args.dialect, |file, dialect, tree, _| {
         // One `git blame` per file, run in the file's own directory so a report
         // spanning several repositories answers for each of them.
-        let blame = measure_blame(&file.canonicalize().unwrap_or_else(|_| file.clone()));
+        let blame = measure_blame(&file.canonicalize().unwrap_or_else(|_| file.to_path_buf()));
         CliResult::Ok(build_blame_report(file, dialect, tree, &blame))
     });
     if analysis.is_total_failure() {

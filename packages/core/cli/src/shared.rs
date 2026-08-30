@@ -973,10 +973,10 @@ where
     F: Fn(&PathBuf) -> Result<T, E> + Sync,
 {
     let workers = worker_count(files.len());
-    let results: Vec<Result<T, E>> = if workers <= 1 {
+    let results: Vec<Result<T, E>> = if workers.get() == 1 {
         files.iter().map(&process).collect()
     } else {
-        analyze_in_parallel_raw(files, &process, workers)
+        analyze_in_parallel_raw(files, &process, workers.get())
     };
 
     let mut analysis = FileAnalysis {

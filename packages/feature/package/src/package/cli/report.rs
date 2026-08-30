@@ -19,7 +19,7 @@ pub fn package_report(args: PackageReportArgs) -> CliResult<()> {
             })?;
 
         CliResult::Ok(PackageReportFile {
-            path: file.clone(),
+            path: file.to_path_buf(),
             dialect,
             report,
         })

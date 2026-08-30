@@ -16,7 +16,7 @@ pub fn naming_report(args: NamingReportArgs) -> CommandResult {
 
     // A file that will not parse is reported, not fatal — see `query find`.
     let analysis = analyze_files(&files, args.dialect, |file, dialect, tree, _| {
-        build_naming_report(file.clone(), dialect, tree)
+        build_naming_report(file.to_path_buf(), dialect, tree)
     });
     if analysis.is_total_failure() {
         return Err(total_file_failure(analysis.failed).into());

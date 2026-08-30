@@ -15,7 +15,7 @@ use paredit_core_workspace::workspace::{WorkspaceDiscoveryOptions, discover_work
 pub fn definition_report(args: DefinitionReportArgs) -> CliResult<()> {
     let files = expand_definition_report_inputs(&args.files, args.dialect)?;
     let analysis = analyze_files(&files, args.dialect, |file, dialect, tree, _input| {
-        CliResult::Ok(build_definition_report(file.clone(), dialect, tree)?)
+        CliResult::Ok(build_definition_report(file.to_path_buf(), dialect, tree)?)
     });
     if analysis.is_total_failure() {
         return Err(total_file_failure(analysis.failed).into());
@@ -29,7 +29,7 @@ pub fn unused_definition_report(args: UnusedDefinitionReportArgs) -> CommandResu
     let files = expand_definition_report_inputs(&args.files, args.dialect)?;
     let analysis = analyze_files(&files, args.dialect, |file, dialect, tree, input| {
         CliResult::Ok(build_parsed_definition_file(
-            file.clone(),
+            file.to_path_buf(),
             dialect,
             tree,
             &input.text,

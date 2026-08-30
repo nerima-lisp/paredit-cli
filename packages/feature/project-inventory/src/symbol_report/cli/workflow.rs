@@ -47,7 +47,7 @@ pub fn symbol_report(args: SymbolReportArgs) -> CommandResult {
             .collect::<Vec<_>>();
 
         CliResult::Ok(SymbolReportFile {
-            path: file.clone(),
+            path: file.to_path_buf(),
             dialect,
             occurrences,
         })

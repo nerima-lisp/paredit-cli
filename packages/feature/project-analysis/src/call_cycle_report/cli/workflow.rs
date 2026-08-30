@@ -13,7 +13,7 @@ pub fn call_cycle_report(args: CallCycleReportArgs) -> CommandResult {
     // A file that will not parse is reported, not fatal — see `query find`.
     let analysis = analyze_files(&args.files, args.dialect, |file, dialect, tree, _| {
         CliResult::Ok(CallGraphReportSource {
-            path: file.clone(),
+            path: file.to_path_buf(),
             dialect,
             tree: tree.clone(),
         })

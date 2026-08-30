@@ -17,7 +17,7 @@ pub fn unused_parameter_report(args: UnusedParameterReportArgs) -> CommandResult
     let files = expand_unused_parameter_report_inputs(&args.files, args.dialect)?;
     // A file that will not parse is reported, not fatal — see `query find`.
     let analysis = analyze_files(&files, args.dialect, |file, dialect, tree, input| {
-        build_unused_parameter_report(file.clone(), dialect, tree, &input.text)
+        build_unused_parameter_report(file.to_path_buf(), dialect, tree, &input.text)
     });
     if analysis.is_total_failure() {
         return Err(total_file_failure(analysis.failed).into());

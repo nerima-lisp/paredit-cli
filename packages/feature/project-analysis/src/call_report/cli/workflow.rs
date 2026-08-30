@@ -17,7 +17,7 @@ pub fn call_report(args: CallReportArgs) -> CommandResult {
             args.include_definitions,
         )?;
         ProjectAnalysisResult::Ok(CallReportFile {
-            path: file.clone(),
+            path: file.to_path_buf(),
             dialect,
             calls,
         })

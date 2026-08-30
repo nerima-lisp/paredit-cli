@@ -11,7 +11,11 @@ use paredit_core_cli::shared::{analyze_files, note_partial_file_failures, total_
 pub fn package_boundary_report(args: PackageBoundaryReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
     let analysis = analyze_files(&files, args.dialect, |file, dialect, tree, _| {
-        CliResult::Ok(build_package_boundary_report(file.clone(), dialect, tree)?)
+        CliResult::Ok(build_package_boundary_report(
+            file.to_path_buf(),
+            dialect,
+            tree,
+        )?)
     });
     if analysis.is_total_failure() {
         return Err(total_file_failure(analysis.failed).into());

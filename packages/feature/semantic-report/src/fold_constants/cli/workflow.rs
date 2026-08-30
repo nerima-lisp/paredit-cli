@@ -70,7 +70,7 @@ pub fn fold_constants(args: FoldConstantsArgs) -> CliResult<()> {
             apply_byte_span_edits(&input.text, edits)?
         };
         CliResult::Ok(FoldPlan {
-            path: file.clone(),
+            path: file.to_path_buf(),
             dialect,
             before: input.text.clone(),
             rewritten,

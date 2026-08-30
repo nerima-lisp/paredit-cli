@@ -17,7 +17,7 @@ pub fn unused_local_callable_report(args: UnusedLocalCallableReportArgs) -> Comm
 
     // A file that will not parse is reported, not fatal — see `query find`.
     let analysis = analyze_files(&files, args.dialect, |file, dialect, tree, input| {
-        build_unused_local_callable_report(file.clone(), dialect, &input.text, tree)
+        build_unused_local_callable_report(file.to_path_buf(), dialect, &input.text, tree)
     });
     if analysis.is_total_failure() {
         return Err(total_file_failure(analysis.failed).into());

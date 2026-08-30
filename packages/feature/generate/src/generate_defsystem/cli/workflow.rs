@@ -31,9 +31,9 @@ pub fn generate_defsystem(args: GenerateDefsystemArgs) -> CliResult<()> {
     let files = expand_input_files(std::slice::from_ref(&args.directory), args.dialect)?;
     let analysis = analyze_files(&files, args.dialect, |file, dialect, tree, _input| {
         CliResult::Ok(if dialect == Dialect::CommonLisp {
-            FileOutcome::Parsed(file.clone(), tree.clone())
+            FileOutcome::Parsed(file.to_path_buf(), tree.clone())
         } else {
-            FileOutcome::SkippedDialect(file.clone())
+            FileOutcome::SkippedDialect(file.to_path_buf())
         })
     });
     // A generated defsystem is meant to cover every file in the directory;
