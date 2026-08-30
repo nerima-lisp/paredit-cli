@@ -1,1 +1,2 @@
-(defun demo (foo) (message "%s" foo))
+(defun demo (foo)
+  (message "%s" foo))

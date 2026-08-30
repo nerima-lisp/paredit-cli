@@ -12,7 +12,7 @@
 //! cannot tell on its own whether it is code. Without [`is_unevaluated_at`],
 //! every rule in this package would fire on template text.
 //!
-//! [`QuoteState`] and [`for_each_evaluated_subview`] are copied from
+//! `QuoteState` and [`for_each_evaluated_subview`] are copied from
 //! `paredit-feature-lint-testing`'s `support.rs` (itself a copy of
 //! `paredit-feature-lint-condition-system`'s), tests included, deliberately as a
 //! copy rather than as a dependency: a lint feature package depending on another

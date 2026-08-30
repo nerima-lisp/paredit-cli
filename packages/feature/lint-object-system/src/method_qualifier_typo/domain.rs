@@ -20,7 +20,7 @@
 //!
 //! Either counts wherever the file compiler would process it as a top-level
 //! form, which includes inside `eval-when`, `progn`, `locally`, `macrolet` and
-//! `symbol-macrolet` — see [`TOP_LEVEL_WRAPPERS`]. Wrapping a
+//! `symbol-macrolet` — see `TOP_LEVEL_WRAPPERS`. Wrapping a
 //! `define-method-combination` in `(eval-when (:compile-toplevel …) …)` so
 //! later forms in the file can use it is ordinary, not exotic.
 //!

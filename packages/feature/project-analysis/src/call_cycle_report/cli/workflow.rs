@@ -6,19 +6,23 @@ use crate::call_cycle_report::usecase::{
     CallCyclePolicyOptions, analyze_call_cycles, evaluate_call_cycle_policy,
 };
 use crate::call_graph_report::usecase::{CallGraphReportSource, build_call_graph_report};
-use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::CliResult;
+use paredit_core_cli::shared::{analyze_files, note_partial_file_failures, total_file_failure};
 
 pub fn call_cycle_report(args: CallCycleReportArgs) -> CommandResult {
-    let mut sources = Vec::with_capacity(args.files.len());
-
-    for file in &args.files {
-        let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        sources.push(CallGraphReportSource {
-            path: file.clone(),
+    // A file that will not parse is reported, not fatal — see `query find`.
+    let analysis = analyze_files(&args.files, args.dialect, |file, dialect, tree, _| {
+        CliResult::Ok(CallGraphReportSource {
+            path: file.to_path_buf(),
             dialect,
-            tree,
-        });
+            tree: tree.clone(),
+        })
+    });
+    if analysis.is_total_failure() {
+        return Err(total_file_failure(analysis.failed).into());
     }
+    note_partial_file_failures(&analysis.failed);
+    let sources = analysis.succeeded;
 
     let report = build_call_graph_report(sources, false, None)?;
     let summary = analyze_call_cycles(&report.files);

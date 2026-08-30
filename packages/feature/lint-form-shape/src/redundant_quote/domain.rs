@@ -116,7 +116,7 @@ pub struct RedundantQuoteItem {
     pub span: ByteSpan,
     pub literal: String,
     /// Which self-evaluating category the literal falls in, from
-    /// [`LiteralKind::describe`]'s closed set.
+    /// `LiteralKind::describe`'s closed set.
     pub kind: &'static str,
 }
 

@@ -1,10 +1,8 @@
-use paredit_core_cli::args::SourceInput;
-use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::{analyze_files, note_partial_file_failures, total_file_failure};
 use paredit_core_cli::{CliResult, CommandResult};
-use paredit_core_syntax::sexpr::SyntaxTree;
 use std::collections::BTreeSet;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use super::args::{DefinitionReportArgs, UnusedDefinitionReportArgs};
 use super::render::{print_definition_report, print_unused_definition_report};
@@ -16,29 +14,32 @@ use paredit_core_workspace::workspace::{WorkspaceDiscoveryOptions, discover_work
 
 pub fn definition_report(args: DefinitionReportArgs) -> CliResult<()> {
     let files = expand_definition_report_inputs(&args.files, args.dialect)?;
-    let mut reports = Vec::with_capacity(files.len());
-
-    for file in &files {
-        let (file, _input, dialect, tree) = load_definition_input(file, args.dialect)?;
-        reports.push(build_definition_report(file, dialect, &tree)?);
+    let analysis = analyze_files(&files, args.dialect, |file, dialect, tree, _input| {
+        CliResult::Ok(build_definition_report(file.to_path_buf(), dialect, tree)?)
+    });
+    if analysis.is_total_failure() {
+        return Err(total_file_failure(analysis.failed).into());
     }
+    note_partial_file_failures(&analysis.failed);
 
-    print_definition_report(&reports, args.output)
+    print_definition_report(&analysis.succeeded, args.output)
 }
 
 pub fn unused_definition_report(args: UnusedDefinitionReportArgs) -> CommandResult {
     let files = expand_definition_report_inputs(&args.files, args.dialect)?;
-    let mut parsed = Vec::with_capacity(files.len());
-
-    for file in &files {
-        let (file, input, dialect, tree) = load_definition_input(file, args.dialect)?;
-        parsed.push(build_parsed_definition_file(
-            file,
+    let analysis = analyze_files(&files, args.dialect, |file, dialect, tree, input| {
+        CliResult::Ok(build_parsed_definition_file(
+            file.to_path_buf(),
             dialect,
-            &tree,
+            tree,
             &input.text,
-        )?);
+        )?)
+    });
+    if analysis.is_total_failure() {
+        return Err(total_file_failure(analysis.failed).into());
     }
+    note_partial_file_failures(&analysis.failed);
+    let parsed = analysis.succeeded;
 
     let reports = collect_unused_definition_candidates(&parsed)?;
     let policy = evaluate_unused_definition_policy(
@@ -95,18 +96,4 @@ fn push_unique(expanded: &mut Vec<PathBuf>, seen: &mut BTreeSet<PathBuf>, path: 
     if seen.insert(canonical) {
         expanded.push(path);
     }
-}
-
-fn load_definition_input(
-    file: &Path,
-    dialect: Option<paredit_core_cli::args::DialectArg>,
-) -> CliResult<(
-    PathBuf,
-    SourceInput,
-    paredit_core_syntax::dialect::Dialect,
-    SyntaxTree,
-)> {
-    let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.to_path_buf()), dialect)?;
-
-    Ok((file.to_path_buf(), input, dialect, tree))
 }

@@ -13,9 +13,9 @@
                 },
                 "region": {
                   "byteLength": 10,
-                  "byteOffset": 6875,
+                  "byteOffset": 4273,
                   "startColumn": 1,
-                  "startLine": 99
+                  "startLine": 234
                 }
               }
             }
@@ -25,7 +25,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "self-assignment/5f1a5b802aa99b47/0",
-            "primaryLocationLineHash": "fnv1a64:3090b4323101cc12:0"
+            "primaryLocationLineHash": "fnv1a64:937cae6f165b9c98:0"
           },
           "ruleId": "self-assignment"
         },
@@ -38,10 +38,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 22,
-                  "byteOffset": 6961,
-                  "startColumn": 17,
-                  "startLine": 100
+                  "byteLength": 30,
+                  "byteOffset": 4321,
+                  "startColumn": 3,
+                  "startLine": 237
                 }
               }
             }
@@ -51,7 +51,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "duplicate-setf-places/8104810ed815b9fd/0",
-            "primaryLocationLineHash": "fnv1a64:dec66b63172ec399:0"
+            "primaryLocationLineHash": "fnv1a64:e369aac3bd876808:0"
           },
           "ruleId": "duplicate-setf-places"
         },
@@ -64,10 +64,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 26,
-                  "byteOffset": 7021,
+                  "byteLength": 32,
+                  "byteOffset": 4378,
                   "startColumn": 1,
-                  "startLine": 101
+                  "startLine": 240
                 }
               }
             }
@@ -77,7 +77,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "setf-arity/b0a5b422aad6d4d2/0",
-            "primaryLocationLineHash": "fnv1a64:adc9c4e54f1f85e9:0"
+            "primaryLocationLineHash": "fnv1a64:922f99954220a3ac:0"
           },
           "ruleId": "setf-arity"
         },
@@ -91,9 +91,9 @@
                 },
                 "region": {
                   "byteLength": 7,
-                  "byteOffset": 7092,
+                  "byteOffset": 4431,
                   "startColumn": 7,
-                  "startLine": 102
+                  "startLine": 243
                 }
               }
             }
@@ -103,7 +103,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "setq-non-variable/93a38b0abb06fba2/0",
-            "primaryLocationLineHash": "fnv1a64:961b4a0b9146b6e8:0"
+            "primaryLocationLineHash": "fnv1a64:ecd08edfe345c3da:0"
           },
           "ruleId": "setq-non-variable"
         },
@@ -119,7 +119,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 19,
-                        "byteOffset": 3644
+                        "byteOffset": 2282
                       },
                       "insertedContent": {
                         "text": "(incf ctr)"
@@ -142,9 +142,9 @@
                 },
                 "region": {
                   "byteLength": 19,
-                  "byteOffset": 3644,
+                  "byteOffset": 2282,
                   "startColumn": 1,
-                  "startLine": 53
+                  "startLine": 129
                 }
               }
             }
@@ -154,7 +154,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "manual-incf/e9cc51bb9767dcb7/0",
-            "primaryLocationLineHash": "fnv1a64:5a5c0c1b982a0284:0"
+            "primaryLocationLineHash": "fnv1a64:4ad9688e6f349584:0"
           },
           "ruleId": "manual-incf"
         },
@@ -170,7 +170,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 23,
-                        "byteOffset": 3710
+                        "byteOffset": 2317
                       },
                       "insertedContent": {
                         "text": "(push e lst)"
@@ -193,9 +193,9 @@
                 },
                 "region": {
                   "byteLength": 23,
-                  "byteOffset": 3710,
+                  "byteOffset": 2317,
                   "startColumn": 1,
-                  "startLine": 54
+                  "startLine": 131
                 }
               }
             }
@@ -205,7 +205,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "manual-push/4847791ff6aa61f5/0",
-            "primaryLocationLineHash": "fnv1a64:f629ef340a844646:0"
+            "primaryLocationLineHash": "fnv1a64:95b9befebdc339e6:0"
           },
           "ruleId": "manual-push"
         },
@@ -221,7 +221,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 23,
-                        "byteOffset": 3776
+                        "byteOffset": 2356
                       },
                       "insertedContent": {
                         "text": "(pushnew e st)"
@@ -244,9 +244,9 @@
                 },
                 "region": {
                   "byteLength": 23,
-                  "byteOffset": 3776,
+                  "byteOffset": 2356,
                   "startColumn": 1,
-                  "startLine": 55
+                  "startLine": 133
                 }
               }
             }
@@ -256,7 +256,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "manual-pushnew/1e8f91739c283b2f/0",
-            "primaryLocationLineHash": "fnv1a64:6a5dce420c660fe8:0"
+            "primaryLocationLineHash": "fnv1a64:af5a2ffbbc06e4c8:0"
           },
           "ruleId": "manual-pushnew"
         },
@@ -272,7 +272,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 14,
-                        "byteOffset": 2773
+                        "byteOffset": 1786
                       },
                       "insertedContent": {
                         "text": "(incf tally)"
@@ -295,9 +295,9 @@
                 },
                 "region": {
                   "byteLength": 14,
-                  "byteOffset": 2773,
+                  "byteOffset": 1786,
                   "startColumn": 1,
-                  "startLine": 41
+                  "startLine": 97
                 }
               }
             }
@@ -307,7 +307,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "explicit-step-delta/00a1f8d32f2b1a3f/0",
-            "primaryLocationLineHash": "fnv1a64:a6f6582f9595e57e:0"
+            "primaryLocationLineHash": "fnv1a64:13ed20ccc0bc217c:0"
           },
           "ruleId": "explicit-step-delta"
         },
@@ -323,7 +323,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 13,
-                        "byteOffset": 2847
+                        "byteOffset": 1824
                       },
                       "insertedContent": {
                         "text": "(decf nsd 3)"
@@ -346,9 +346,9 @@
                 },
                 "region": {
                   "byteLength": 13,
-                  "byteOffset": 2847,
+                  "byteOffset": 1824,
                   "startColumn": 1,
-                  "startLine": 42
+                  "startLine": 99
                 }
               }
             }
@@ -358,7 +358,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "negated-step-delta/c72d843010c3cb77/0",
-            "primaryLocationLineHash": "fnv1a64:653c09f0cd0befce:0"
+            "primaryLocationLineHash": "fnv1a64:16866cf820b2cb06:0"
           },
           "ruleId": "negated-step-delta"
         },
@@ -373,8 +373,8 @@
                   "replacements": [
                     {
                       "deletedRegion": {
-                        "byteLength": 21,
-                        "byteOffset": 2920
+                        "byteLength": 23,
+                        "byteOffset": 1860
                       },
                       "insertedContent": {
                         "text": "(return-from blk)"
@@ -396,10 +396,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 21,
-                  "byteOffset": 2920,
+                  "byteLength": 23,
+                  "byteOffset": 1860,
                   "startColumn": 1,
-                  "startLine": 43
+                  "startLine": 101
                 }
               }
             }
@@ -409,7 +409,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "explicit-nil-return/83c6c0866319952f/0",
-            "primaryLocationLineHash": "fnv1a64:4a60f7a86f540560:0"
+            "primaryLocationLineHash": "fnv1a64:960ae5beeac85c8c:0"
           },
           "ruleId": "explicit-nil-return"
         },
@@ -425,7 +425,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 12,
-                        "byteOffset": 1223
+                        "byteOffset": 916
                       },
                       "insertedContent": {
                         "text": "(list e)"
@@ -448,9 +448,9 @@
                 },
                 "region": {
                   "byteLength": 12,
-                  "byteOffset": 1223,
+                  "byteOffset": 916,
                   "startColumn": 1,
-                  "startLine": 19
+                  "startLine": 47
                 }
               }
             }
@@ -460,7 +460,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "cons-to-list/30734641edf18c29/0",
-            "primaryLocationLineHash": "fnv1a64:92886f9c57c080aa:0"
+            "primaryLocationLineHash": "fnv1a64:4b1f362be758ec88:0"
           },
           "ruleId": "cons-to-list"
         },
@@ -476,7 +476,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 22,
-                        "byteOffset": 1290
+                        "byteOffset": 945
                       },
                       "insertedContent": {
                         "text": "(copy-seq dr)"
@@ -499,9 +499,9 @@
                 },
                 "region": {
                   "byteLength": 22,
-                  "byteOffset": 1290,
+                  "byteOffset": 945,
                   "startColumn": 1,
-                  "startLine": 20
+                  "startLine": 49
                 }
               }
             }
@@ -511,7 +511,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "double-reverse/64abc2d4def62155/0",
-            "primaryLocationLineHash": "fnv1a64:ef22f2138a3df6ca:0"
+            "primaryLocationLineHash": "fnv1a64:86aac9418b8d9904:0"
           },
           "ruleId": "double-reverse"
         },
@@ -525,9 +525,9 @@
                 },
                 "region": {
                   "byteLength": 18,
-                  "byteOffset": 7158,
+                  "byteOffset": 4463,
                   "startColumn": 1,
-                  "startLine": 103
+                  "startLine": 245
                 }
               }
             }
@@ -537,7 +537,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "modify-macro-arity/1c9711db871ff5e7/0",
-            "primaryLocationLineHash": "fnv1a64:ffb1d94fba73bf2e:0"
+            "primaryLocationLineHash": "fnv1a64:b6c9e79d7a681282:0"
           },
           "ruleId": "modify-macro-arity"
         },
@@ -550,10 +550,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 44,
-                  "byteOffset": 7231,
+                  "byteLength": 46,
+                  "byteOffset": 4504,
                   "startColumn": 1,
-                  "startLine": 104
+                  "startLine": 247
                 }
               }
             }
@@ -563,7 +563,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "duplicate-parameters/fc20fd38e853fe41/0",
-            "primaryLocationLineHash": "fnv1a64:f231a6cd2f17e63a:0"
+            "primaryLocationLineHash": "fnv1a64:7edcf7a89269afbe:0"
           },
           "ruleId": "duplicate-parameters"
         },
@@ -576,10 +576,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 41,
-                  "byteOffset": 7306,
+                  "byteLength": 43,
+                  "byteOffset": 4575,
                   "startColumn": 1,
-                  "startLine": 105
+                  "startLine": 250
                 }
               }
             }
@@ -589,7 +589,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "duplicate-lambda-list-keyword/2f60a48b9e4ef7e3/0",
-            "primaryLocationLineHash": "fnv1a64:898223a354d25b28:0"
+            "primaryLocationLineHash": "fnv1a64:db8d897dd15bad8e:0"
           },
           "ruleId": "duplicate-lambda-list-keyword"
         },
@@ -602,10 +602,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 38,
-                  "byteOffset": 7390,
+                  "byteLength": 40,
+                  "byteOffset": 4652,
                   "startColumn": 1,
-                  "startLine": 106
+                  "startLine": 253
                 }
               }
             }
@@ -615,7 +615,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "lambda-list-keyword-order/617c0a49865251a2/0",
-            "primaryLocationLineHash": "fnv1a64:60b6533ac07ce5c9:0"
+            "primaryLocationLineHash": "fnv1a64:64e44b51bed932e3:0"
           },
           "ruleId": "lambda-list-keyword-order"
         },
@@ -631,7 +631,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 2,
-                        "byteOffset": 438
+                        "byteOffset": 437
                       },
                       "insertedContent": {
                         "text": "5"
@@ -654,9 +654,9 @@
                 },
                 "region": {
                   "byteLength": 2,
-                  "byteOffset": 438,
+                  "byteOffset": 437,
                   "startColumn": 7,
-                  "startLine": 8
+                  "startLine": 7
                 }
               }
             }
@@ -666,7 +666,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "redundant-quote/07bb8307b4864109/0",
-            "primaryLocationLineHash": "fnv1a64:f55478ae60504a63:0"
+            "primaryLocationLineHash": "fnv1a64:f52fbd732150ff13:0"
           },
           "ruleId": "redundant-quote"
         },
@@ -681,8 +681,8 @@
                   "replacements": [
                     {
                       "deletedRegion": {
-                        "byteLength": 12,
-                        "byteOffset": 502
+                        "byteLength": 14,
+                        "byteOffset": 460
                       },
                       "insertedContent": {
                         "text": "only"
@@ -704,8 +704,8 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 12,
-                  "byteOffset": 502,
+                  "byteLength": 14,
+                  "byteOffset": 460,
                   "startColumn": 1,
                   "startLine": 9
                 }
@@ -717,7 +717,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "redundant-progn/a2fdba9820c97822/0",
-            "primaryLocationLineHash": "fnv1a64:16a6524ab05ba619:0"
+            "primaryLocationLineHash": "fnv1a64:8b06e00bd2adf89b:0"
           },
           "ruleId": "redundant-progn"
         },
@@ -732,11 +732,11 @@
                   "replacements": [
                     {
                       "deletedRegion": {
-                        "byteLength": 11,
-                        "byteOffset": 581
+                        "byteLength": 19,
+                        "byteOffset": 507
                       },
                       "insertedContent": {
-                        "text": "b c"
+                        "text": "b\n    c"
                       }
                     }
                   ]
@@ -755,10 +755,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 11,
-                  "byteOffset": 581,
-                  "startColumn": 10,
-                  "startLine": 10
+                  "byteLength": 19,
+                  "byteOffset": 507,
+                  "startColumn": 3,
+                  "startLine": 14
                 }
               }
             }
@@ -768,7 +768,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "nested-progn/5cd55ce143529b1f/0",
-            "primaryLocationLineHash": "fnv1a64:5ecf422cc5677c46:0"
+            "primaryLocationLineHash": "fnv1a64:237c01a0c789050b:0"
           },
           "ruleId": "nested-progn"
         },
@@ -783,8 +783,8 @@
                   "replacements": [
                     {
                       "deletedRegion": {
-                        "byteLength": 24,
-                        "byteOffset": 3135
+                        "byteLength": 30,
+                        "byteOffset": 2004
                       },
                       "insertedContent": {
                         "text": "(when (and wa wb) (wc))"
@@ -806,10 +806,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 24,
-                  "byteOffset": 3135,
+                  "byteLength": 30,
+                  "byteOffset": 2004,
                   "startColumn": 1,
-                  "startLine": 46
+                  "startLine": 109
                 }
               }
             }
@@ -819,7 +819,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "nested-when/3709b9f1558a096d/0",
-            "primaryLocationLineHash": "fnv1a64:860a5bc0c11ea718:0"
+            "primaryLocationLineHash": "fnv1a64:27a7debe0372bafd:0"
           },
           "ruleId": "nested-when"
         },
@@ -834,8 +834,8 @@
                   "replacements": [
                     {
                       "deletedRegion": {
-                        "byteLength": 28,
-                        "byteOffset": 3201
+                        "byteLength": 34,
+                        "byteOffset": 2050
                       },
                       "insertedContent": {
                         "text": "(unless (or ua ub) (uc))"
@@ -857,10 +857,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 28,
-                  "byteOffset": 3201,
+                  "byteLength": 34,
+                  "byteOffset": 2050,
                   "startColumn": 1,
-                  "startLine": 47
+                  "startLine": 113
                 }
               }
             }
@@ -870,7 +870,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "nested-unless/374f1c05f4fd74ef/0",
-            "primaryLocationLineHash": "fnv1a64:b12f2e1b4f562872:0"
+            "primaryLocationLineHash": "fnv1a64:632a63e510e89843:0"
           },
           "ruleId": "nested-unless"
         },
@@ -886,7 +886,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 10,
-                        "byteOffset": 3073
+                        "byteOffset": 1974
                       },
                       "insertedContent": {
                         "text": "pb qc"
@@ -909,9 +909,9 @@
                 },
                 "region": {
                   "byteLength": 10,
-                  "byteOffset": 3073,
+                  "byteOffset": 1974,
                   "startColumn": 8,
-                  "startLine": 45
+                  "startLine": 107
                 }
               }
             }
@@ -921,7 +921,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "nested-boolean/62bd4b586d0045bf/0",
-            "primaryLocationLineHash": "fnv1a64:becd738b2f54a859:0"
+            "primaryLocationLineHash": "fnv1a64:61f4f69082012eb1:0"
           },
           "ruleId": "nested-boolean"
         },
@@ -937,7 +937,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 13,
-                        "byteOffset": 3845
+                        "byteOffset": 2398
                       },
                       "insertedContent": {
                         "text": "(cadr z)"
@@ -960,9 +960,9 @@
                 },
                 "region": {
                   "byteLength": 13,
-                  "byteOffset": 3845,
+                  "byteOffset": 2398,
                   "startColumn": 1,
-                  "startLine": 56
+                  "startLine": 135
                 }
               }
             }
@@ -972,7 +972,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "nested-cxr/109a80ae72e5eb4e/0",
-            "primaryLocationLineHash": "fnv1a64:6950a74d950cd247:0"
+            "primaryLocationLineHash": "fnv1a64:d1781131b8b811af:0"
           },
           "ruleId": "nested-cxr"
         },
@@ -988,7 +988,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 10,
-                        "byteOffset": 3910
+                        "byteOffset": 2426
                       },
                       "insertedContent": {
                         "text": "(first zs)"
@@ -1011,9 +1011,9 @@
                 },
                 "region": {
                   "byteLength": 10,
-                  "byteOffset": 3910,
+                  "byteOffset": 2426,
                   "startColumn": 1,
-                  "startLine": 57
+                  "startLine": 137
                 }
               }
             }
@@ -1023,7 +1023,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "nth-constant-index/9c4d78c87d9ad119/0",
-            "primaryLocationLineHash": "fnv1a64:713b5762fbc57522:0"
+            "primaryLocationLineHash": "fnv1a64:92f31e88b94d0434:0"
           },
           "ruleId": "nth-constant-index"
         },
@@ -1039,7 +1039,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 13,
-                        "byteOffset": 3983
+                        "byteOffset": 2459
                       },
                       "insertedContent": {
                         "text": "nz"
@@ -1062,9 +1062,9 @@
                 },
                 "region": {
                   "byteLength": 13,
-                  "byteOffset": 3983,
+                  "byteOffset": 2459,
                   "startColumn": 1,
-                  "startLine": 58
+                  "startLine": 139
                 }
               }
             }
@@ -1074,7 +1074,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "nthcdr-zero/bfda713e07890a09/0",
-            "primaryLocationLineHash": "fnv1a64:12a7637d498d9262:0"
+            "primaryLocationLineHash": "fnv1a64:c6d5daeaca72f8aa:0"
           },
           "ruleId": "nthcdr-zero"
         },
@@ -1090,7 +1090,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 13,
-                        "byteOffset": 4049
+                        "byteOffset": 2488
                       },
                       "insertedContent": {
                         "text": "(cddr ns)"
@@ -1113,9 +1113,9 @@
                 },
                 "region": {
                   "byteLength": 13,
-                  "byteOffset": 4049,
+                  "byteOffset": 2488,
                   "startColumn": 1,
-                  "startLine": 59
+                  "startLine": 141
                 }
               }
             }
@@ -1125,7 +1125,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "nthcdr-small-index/f273b4ffe8359de6/0",
-            "primaryLocationLineHash": "fnv1a64:2bdf34280b5d4185:0"
+            "primaryLocationLineHash": "fnv1a64:1e089bc9cb6239a5:0"
           },
           "ruleId": "nthcdr-small-index"
         },
@@ -1140,11 +1140,11 @@
                   "replacements": [
                     {
                       "deletedRegion": {
-                        "byteLength": 11,
-                        "byteOffset": 665
+                        "byteLength": 19,
+                        "byteOffset": 572
                       },
                       "insertedContent": {
-                        "text": "s t"
+                        "text": "s\n    t"
                       }
                     }
                   ]
@@ -1163,10 +1163,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 11,
-                  "byteOffset": 665,
-                  "startColumn": 9,
-                  "startLine": 11
+                  "byteLength": 19,
+                  "byteOffset": 572,
+                  "startColumn": 3,
+                  "startLine": 19
                 }
               }
             }
@@ -1176,7 +1176,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "redundant-body-progn/bd91eb5e515cc145/0",
-            "primaryLocationLineHash": "fnv1a64:b77e04695f87ff9c:0"
+            "primaryLocationLineHash": "fnv1a64:610ff84ec923f832:0"
           },
           "ruleId": "redundant-body-progn"
         },
@@ -1192,7 +1192,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 7,
-                        "byteOffset": 732
+                        "byteOffset": 617
                       },
                       "insertedContent": {
                         "text": "(progn"
@@ -1214,10 +1214,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 20,
-                  "byteOffset": 732,
+                  "byteLength": 24,
+                  "byteOffset": 617,
                   "startColumn": 1,
-                  "startLine": 12
+                  "startLine": 23
                 }
               }
             }
@@ -1227,7 +1227,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "empty-let/6f975d0b4722f4eb/0",
-            "primaryLocationLineHash": "fnv1a64:2f45ac0b02ff3fa6:0"
+            "primaryLocationLineHash": "fnv1a64:5ead522e3c909d98:0"
           },
           "ruleId": "empty-let"
         },
@@ -1242,8 +1242,8 @@
                   "replacements": [
                     {
                       "deletedRegion": {
-                        "byteLength": 4,
-                        "byteOffset": 803
+                        "byteLength": 8,
+                        "byteOffset": 666
                       },
                       "insertedContent": {
                         "text": ""
@@ -1265,10 +1265,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 12,
-                  "byteOffset": 796,
+                  "byteLength": 20,
+                  "byteOffset": 655,
                   "startColumn": 1,
-                  "startLine": 13
+                  "startLine": 27
                 }
               }
             }
@@ -1278,7 +1278,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "redundant-if-nil/e883c2a7438b14d9/0",
-            "primaryLocationLineHash": "fnv1a64:d7e58f51fda42304:0"
+            "primaryLocationLineHash": "fnv1a64:b7b2f9c2e345a494:0"
           },
           "ruleId": "redundant-if-nil"
         },
@@ -1294,7 +1294,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 4,
-                        "byteOffset": 2560
+                        "byteOffset": 1656
                       },
                       "insertedContent": {
                         "text": "let"
@@ -1316,10 +1316,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 16,
-                  "byteOffset": 2559,
+                  "byteLength": 18,
+                  "byteOffset": 1655,
                   "startColumn": 1,
-                  "startLine": 38
+                  "startLine": 86
                 }
               }
             }
@@ -1329,7 +1329,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "redundant-let-star/a18f256659e1ba9a/0",
-            "primaryLocationLineHash": "fnv1a64:ff3b2ae8c5f74a89:0"
+            "primaryLocationLineHash": "fnv1a64:6e0f0e235f872590:0"
           },
           "ruleId": "redundant-let-star"
         },
@@ -1345,7 +1345,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 10,
-                        "byteOffset": 868
+                        "byteOffset": 697
                       },
                       "insertedContent": {
                         "text": ""
@@ -1368,9 +1368,9 @@
                 },
                 "region": {
                   "byteLength": 15,
-                  "byteOffset": 867,
+                  "byteOffset": 696,
                   "startColumn": 1,
-                  "startLine": 14
+                  "startLine": 31
                 }
               }
             }
@@ -1380,7 +1380,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "redundant-funcall/80c1c3159cdf3d87/0",
-            "primaryLocationLineHash": "fnv1a64:baf4cdcef2e2549c:0"
+            "primaryLocationLineHash": "fnv1a64:2b41a17b8f18089c:0"
           },
           "ruleId": "redundant-funcall"
         },
@@ -1396,7 +1396,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 16,
-                        "byteOffset": 939
+                        "byteOffset": 733
                       },
                       "insertedContent": {
                         "text": "whatever"
@@ -1419,9 +1419,9 @@
                 },
                 "region": {
                   "byteLength": 16,
-                  "byteOffset": 939,
+                  "byteOffset": 733,
                   "startColumn": 1,
-                  "startLine": 15
+                  "startLine": 33
                 }
               }
             }
@@ -1431,7 +1431,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "redundant-the/2bac242fe26b506b/0",
-            "primaryLocationLineHash": "fnv1a64:e01d638688c7bec2:0"
+            "primaryLocationLineHash": "fnv1a64:454a071776dd9032:0"
           },
           "ruleId": "redundant-the"
         },
@@ -1446,8 +1446,8 @@
                   "replacements": [
                     {
                       "deletedRegion": {
-                        "byteLength": 8,
-                        "byteOffset": 1008
+                        "byteLength": 9,
+                        "byteOffset": 768
                       },
                       "insertedContent": {
                         "text": ""
@@ -1469,10 +1469,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 28,
-                  "byteOffset": 1007,
+                  "byteLength": 33,
+                  "byteOffset": 767,
                   "startColumn": 1,
-                  "startLine": 16
+                  "startLine": 35
                 }
               }
             }
@@ -1482,7 +1482,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "funcall-lambda/673d7cfe29eecb61/0",
-            "primaryLocationLineHash": "fnv1a64:da55f61fad0f3668:0"
+            "primaryLocationLineHash": "fnv1a64:85b1f6e1d6531da5:0"
           },
           "ruleId": "funcall-lambda"
         },
@@ -1497,11 +1497,11 @@
                   "replacements": [
                     {
                       "deletedRegion": {
-                        "byteLength": 18,
-                        "byteOffset": 1084
+                        "byteLength": 23,
+                        "byteOffset": 828
                       },
                       "insertedContent": {
-                        "text": "(lambda (sq) sq)"
+                        "text": "(lambda (sq)\n     sq)"
                       }
                     }
                   ]
@@ -1520,10 +1520,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 18,
-                  "byteOffset": 1084,
-                  "startColumn": 9,
-                  "startLine": 17
+                  "byteLength": 23,
+                  "byteOffset": 828,
+                  "startColumn": 2,
+                  "startLine": 41
                 }
               }
             }
@@ -1533,7 +1533,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "sharp-quoted-lambda/8265b306d04d5a6a/0",
-            "primaryLocationLineHash": "fnv1a64:3f3939cd32da23b1:0"
+            "primaryLocationLineHash": "fnv1a64:c8a74208e8fac938:0"
           },
           "ruleId": "sharp-quoted-lambda"
         },
@@ -1549,7 +1549,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 12,
-                        "byteOffset": 1150
+                        "byteOffset": 881
                       },
                       "insertedContent": {
                         "text": "h"
@@ -1572,9 +1572,9 @@
                 },
                 "region": {
                   "byteLength": 12,
-                  "byteOffset": 1150,
+                  "byteOffset": 881,
                   "startColumn": 1,
-                  "startLine": 18
+                  "startLine": 45
                 }
               }
             }
@@ -1584,7 +1584,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "redundant-identity/05affcb5b7734a90/0",
-            "primaryLocationLineHash": "fnv1a64:1c26f1905316a18f:0"
+            "primaryLocationLineHash": "fnv1a64:b69f39f23cf16d1b:0"
           },
           "ruleId": "redundant-identity"
         },
@@ -1600,7 +1600,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 20,
-                        "byteOffset": 4122
+                        "byteOffset": 2524
                       },
                       "insertedContent": {
                         "text": "(g m)"
@@ -1623,9 +1623,9 @@
                 },
                 "region": {
                   "byteLength": 20,
-                  "byteOffset": 4122,
+                  "byteOffset": 2524,
                   "startColumn": 1,
-                  "startLine": 60
+                  "startLine": 143
                 }
               }
             }
@@ -1635,7 +1635,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "redundant-apply/f5c33aecf2ade963/0",
-            "primaryLocationLineHash": "fnv1a64:f541798a5705fb96:0"
+            "primaryLocationLineHash": "fnv1a64:0d293b096033f424:0"
           },
           "ruleId": "redundant-apply"
         },
@@ -1651,7 +1651,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 12,
-                        "byteOffset": 4205
+                        "byteOffset": 2577
                       },
                       "insertedContent": {
                         "text": ""
@@ -1674,9 +1674,9 @@
                 },
                 "region": {
                   "byteLength": 26,
-                  "byteOffset": 4192,
+                  "byteOffset": 2564,
                   "startColumn": 1,
-                  "startLine": 61
+                  "startLine": 145
                 }
               }
             }
@@ -1686,7 +1686,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "redundant-eql-test/08921075042be6dd/0",
-            "primaryLocationLineHash": "fnv1a64:954f815ba503034c:0"
+            "primaryLocationLineHash": "fnv1a64:75e9850ffd56ad98:0"
           },
           "ruleId": "redundant-eql-test"
         },
@@ -1702,7 +1702,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 16,
-                        "byteOffset": 5465
+                        "byteOffset": 3472
                       },
                       "insertedContent": {
                         "text": ""
@@ -1725,9 +1725,9 @@
                 },
                 "region": {
                   "byteLength": 30,
-                  "byteOffset": 5452,
+                  "byteOffset": 3459,
                   "startColumn": 1,
-                  "startLine": 78
+                  "startLine": 179
                 }
               }
             }
@@ -1737,7 +1737,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "redundant-identity-key/0d6a3e2540c960d7/0",
-            "primaryLocationLineHash": "fnv1a64:18bb3da3ff50f4cc:0"
+            "primaryLocationLineHash": "fnv1a64:c400ef0fc6539cf2:0"
           },
           "ruleId": "redundant-identity-key"
         },
@@ -1753,7 +1753,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 4,
-                        "byteOffset": 3504
+                        "byteOffset": 2212
                       },
                       "insertedContent": {
                         "text": "unless"
@@ -1762,7 +1762,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 7,
-                        "byteOffset": 3509
+                        "byteOffset": 2217
                       },
                       "insertedContent": {
                         "text": "r"
@@ -1784,10 +1784,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 16,
-                  "byteOffset": 3503,
+                  "byteLength": 18,
+                  "byteOffset": 2211,
                   "startColumn": 1,
-                  "startLine": 51
+                  "startLine": 123
                 }
               }
             }
@@ -1797,7 +1797,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "negated-when-unless/8cea77f08ec45975/0",
-            "primaryLocationLineHash": "fnv1a64:ba0d1f7e3afd3954:0"
+            "primaryLocationLineHash": "fnv1a64:2b372b14990f6ded:0"
           },
           "ruleId": "negated-when-unless"
         },
@@ -1813,7 +1813,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 13,
-                        "byteOffset": 5599
+                        "byteOffset": 3547
                       },
                       "insertedContent": {
                         "text": "(>= a b)"
@@ -1836,9 +1836,9 @@
                 },
                 "region": {
                   "byteLength": 13,
-                  "byteOffset": 5599,
+                  "byteOffset": 3547,
                   "startColumn": 1,
-                  "startLine": 80
+                  "startLine": 183
                 }
               }
             }
@@ -1848,7 +1848,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "negated-comparison/63ee3702a87c2d97/0",
-            "primaryLocationLineHash": "fnv1a64:3a77f06c38b9c956:0"
+            "primaryLocationLineHash": "fnv1a64:42d59db6cfd3613e:0"
           },
           "ruleId": "negated-comparison"
         },
@@ -1863,8 +1863,8 @@
                   "replacements": [
                     {
                       "deletedRegion": {
-                        "byteLength": 16,
-                        "byteOffset": 5672
+                        "byteLength": 24,
+                        "byteOffset": 3583
                       },
                       "insertedContent": {
                         "text": "(if c b a)"
@@ -1886,10 +1886,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 16,
-                  "byteOffset": 5672,
+                  "byteLength": 24,
+                  "byteOffset": 3583,
                   "startColumn": 1,
-                  "startLine": 81
+                  "startLine": 185
                 }
               }
             }
@@ -1899,7 +1899,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "negated-if/33df133ba8537bf9/0",
-            "primaryLocationLineHash": "fnv1a64:5d377dbd261def62:0"
+            "primaryLocationLineHash": "fnv1a64:2d1e58630d7b0515:0"
           },
           "ruleId": "negated-if"
         },
@@ -1914,8 +1914,8 @@
                   "replacements": [
                     {
                       "deletedRegion": {
-                        "byteLength": 13,
-                        "byteOffset": 5737
+                        "byteLength": 21,
+                        "byteOffset": 3622
                       },
                       "insertedContent": {
                         "text": "(or iv jv)"
@@ -1937,10 +1937,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 13,
-                  "byteOffset": 5737,
+                  "byteLength": 21,
+                  "byteOffset": 3622,
                   "startColumn": 1,
-                  "startLine": 82
+                  "startLine": 189
                 }
               }
             }
@@ -1950,7 +1950,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "if-to-or/ab61c84ad573df95/0",
-            "primaryLocationLineHash": "fnv1a64:439a5168093cfcae:0"
+            "primaryLocationLineHash": "fnv1a64:7d8356fa43277d1a:0"
           },
           "ruleId": "if-to-or"
         },
@@ -1965,8 +1965,8 @@
                   "replacements": [
                     {
                       "deletedRegion": {
-                        "byteLength": 13,
-                        "byteOffset": 5800
+                        "byteLength": 21,
+                        "byteOffset": 3656
                       },
                       "insertedContent": {
                         "text": "(not iw)"
@@ -1988,10 +1988,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 13,
-                  "byteOffset": 5800,
+                  "byteLength": 21,
+                  "byteOffset": 3656,
                   "startColumn": 1,
-                  "startLine": 83
+                  "startLine": 193
                 }
               }
             }
@@ -2001,7 +2001,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "if-not/62237ccefbf0b61e/0",
-            "primaryLocationLineHash": "fnv1a64:7b9908e9c81e94cb:0"
+            "primaryLocationLineHash": "fnv1a64:c8ef3af364e97075:0"
           },
           "ruleId": "if-not"
         },
@@ -2017,7 +2017,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 9,
-                        "byteOffset": 6155
+                        "byteOffset": 3872
                       },
                       "insertedContent": {
                         "text": "(1+ osa)"
@@ -2040,9 +2040,9 @@
                 },
                 "region": {
                   "byteLength": 9,
-                  "byteOffset": 6155,
+                  "byteOffset": 3872,
                   "startColumn": 1,
-                  "startLine": 88
+                  "startLine": 209
                 }
               }
             }
@@ -2052,7 +2052,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "one-step-arithmetic/044bc8cb6d37fb31/0",
-            "primaryLocationLineHash": "fnv1a64:4c45b639d0c24ada:0"
+            "primaryLocationLineHash": "fnv1a64:8d1b5e2a8a55c9d2:0"
           },
           "ruleId": "one-step-arithmetic"
         },
@@ -2068,7 +2068,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 2,
-                        "byteOffset": 3578
+                        "byteOffset": 2254
                       },
                       "insertedContent": {
                         "text": "when"
@@ -2090,10 +2090,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 8,
-                  "byteOffset": 3577,
+                  "byteLength": 12,
+                  "byteOffset": 2253,
                   "startColumn": 1,
-                  "startLine": 52
+                  "startLine": 126
                 }
               }
             }
@@ -2103,7 +2103,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "one-armed-if/efd043892749780a/0",
-            "primaryLocationLineHash": "fnv1a64:c611145142b55185:0"
+            "primaryLocationLineHash": "fnv1a64:8eee6de9d82e904a:0"
           },
           "ruleId": "one-armed-if"
         },
@@ -2117,9 +2117,9 @@
                 },
                 "region": {
                   "byteLength": 18,
-                  "byteOffset": 7476,
+                  "byteOffset": 4728,
                   "startColumn": 7,
-                  "startLine": 107
+                  "startLine": 256
                 }
               }
             }
@@ -2129,7 +2129,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "self-comparison/448235d114bbed7c/0",
-            "primaryLocationLineHash": "fnv1a64:aa2528fc94277c15:0"
+            "primaryLocationLineHash": "fnv1a64:4f8255d15ceed382:0"
           },
           "ruleId": "self-comparison"
         },
@@ -2145,7 +2145,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 13,
-                        "byteOffset": 6518
+                        "byteOffset": 4062
                       },
                       "insertedContent": {
                         "text": "(null w)"
@@ -2168,9 +2168,9 @@
                 },
                 "region": {
                   "byteLength": 13,
-                  "byteOffset": 6518,
+                  "byteOffset": 4062,
                   "startColumn": 1,
-                  "startLine": 93
+                  "startLine": 222
                 }
               }
             }
@@ -2180,7 +2180,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "nil-comparison/826bacda3f3e61e2/0",
-            "primaryLocationLineHash": "fnv1a64:cee862a953ed938b:0"
+            "primaryLocationLineHash": "fnv1a64:c9798a47b12196c3:0"
           },
           "ruleId": "nil-comparison"
         },
@@ -2194,9 +2194,9 @@
                 },
                 "region": {
                   "byteLength": 18,
-                  "byteOffset": 7558,
-                  "startColumn": 19,
-                  "startLine": 108
+                  "byteOffset": 4791,
+                  "startColumn": 3,
+                  "startLine": 260
                 }
               }
             }
@@ -2206,7 +2206,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "t-comparison/5e76896e21ed7ee4/0",
-            "primaryLocationLineHash": "fnv1a64:cbc3239c54512777:0"
+            "primaryLocationLineHash": "fnv1a64:e7def32533ac17b2:0"
           },
           "ruleId": "t-comparison"
         },
@@ -2219,10 +2219,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 25,
-                  "byteOffset": 7607,
+                  "byteLength": 33,
+                  "byteOffset": 4827,
                   "startColumn": 1,
-                  "startLine": 109
+                  "startLine": 262
                 }
               }
             }
@@ -2232,7 +2232,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "identical-if-branches/5ea1ac8de34ee4b7/0",
-            "primaryLocationLineHash": "fnv1a64:96e9fc2b041f8884:0"
+            "primaryLocationLineHash": "fnv1a64:013209230f5f679e:0"
           },
           "ruleId": "identical-if-branches"
         },
@@ -2247,8 +2247,8 @@
                   "replacements": [
                     {
                       "deletedRegion": {
-                        "byteLength": 13,
-                        "byteOffset": 6229
+                        "byteLength": 21,
+                        "byteOffset": 3905
                       },
                       "insertedContent": {
                         "text": "on"
@@ -2270,10 +2270,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 13,
-                  "byteOffset": 6229,
+                  "byteLength": 21,
+                  "byteOffset": 3905,
                   "startColumn": 1,
-                  "startLine": 89
+                  "startLine": 211
                 }
               }
             }
@@ -2283,7 +2283,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "constant-if-test/026b11490469946b/0",
-            "primaryLocationLineHash": "fnv1a64:40ec4efff8b28494:0"
+            "primaryLocationLineHash": "fnv1a64:084de9c82365d0df:0"
           },
           "ruleId": "constant-if-test"
         },
@@ -2299,7 +2299,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 7,
-                        "byteOffset": 6300
+                        "byteOffset": 3947
                       },
                       "insertedContent": {
                         "text": "(progn"
@@ -2321,10 +2321,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 13,
-                  "byteOffset": 6300,
+                  "byteLength": 15,
+                  "byteOffset": 3947,
                   "startColumn": 1,
-                  "startLine": 90
+                  "startLine": 215
                 }
               }
             }
@@ -2334,7 +2334,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "constant-when-test/9b0a7978fb01361b/0",
-            "primaryLocationLineHash": "fnv1a64:19e72980000a867e:0"
+            "primaryLocationLineHash": "fnv1a64:208acf2163b05f31:0"
           },
           "ruleId": "constant-when-test"
         },
@@ -2347,10 +2347,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 12,
-                  "byteOffset": 6735,
+                  "byteLength": 24,
+                  "byteOffset": 4160,
                   "startColumn": 1,
-                  "startLine": 96
+                  "startLine": 228
                 }
               }
             }
@@ -2360,7 +2360,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "if-arity/312e6de6292b7113/0",
-            "primaryLocationLineHash": "fnv1a64:18d463927d801823:0"
+            "primaryLocationLineHash": "fnv1a64:d310ceaabd92b0f8:0"
           },
           "ruleId": "if-arity"
         },
@@ -2374,9 +2374,9 @@
                 },
                 "region": {
                   "byteLength": 12,
-                  "byteOffset": 7683,
+                  "byteOffset": 4886,
                   "startColumn": 1,
-                  "startLine": 110
+                  "startLine": 266
                 }
               }
             }
@@ -2386,7 +2386,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "the-arity/1898bfc17b742eda/0",
-            "primaryLocationLineHash": "fnv1a64:0ac530374b9a022d:0"
+            "primaryLocationLineHash": "fnv1a64:282e46a03e91fd93:0"
           },
           "ruleId": "the-arity"
         },
@@ -2400,9 +2400,9 @@
                 },
                 "region": {
                   "byteLength": 6,
-                  "byteOffset": 7747,
+                  "byteOffset": 4912,
                   "startColumn": 1,
-                  "startLine": 111
+                  "startLine": 268
                 }
               }
             }
@@ -2412,7 +2412,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "equality-arity/34d47bdb8164b7a4/0",
-            "primaryLocationLineHash": "fnv1a64:e3d8d5b8b9adad9b:0"
+            "primaryLocationLineHash": "fnv1a64:ccef3b6d92b0813b:0"
           },
           "ruleId": "equality-arity"
         },
@@ -2426,9 +2426,9 @@
                 },
                 "region": {
                   "byteLength": 13,
-                  "byteOffset": 7816,
+                  "byteOffset": 4937,
                   "startColumn": 1,
-                  "startLine": 112
+                  "startLine": 270
                 }
               }
             }
@@ -2438,7 +2438,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "accessor-arity/b4355bf4eacf6bc5/0",
-            "primaryLocationLineHash": "fnv1a64:9b5275f448c882d6:0"
+            "primaryLocationLineHash": "fnv1a64:6dd5aa690d24bb46:0"
           },
           "ruleId": "accessor-arity"
         },
@@ -2454,7 +2454,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 21,
-                        "byteOffset": 1359
+                        "byteOffset": 986
                       },
                       "insertedContent": {
                         "text": "(cons al ar)"
@@ -2477,9 +2477,9 @@
                 },
                 "region": {
                   "byteLength": 21,
-                  "byteOffset": 1359,
+                  "byteOffset": 986,
                   "startColumn": 1,
-                  "startLine": 21
+                  "startLine": 51
                 }
               }
             }
@@ -2489,7 +2489,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "append-list-to-cons/88d7b250cdb0e3fd/0",
-            "primaryLocationLineHash": "fnv1a64:53ed80f9b75512ce:0"
+            "primaryLocationLineHash": "fnv1a64:00f91d5f14f0e56e:0"
           },
           "ruleId": "append-list-to-cons"
         },
@@ -2505,7 +2505,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 20,
-                        "byteOffset": 1433
+                        "byteOffset": 1031
                       },
                       "insertedContent": {
                         "text": "(princ-to-string fs)"
@@ -2528,9 +2528,9 @@
                 },
                 "region": {
                   "byteLength": 20,
-                  "byteOffset": 1433,
+                  "byteOffset": 1031,
                   "startColumn": 1,
-                  "startLine": 22
+                  "startLine": 53
                 }
               }
             }
@@ -2540,7 +2540,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "format-to-string/39b50b82e8ac11f4/0",
-            "primaryLocationLineHash": "fnv1a64:fbf825c42917e7fd:0"
+            "primaryLocationLineHash": "fnv1a64:bb2ecb9fb2808c33:0"
           },
           "ruleId": "format-to-string"
         },
@@ -2556,7 +2556,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 15,
-                        "byteOffset": 1504
+                        "byteOffset": 1072
                       },
                       "insertedContent": {
                         "text": "(terpri)"
@@ -2579,9 +2579,9 @@
                 },
                 "region": {
                   "byteLength": 15,
-                  "byteOffset": 1504,
+                  "byteOffset": 1072,
                   "startColumn": 1,
-                  "startLine": 23
+                  "startLine": 55
                 }
               }
             }
@@ -2591,7 +2591,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "format-newline/b36342f1429c38ae/0",
-            "primaryLocationLineHash": "fnv1a64:713a8c2ea7d48dd1:0"
+            "primaryLocationLineHash": "fnv1a64:c282651d9a6f84d1:0"
           },
           "ruleId": "format-newline"
         },
@@ -2607,7 +2607,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 12,
-                        "byteOffset": 1573
+                        "byteOffset": 1106
                       },
                       "insertedContent": {
                         "text": "(floor fq)"
@@ -2630,9 +2630,9 @@
                 },
                 "region": {
                   "byteLength": 12,
-                  "byteOffset": 1573,
+                  "byteOffset": 1106,
                   "startColumn": 1,
-                  "startLine": 24
+                  "startLine": 57
                 }
               }
             }
@@ -2642,7 +2642,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "redundant-divisor/ec0523314eb5cfd2/0",
-            "primaryLocationLineHash": "fnv1a64:2661273716ad8a49:0"
+            "primaryLocationLineHash": "fnv1a64:c061d3d69963413d:0"
           },
           "ruleId": "redundant-divisor"
         },
@@ -2655,10 +2655,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 29,
-                  "byteOffset": 7885,
+                  "byteLength": 35,
+                  "byteOffset": 4969,
                   "startColumn": 1,
-                  "startLine": 113
+                  "startLine": 272
                 }
               }
             }
@@ -2668,7 +2668,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "duplicate-case-keys/33bca4c760e6356b/0",
-            "primaryLocationLineHash": "fnv1a64:cdbd75258d01d9bc:0"
+            "primaryLocationLineHash": "fnv1a64:668e8b9c14f902da:0"
           },
           "ruleId": "duplicate-case-keys"
         },
@@ -2682,9 +2682,9 @@
                 },
                 "region": {
                   "byteLength": 6,
-                  "byteOffset": 7970,
-                  "startColumn": 12,
-                  "startLine": 114
+                  "byteOffset": 5041,
+                  "startColumn": 4,
+                  "startLine": 278
                 }
               }
             }
@@ -2694,7 +2694,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "quoted-case-key/9a7165a51a9415a2/0",
-            "primaryLocationLineHash": "fnv1a64:735ee2f495dae0ec:0"
+            "primaryLocationLineHash": "fnv1a64:6a4f7e926420c564:0"
           },
           "ruleId": "quoted-case-key"
         },
@@ -2708,9 +2708,9 @@
                 },
                 "region": {
                   "byteLength": 7,
-                  "byteOffset": 7986,
-                  "startColumn": 28,
-                  "startLine": 114
+                  "byteOffset": 5059,
+                  "startColumn": 4,
+                  "startLine": 279
                 }
               }
             }
@@ -2720,7 +2720,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "quoted-case-key/a3c77c1112303135/0",
-            "primaryLocationLineHash": "fnv1a64:735ee2f495dae0ec:1"
+            "primaryLocationLineHash": "fnv1a64:dde49a8ede5a560d:0"
           },
           "ruleId": "quoted-case-key"
         },
@@ -2734,9 +2734,9 @@
                 },
                 "region": {
                   "byteLength": 3,
-                  "byteOffset": 8038,
-                  "startColumn": 10,
-                  "startLine": 115
+                  "byteOffset": 5113,
+                  "startColumn": 4,
+                  "startLine": 283
                 }
               }
             }
@@ -2746,7 +2746,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "case-nil-key/2146ba19257dc6ac/0",
-            "primaryLocationLineHash": "fnv1a64:625a86911508d9ef:0"
+            "primaryLocationLineHash": "fnv1a64:7e13aa199b7014c4:0"
           },
           "ruleId": "case-nil-key"
         },
@@ -2760,9 +2760,9 @@
                 },
                 "region": {
                   "byteLength": 3,
-                  "byteOffset": 8109,
-                  "startColumn": 14,
-                  "startLine": 116
+                  "byteOffset": 5160,
+                  "startColumn": 4,
+                  "startLine": 287
                 }
               }
             }
@@ -2772,7 +2772,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "typecase-nil-key/2146ba19257dc6ac/0",
-            "primaryLocationLineHash": "fnv1a64:2ba4b132de485ff7:0"
+            "primaryLocationLineHash": "fnv1a64:aea918da42d03abc:0"
           },
           "ruleId": "typecase-nil-key"
         },
@@ -2786,9 +2786,9 @@
                 },
                 "region": {
                   "byteLength": 1,
-                  "byteOffset": 8184,
-                  "startColumn": 18,
-                  "startLine": 117
+                  "byteOffset": 5217,
+                  "startColumn": 3,
+                  "startLine": 292
                 }
               }
             }
@@ -2798,7 +2798,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "malformed-case-clause/af63af4c8601a015/0",
-            "primaryLocationLineHash": "fnv1a64:c74db1edae0d4401:0"
+            "primaryLocationLineHash": "fnv1a64:92192e2282028a6d:0"
           },
           "ruleId": "malformed-case-clause"
         },
@@ -2812,9 +2812,9 @@
                 },
                 "region": {
                   "byteLength": 4,
-                  "byteOffset": 8186,
-                  "startColumn": 20,
-                  "startLine": 117
+                  "byteOffset": 5221,
+                  "startColumn": 3,
+                  "startLine": 293
                 }
               }
             }
@@ -2824,7 +2824,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "malformed-case-clause/0aa07f4e709cc5f1/0",
-            "primaryLocationLineHash": "fnv1a64:c74db1edae0d4401:1"
+            "primaryLocationLineHash": "fnv1a64:c79b3356673b7703:0"
           },
           "ruleId": "malformed-case-clause"
         },
@@ -2838,9 +2838,9 @@
                 },
                 "region": {
                   "byteLength": 8,
-                  "byteOffset": 8269,
-                  "startColumn": 27,
-                  "startLine": 118
+                  "byteOffset": 5284,
+                  "startColumn": 3,
+                  "startLine": 298
                 }
               }
             }
@@ -2850,7 +2850,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "unreachable-case-clause/f0fe18a1d1f7cd70/0",
-            "primaryLocationLineHash": "fnv1a64:89f109d154de306e:0"
+            "primaryLocationLineHash": "fnv1a64:6761430a43f3bd64:0"
           },
           "ruleId": "unreachable-case-clause"
         },
@@ -2864,9 +2864,9 @@
                 },
                 "region": {
                   "byteLength": 12,
-                  "byteOffset": 8339,
-                  "startColumn": 19,
-                  "startLine": 119
+                  "byteOffset": 5343,
+                  "startColumn": 3,
+                  "startLine": 302
                 }
               }
             }
@@ -2876,7 +2876,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "exhaustive-case-otherwise/2a99d8e2b6f9f1f7/0",
-            "primaryLocationLineHash": "fnv1a64:5b1f0f613812b9ba:0"
+            "primaryLocationLineHash": "fnv1a64:c038dcec4c48c8c9:0"
           },
           "ruleId": "exhaustive-case-otherwise"
         },
@@ -2889,10 +2889,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 36,
-                  "byteOffset": 8401,
+                  "byteLength": 42,
+                  "byteOffset": 5386,
                   "startColumn": 1,
-                  "startLine": 120
+                  "startLine": 304
                 }
               }
             }
@@ -2902,7 +2902,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "duplicate-cond-tests/8e590007a2341d0f/0",
-            "primaryLocationLineHash": "fnv1a64:7fb2d6dd773522fc:0"
+            "primaryLocationLineHash": "fnv1a64:cb37e0acf30059d7:0"
           },
           "ruleId": "duplicate-cond-tests"
         },
@@ -2916,9 +2916,9 @@
                 },
                 "region": {
                   "byteLength": 9,
-                  "byteOffset": 8498,
-                  "startColumn": 23,
-                  "startLine": 121
+                  "byteOffset": 5481,
+                  "startColumn": 3,
+                  "startLine": 312
                 }
               }
             }
@@ -2928,7 +2928,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "unreachable-cond-clause/bf880ff3fe6aad2b/0",
-            "primaryLocationLineHash": "fnv1a64:095ab24fccb44c97:0"
+            "primaryLocationLineHash": "fnv1a64:97cb167fc7dc8b23:0"
           },
           "ruleId": "unreachable-cond-clause"
         },
@@ -2942,9 +2942,9 @@
                 },
                 "region": {
                   "byteLength": 5,
-                  "byteOffset": 8595,
-                  "startColumn": 42,
-                  "startLine": 122
+                  "byteOffset": 5566,
+                  "startColumn": 3,
+                  "startLine": 317
                 }
               }
             }
@@ -2954,7 +2954,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "malformed-cond-clause/985b7e37a585f76b/0",
-            "primaryLocationLineHash": "fnv1a64:4b6a6a40720d6b1f:0"
+            "primaryLocationLineHash": "fnv1a64:eb11858493ecb631:0"
           },
           "ruleId": "malformed-cond-clause"
         },
@@ -2967,10 +2967,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 27,
-                  "byteOffset": 8630,
+                  "byteLength": 41,
+                  "byteOffset": 5598,
                   "startColumn": 1,
-                  "startLine": 123
+                  "startLine": 319
                 }
               }
             }
@@ -2980,7 +2980,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "duplicate-let-bindings/786fd22df524c3b4/0",
-            "primaryLocationLineHash": "fnv1a64:94391242987acbff:0"
+            "primaryLocationLineHash": "fnv1a64:6cdc131520de94f4:0"
           },
           "ruleId": "duplicate-let-bindings"
         },
@@ -2994,9 +2994,9 @@
                 },
                 "region": {
                   "byteLength": 9,
-                  "byteOffset": 8713,
+                  "byteOffset": 5672,
                   "startColumn": 7,
-                  "startLine": 124
+                  "startLine": 324
                 }
               }
             }
@@ -3006,7 +3006,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "malformed-let-binding/b287ea0350e932c2/0",
-            "primaryLocationLineHash": "fnv1a64:37f482e9c52613ff:0"
+            "primaryLocationLineHash": "fnv1a64:fc3d54de8f282ba5:0"
           },
           "ruleId": "malformed-let-binding"
         },
@@ -3020,9 +3020,9 @@
                 },
                 "region": {
                   "byteLength": 7,
-                  "byteOffset": 8789,
+                  "byteOffset": 5725,
                   "startColumn": 7,
-                  "startLine": 125
+                  "startLine": 327
                 }
               }
             }
@@ -3032,7 +3032,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "binds-constant/238892383a531bb8/0",
-            "primaryLocationLineHash": "fnv1a64:a27a129aebba6333:0"
+            "primaryLocationLineHash": "fnv1a64:fc3656efe9b7a634:0"
           },
           "ruleId": "binds-constant"
         },
@@ -3046,9 +3046,9 @@
                 },
                 "region": {
                   "byteLength": 13,
-                  "byteOffset": 8797,
-                  "startColumn": 15,
-                  "startLine": 125
+                  "byteOffset": 5739,
+                  "startColumn": 7,
+                  "startLine": 328
                 }
               }
             }
@@ -3058,7 +3058,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "binds-constant/e7aba77a1dc6c0e4/0",
-            "primaryLocationLineHash": "fnv1a64:a27a129aebba6333:1"
+            "primaryLocationLineHash": "fnv1a64:e3cfd23a357a23ea:0"
           },
           "ruleId": "binds-constant"
         },
@@ -3072,9 +3072,9 @@
                 },
                 "region": {
                   "byteLength": 3,
-                  "byteOffset": 8860,
+                  "byteOffset": 5791,
                   "startColumn": 9,
-                  "startLine": 126
+                  "startLine": 331
                 }
               }
             }
@@ -3084,7 +3084,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "malformed-iteration-spec/0a94b117f74d8cdc/0",
-            "primaryLocationLineHash": "fnv1a64:442f3db54e8bfb9f:0"
+            "primaryLocationLineHash": "fnv1a64:8e3f345e01c54dfc:0"
           },
           "ruleId": "malformed-iteration-spec"
         },
@@ -3098,9 +3098,9 @@
                 },
                 "region": {
                   "byteLength": 9,
-                  "byteOffset": 8961,
+                  "byteOffset": 5866,
                   "startColumn": 31,
-                  "startLine": 127
+                  "startLine": 334
                 }
               }
             }
@@ -3110,7 +3110,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "eval-when-situation/db9d83b2f50bfeff/0",
-            "primaryLocationLineHash": "fnv1a64:562f7d8ce4c3d05d:0"
+            "primaryLocationLineHash": "fnv1a64:987fd76f98caa8c6:0"
           },
           "ruleId": "eval-when-situation"
         },
@@ -3124,9 +3124,9 @@
                 },
                 "region": {
                   "byteLength": 10,
-                  "byteOffset": 9005,
+                  "byteOffset": 5905,
                   "startColumn": 1,
-                  "startLine": 128
+                  "startLine": 337
                 }
               }
             }
@@ -3136,7 +3136,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "duplicate-boolean-operands/20e6cca62d6c6b08/0",
-            "primaryLocationLineHash": "fnv1a64:340340cbca40b2f9:0"
+            "primaryLocationLineHash": "fnv1a64:a97f610da4ea75e7:0"
           },
           "ruleId": "duplicate-boolean-operands"
         },
@@ -3150,9 +3150,9 @@
                 },
                 "region": {
                   "byteLength": 32,
-                  "byteOffset": 9086,
+                  "byteOffset": 5946,
                   "startColumn": 1,
-                  "startLine": 129
+                  "startLine": 339
                 }
               }
             }
@@ -3162,7 +3162,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "dead-boolean-operand/3a7c0733832bd30e/0",
-            "primaryLocationLineHash": "fnv1a64:92c8ba1375180d7f:0"
+            "primaryLocationLineHash": "fnv1a64:f9607c38c23610cd:0"
           },
           "ruleId": "dead-boolean-operand"
         },
@@ -3178,7 +3178,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 11,
-                        "byteOffset": 6373
+                        "byteOffset": 3985
                       },
                       "insertedContent": {
                         "text": "(and p q)"
@@ -3201,9 +3201,9 @@
                 },
                 "region": {
                   "byteLength": 11,
-                  "byteOffset": 6373,
+                  "byteOffset": 3985,
                   "startColumn": 1,
-                  "startLine": 91
+                  "startLine": 218
                 }
               }
             }
@@ -3213,7 +3213,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "redundant-boolean-identity/6099f3c432a128b2/0",
-            "primaryLocationLineHash": "fnv1a64:ba84fff9de9cc9b7:0"
+            "primaryLocationLineHash": "fnv1a64:3f236e822980ecd7:0"
           },
           "ruleId": "redundant-boolean-identity"
         },
@@ -3229,7 +3229,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 21,
-                        "byteOffset": 6454
+                        "byteOffset": 4027
                       },
                       "insertedContent": {
                         "text": "(not (or p q))"
@@ -3252,9 +3252,9 @@
                 },
                 "region": {
                   "byteLength": 21,
-                  "byteOffset": 6454,
+                  "byteOffset": 4027,
                   "startColumn": 1,
-                  "startLine": 92
+                  "startLine": 220
                 }
               }
             }
@@ -3264,7 +3264,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "de-morgan/59f199d4d6ca0ffc/0",
-            "primaryLocationLineHash": "fnv1a64:addce880015da6a3:0"
+            "primaryLocationLineHash": "fnv1a64:bd6236437c850ca3:0"
           },
           "ruleId": "de-morgan"
         },
@@ -3280,7 +3280,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 7,
-                        "byteOffset": 3269
+                        "byteOffset": 2102
                       },
                       "insertedContent": {
                         "text": "x"
@@ -3303,9 +3303,9 @@
                 },
                 "region": {
                   "byteLength": 7,
-                  "byteOffset": 3269,
+                  "byteOffset": 2102,
                   "startColumn": 1,
-                  "startLine": 48
+                  "startLine": 117
                 }
               }
             }
@@ -3315,7 +3315,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "single-operand-boolean/7e86df9999f069f3/0",
-            "primaryLocationLineHash": "fnv1a64:7aee93deb4ed2fbc:0"
+            "primaryLocationLineHash": "fnv1a64:731aa166bc1cfd5c:0"
           },
           "ruleId": "single-operand-boolean"
         },
@@ -3331,7 +3331,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 13,
-                        "byteOffset": 3346
+                        "byteOffset": 2136
                       },
                       "insertedContent": {
                         "text": "solo"
@@ -3354,9 +3354,9 @@
                 },
                 "region": {
                   "byteLength": 13,
-                  "byteOffset": 3346,
+                  "byteOffset": 2136,
                   "startColumn": 1,
-                  "startLine": 49
+                  "startLine": 119
                 }
               }
             }
@@ -3366,7 +3366,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "single-operand-list-op/6e6fdee3fc4c76f1/0",
-            "primaryLocationLineHash": "fnv1a64:6940eb67f0869072:0"
+            "primaryLocationLineHash": "fnv1a64:790ec3f692c67672:0"
           },
           "ruleId": "single-operand-list-op"
         },
@@ -3382,7 +3382,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 5,
-                        "byteOffset": 3423
+                        "byteOffset": 2176
                       },
                       "insertedContent": {
                         "text": "x"
@@ -3405,9 +3405,9 @@
                 },
                 "region": {
                   "byteLength": 5,
-                  "byteOffset": 3423,
+                  "byteOffset": 2176,
                   "startColumn": 1,
-                  "startLine": 50
+                  "startLine": 121
                 }
               }
             }
@@ -3417,7 +3417,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "single-operand-arithmetic/5d68a41993e476ea/0",
-            "primaryLocationLineHash": "fnv1a64:2cf0b47fbeb70e05:0"
+            "primaryLocationLineHash": "fnv1a64:f775e609b734f11d:0"
           },
           "ruleId": "single-operand-arithmetic"
         },
@@ -3431,9 +3431,9 @@
                 },
                 "region": {
                   "byteLength": 17,
-                  "byteOffset": 9167,
+                  "byteOffset": 6009,
                   "startColumn": 7,
-                  "startLine": 130
+                  "startLine": 341
                 }
               }
             }
@@ -3443,7 +3443,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "eql-string-comparison/5df8497b5e9f67a1/0",
-            "primaryLocationLineHash": "fnv1a64:a308a685768efd84:0"
+            "primaryLocationLineHash": "fnv1a64:05436109130fc575:0"
           },
           "ruleId": "eql-string-comparison"
         },
@@ -3457,9 +3457,9 @@
                 },
                 "region": {
                   "byteLength": 16,
-                  "byteOffset": 9243,
+                  "byteOffset": 6063,
                   "startColumn": 7,
-                  "startLine": 131
+                  "startLine": 344
                 }
               }
             }
@@ -3469,7 +3469,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "eql-list-comparison/610ef7b2729acd17/0",
-            "primaryLocationLineHash": "fnv1a64:1efb9e1ea88c80a4:0"
+            "primaryLocationLineHash": "fnv1a64:f4074d552b1f6b3e:0"
           },
           "ruleId": "eql-list-comparison"
         },
@@ -3483,9 +3483,9 @@
                 },
                 "region": {
                   "byteLength": 18,
-                  "byteOffset": 9336,
-                  "startColumn": 26,
-                  "startLine": 132
+                  "byteOffset": 6135,
+                  "startColumn": 3,
+                  "startLine": 348
                 }
               }
             }
@@ -3495,7 +3495,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "eql-search-literal/96249e1f05669ad0/0",
-            "primaryLocationLineHash": "fnv1a64:73b714f4835d1969:0"
+            "primaryLocationLineHash": "fnv1a64:c48ce83857005e28:0"
           },
           "ruleId": "eql-search-literal"
         },
@@ -3511,7 +3511,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 2,
-                        "byteOffset": 6588
+                        "byteOffset": 4095
                       },
                       "insertedContent": {
                         "text": "eql"
@@ -3534,9 +3534,9 @@
                 },
                 "region": {
                   "byteLength": 8,
-                  "byteOffset": 6587,
+                  "byteOffset": 4094,
                   "startColumn": 1,
-                  "startLine": 94
+                  "startLine": 224
                 }
               }
             }
@@ -3546,7 +3546,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "eq-number-comparison/23196700b33d9c59/0",
-            "primaryLocationLineHash": "fnv1a64:8823fcf13b2a50ae:0"
+            "primaryLocationLineHash": "fnv1a64:3b187ee08e5ca33c:0"
           },
           "ruleId": "eq-number-comparison"
         },
@@ -3562,7 +3562,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 2,
-                        "byteOffset": 6663
+                        "byteOffset": 4128
                       },
                       "insertedContent": {
                         "text": "eql"
@@ -3585,9 +3585,9 @@
                 },
                 "region": {
                   "byteLength": 10,
-                  "byteOffset": 6662,
+                  "byteOffset": 4127,
                   "startColumn": 1,
-                  "startLine": 95
+                  "startLine": 226
                 }
               }
             }
@@ -3597,7 +3597,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "eq-char-comparison/0372a7cb6b4144bd/0",
-            "primaryLocationLineHash": "fnv1a64:bcb9cd0e7e2bbd20:0"
+            "primaryLocationLineHash": "fnv1a64:ad953fe5b53dae54:0"
           },
           "ruleId": "eq-char-comparison"
         },
@@ -3611,9 +3611,9 @@
                 },
                 "region": {
                   "byteLength": 5,
-                  "byteOffset": 9411,
-                  "startColumn": 28,
-                  "startLine": 133
+                  "byteOffset": 6206,
+                  "startColumn": 9,
+                  "startLine": 351
                 }
               }
             }
@@ -3623,7 +3623,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "single-arg-comparison/4900cb84bed5a9b8/0",
-            "primaryLocationLineHash": "fnv1a64:c3ddef745e9765df:0"
+            "primaryLocationLineHash": "fnv1a64:11ded5b75adee42b:0"
           },
           "ruleId": "single-arg-comparison"
         },
@@ -3639,7 +3639,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 11,
-                        "byteOffset": 5529
+                        "byteOffset": 3516
                       },
                       "insertedContent": {
                         "text": "(zerop tally)"
@@ -3662,9 +3662,9 @@
                 },
                 "region": {
                   "byteLength": 11,
-                  "byteOffset": 5529,
+                  "byteOffset": 3516,
                   "startColumn": 1,
-                  "startLine": 79
+                  "startLine": 181
                 }
               }
             }
@@ -3674,7 +3674,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "sign-comparison/93d63434e0602a33/0",
-            "primaryLocationLineHash": "fnv1a64:8a489ffbedab5bfc:0"
+            "primaryLocationLineHash": "fnv1a64:a85faf57bc42107c:0"
           },
           "ruleId": "sign-comparison"
         },
@@ -3689,8 +3689,8 @@
                   "replacements": [
                     {
                       "deletedRegion": {
-                        "byteLength": 17,
-                        "byteOffset": 2632
+                        "byteLength": 19,
+                        "byteOffset": 1696
                       },
                       "insertedContent": {
                         "text": "(when ok (run))"
@@ -3712,10 +3712,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 17,
-                  "byteOffset": 2632,
+                  "byteLength": 19,
+                  "byteOffset": 1696,
                   "startColumn": 1,
-                  "startLine": 39
+                  "startLine": 89
                 }
               }
             }
@@ -3725,7 +3725,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "single-clause-cond/370e08e4584356c3/0",
-            "primaryLocationLineHash": "fnv1a64:c02a36a77d2ebab0:0"
+            "primaryLocationLineHash": "fnv1a64:2bcb371ff5e0f782:0"
           },
           "ruleId": "single-clause-cond"
         },
@@ -3740,11 +3740,11 @@
                   "replacements": [
                     {
                       "deletedRegion": {
-                        "byteLength": 20,
-                        "byteOffset": 2705
+                        "byteLength": 30,
+                        "byteOffset": 1738
                       },
                       "insertedContent": {
-                        "text": "(progn (r1) (r2))"
+                        "text": "(progn (r1)\n    (r2))"
                       }
                     }
                   ]
@@ -3763,10 +3763,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 20,
-                  "byteOffset": 2705,
+                  "byteLength": 30,
+                  "byteOffset": 1738,
                   "startColumn": 1,
-                  "startLine": 40
+                  "startLine": 92
                 }
               }
             }
@@ -3776,7 +3776,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "cond-t-clause/8c478783d564aef8/0",
-            "primaryLocationLineHash": "fnv1a64:469ce8171b1648e7:0"
+            "primaryLocationLineHash": "fnv1a64:c3aa67ca700cf43c:0"
           },
           "ruleId": "cond-t-clause"
         },
@@ -3791,8 +3791,8 @@
                   "replacements": [
                     {
                       "deletedRegion": {
-                        "byteLength": 36,
-                        "byteOffset": 2994
+                        "byteLength": 38,
+                        "byteOffset": 1907
                       },
                       "insertedContent": {
                         "text": "(let ((mv (vals))) mv)"
@@ -3814,10 +3814,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 36,
-                  "byteOffset": 2994,
+                  "byteLength": 38,
+                  "byteOffset": 1907,
                   "startColumn": 1,
-                  "startLine": 44
+                  "startLine": 104
                 }
               }
             }
@@ -3827,7 +3827,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "single-value-bind/aabdcc153cb0635a/0",
-            "primaryLocationLineHash": "fnv1a64:d6d9827754af63c1:0"
+            "primaryLocationLineHash": "fnv1a64:8ec3193454fd444e:0"
           },
           "ruleId": "single-value-bind"
         },
@@ -3841,9 +3841,9 @@
                 },
                 "region": {
                   "byteLength": 17,
-                  "byteOffset": 9483,
-                  "startColumn": 24,
-                  "startLine": 134
+                  "byteOffset": 6273,
+                  "startColumn": 3,
+                  "startLine": 355
                 }
               }
             }
@@ -3853,7 +3853,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "format-missing-destination/7a85f56d04f4c6ff/0",
-            "primaryLocationLineHash": "fnv1a64:cbc9f52267cc0c42:0"
+            "primaryLocationLineHash": "fnv1a64:5a616ec4d0a80801:0"
           },
           "ruleId": "format-missing-destination"
         },
@@ -3867,9 +3867,9 @@
                 },
                 "region": {
                   "byteLength": 8,
-                  "byteOffset": 9560,
-                  "startColumn": 20,
-                  "startLine": 135
+                  "byteOffset": 6343,
+                  "startColumn": 3,
+                  "startLine": 358
                 }
               }
             }
@@ -3879,7 +3879,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "literal-place/7088193b550b4211/0",
-            "primaryLocationLineHash": "fnv1a64:dcce8158e138dad0:0"
+            "primaryLocationLineHash": "fnv1a64:a540c159931cb47b:0"
           },
           "ruleId": "literal-place"
         },
@@ -3893,9 +3893,9 @@
                 },
                 "region": {
                   "byteLength": 19,
-                  "byteOffset": 9628,
-                  "startColumn": 20,
-                  "startLine": 136
+                  "byteOffset": 6391,
+                  "startColumn": 3,
+                  "startLine": 361
                 }
               }
             }
@@ -3905,7 +3905,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "destructive-literal/5bf9f65d8c2b2acc/0",
-            "primaryLocationLineHash": "fnv1a64:d8f646b5f21549b2:0"
+            "primaryLocationLineHash": "fnv1a64:776ad11e843bf038:0"
           },
           "ruleId": "destructive-literal"
         },
@@ -3919,9 +3919,9 @@
                 },
                 "region": {
                   "byteLength": 13,
-                  "byteOffset": 9711,
-                  "startColumn": 28,
-                  "startLine": 137
+                  "byteOffset": 6464,
+                  "startColumn": 9,
+                  "startLine": 364
                 }
               }
             }
@@ -3931,7 +3931,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "char-op-string/90d896193ca587cd/0",
-            "primaryLocationLineHash": "fnv1a64:df72af9466c90c29:0"
+            "primaryLocationLineHash": "fnv1a64:f4331714955a3bc3:0"
           },
           "ruleId": "char-op-string"
         },
@@ -3945,9 +3945,9 @@
                 },
                 "region": {
                   "byteLength": 12,
-                  "byteOffset": 9778,
-                  "startColumn": 26,
-                  "startLine": 138
+                  "byteOffset": 6534,
+                  "startColumn": 3,
+                  "startLine": 368
                 }
               }
             }
@@ -3957,7 +3957,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "empty-body/713b5add40eb9a23/0",
-            "primaryLocationLineHash": "fnv1a64:13d43d7f3e8e34d8:0"
+            "primaryLocationLineHash": "fnv1a64:c7a60d2211f5d9e9:0"
           },
           "ruleId": "empty-body"
         },
@@ -3971,9 +3971,9 @@
                 },
                 "region": {
                   "byteLength": 7,
-                  "byteOffset": 9840,
-                  "startColumn": 23,
-                  "startLine": 139
+                  "byteOffset": 6586,
+                  "startColumn": 3,
+                  "startLine": 371
                 }
               }
             }
@@ -3983,7 +3983,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "identity-arithmetic/5957946d13e87c0f/0",
-            "primaryLocationLineHash": "fnv1a64:e3f2c3976f0803ae:0"
+            "primaryLocationLineHash": "fnv1a64:c18489e666a8a30f:0"
           },
           "ruleId": "identity-arithmetic"
         },
@@ -3999,7 +3999,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 9,
-                        "byteOffset": 1645
+                        "byteOffset": 1140
                       },
                       "insertedContent": {
                         "text": "(- amt)"
@@ -4022,9 +4022,9 @@
                 },
                 "region": {
                   "byteLength": 9,
-                  "byteOffset": 1645,
+                  "byteOffset": 1140,
                   "startColumn": 1,
-                  "startLine": 25
+                  "startLine": 59
                 }
               }
             }
@@ -4034,7 +4034,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "verbose-negation/db07057c02c96d6b/0",
-            "primaryLocationLineHash": "fnv1a64:05f507d4301cf8e6:0"
+            "primaryLocationLineHash": "fnv1a64:ecc15495cd705b7e:0"
           },
           "ruleId": "verbose-negation"
         },
@@ -4050,7 +4050,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 13,
-                        "byteOffset": 1716
+                        "byteOffset": 1170
                       },
                       "insertedContent": {
                         "text": "(cons la lb)"
@@ -4073,9 +4073,9 @@
                 },
                 "region": {
                   "byteLength": 13,
-                  "byteOffset": 1716,
+                  "byteOffset": 1170,
                   "startColumn": 1,
-                  "startLine": 26
+                  "startLine": 61
                 }
               }
             }
@@ -4085,7 +4085,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "list-star-to-cons/8dfbceb8e6484013/0",
-            "primaryLocationLineHash": "fnv1a64:841c939526f306b8:0"
+            "primaryLocationLineHash": "fnv1a64:ca6d7c7781530d28:0"
           },
           "ruleId": "list-star-to-cons"
         },
@@ -4101,7 +4101,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 26,
-                        "byteOffset": 1788
+                        "byteOffset": 1205
                       },
                       "insertedContent": {
                         "text": "(values va vb)"
@@ -4124,9 +4124,9 @@
                 },
                 "region": {
                   "byteLength": 26,
-                  "byteOffset": 1788,
+                  "byteOffset": 1205,
                   "startColumn": 1,
-                  "startLine": 27
+                  "startLine": 63
                 }
               }
             }
@@ -4136,7 +4136,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "values-list-of-list/a01fe3b901d6d599/0",
-            "primaryLocationLineHash": "fnv1a64:ae17b6d2459fc324:0"
+            "primaryLocationLineHash": "fnv1a64:173232562b0259aa:0"
           },
           "ruleId": "values-list-of-list"
         },
@@ -4151,8 +4151,8 @@
                   "replacements": [
                     {
                       "deletedRegion": {
-                        "byteLength": 13,
-                        "byteOffset": 1862
+                        "byteLength": 15,
+                        "byteOffset": 1255
                       },
                       "insertedContent": {
                         "text": "(p1x)"
@@ -4174,10 +4174,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 13,
-                  "byteOffset": 1862,
+                  "byteLength": 15,
+                  "byteOffset": 1255,
                   "startColumn": 1,
-                  "startLine": 28
+                  "startLine": 65
                 }
               }
             }
@@ -4187,7 +4187,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "redundant-prog1/d11c68d1c2a8c075/0",
-            "primaryLocationLineHash": "fnv1a64:b8f40ca236cb4c3a:0"
+            "primaryLocationLineHash": "fnv1a64:567951eb6e91065d:0"
           },
           "ruleId": "redundant-prog1"
         },
@@ -4203,7 +4203,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 13,
-                        "byteOffset": 1932
+                        "byteOffset": 1290
                       },
                       "insertedContent": {
                         "text": "(copy-seq sz)"
@@ -4226,9 +4226,9 @@
                 },
                 "region": {
                   "byteLength": 13,
-                  "byteOffset": 1932,
+                  "byteOffset": 1290,
                   "startColumn": 1,
-                  "startLine": 29
+                  "startLine": 68
                 }
               }
             }
@@ -4238,7 +4238,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "subseq-zero/86623ddc853cc31a/0",
-            "primaryLocationLineHash": "fnv1a64:26d5740759625745:0"
+            "primaryLocationLineHash": "fnv1a64:a17e295ebedaa8f5:0"
           },
           "ruleId": "subseq-zero"
         },
@@ -4254,7 +4254,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 20,
-                        "byteOffset": 1998
+                        "byteOffset": 1319
                       },
                       "insertedContent": {
                         "text": "(nth cn cx)"
@@ -4277,9 +4277,9 @@
                 },
                 "region": {
                   "byteLength": 20,
-                  "byteOffset": 1998,
+                  "byteOffset": 1319,
                   "startColumn": 1,
-                  "startLine": 30
+                  "startLine": 70
                 }
               }
             }
@@ -4289,7 +4289,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "car-nthcdr/fa5f8068ce51888c/0",
-            "primaryLocationLineHash": "fnv1a64:ebc22df4f9d155d3:0"
+            "primaryLocationLineHash": "fnv1a64:174875f8fcb7f4db:0"
           },
           "ruleId": "car-nthcdr"
         },
@@ -4305,7 +4305,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 19,
-                        "byteOffset": 2063
+                        "byteOffset": 1354
                       },
                       "insertedContent": {
                         "text": "(car (last crx))"
@@ -4328,9 +4328,9 @@
                 },
                 "region": {
                   "byteLength": 19,
-                  "byteOffset": 2063,
+                  "byteOffset": 1354,
                   "startColumn": 1,
-                  "startLine": 31
+                  "startLine": 72
                 }
               }
             }
@@ -4340,7 +4340,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "car-reverse/358664c82b8eb6c2/0",
-            "primaryLocationLineHash": "fnv1a64:50347c7603a050b5:0"
+            "primaryLocationLineHash": "fnv1a64:74b2319d6206c235:0"
           },
           "ruleId": "car-reverse"
         },
@@ -4356,7 +4356,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 16,
-                        "byteOffset": 2129
+                        "byteOffset": 1389
                       },
                       "insertedContent": {
                         "text": "(copy-list anx)"
@@ -4379,9 +4379,9 @@
                 },
                 "region": {
                   "byteLength": 16,
-                  "byteOffset": 2129,
+                  "byteOffset": 1389,
                   "startColumn": 1,
-                  "startLine": 32
+                  "startLine": 74
                 }
               }
             }
@@ -4391,7 +4391,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "append-nil/9dcde276136a9a2c/0",
-            "primaryLocationLineHash": "fnv1a64:655fffeff878b55b:0"
+            "primaryLocationLineHash": "fnv1a64:497b7f35513a63d7:0"
           },
           "ruleId": "append-nil"
         },
@@ -4407,7 +4407,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 38,
-                        "byteOffset": 2194
+                        "byteOffset": 1420
                       },
                       "insertedContent": {
                         "text": "(list mva mvb)"
@@ -4430,9 +4430,9 @@
                 },
                 "region": {
                   "byteLength": 38,
-                  "byteOffset": 2194,
+                  "byteOffset": 1420,
                   "startColumn": 1,
-                  "startLine": 33
+                  "startLine": 76
                 }
               }
             }
@@ -4442,7 +4442,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "multiple-value-list-of-values/1b4099bfb77b9dcf/0",
-            "primaryLocationLineHash": "fnv1a64:ff426032c066c22a:0"
+            "primaryLocationLineHash": "fnv1a64:f1fe2aedbd31e474:0"
           },
           "ruleId": "multiple-value-list-of-values"
         },
@@ -4458,7 +4458,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 19,
-                        "byteOffset": 2278
+                        "byteOffset": 1492
                       },
                       "insertedContent": {
                         "text": "(stringp tpx)"
@@ -4481,9 +4481,9 @@
                 },
                 "region": {
                   "byteLength": 19,
-                  "byteOffset": 2278,
+                  "byteOffset": 1492,
                   "startColumn": 1,
-                  "startLine": 34
+                  "startLine": 78
                 }
               }
             }
@@ -4493,7 +4493,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "typep-predicate/c4524e22023511e4/0",
-            "primaryLocationLineHash": "fnv1a64:150074136afea02b:0"
+            "primaryLocationLineHash": "fnv1a64:aef6e773733f332b:0"
           },
           "ruleId": "typep-predicate"
         },
@@ -4509,7 +4509,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 14,
-                        "byteOffset": 2348
+                        "byteOffset": 1531
                       },
                       "insertedContent": {
                         "text": "ctx"
@@ -4532,9 +4532,9 @@
                 },
                 "region": {
                   "byteLength": 14,
-                  "byteOffset": 2348,
+                  "byteOffset": 1531,
                   "startColumn": 1,
-                  "startLine": 35
+                  "startLine": 80
                 }
               }
             }
@@ -4544,7 +4544,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "coerce-to-t/5287c8c7f1849642/0",
-            "primaryLocationLineHash": "fnv1a64:8cb3d956aa394b6d:0"
+            "primaryLocationLineHash": "fnv1a64:64c650102f8471a5:0"
           },
           "ruleId": "coerce-to-t"
         },
@@ -4560,7 +4560,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 4,
-                        "byteOffset": 2430
+                        "byteOffset": 1577
                       },
                       "insertedContent": {
                         "text": ""
@@ -4583,9 +4583,9 @@
                 },
                 "region": {
                   "byteLength": 21,
-                  "byteOffset": 2414,
+                  "byteOffset": 1561,
                   "startColumn": 1,
-                  "startLine": 36
+                  "startLine": 82
                 }
               }
             }
@@ -4595,7 +4595,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "gethash-default/f31c83fc13478b4e/0",
-            "primaryLocationLineHash": "fnv1a64:0dd73547e000f721:0"
+            "primaryLocationLineHash": "fnv1a64:085c9292655ef661:0"
           },
           "ruleId": "gethash-default"
         },
@@ -4611,7 +4611,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 11,
-                        "byteOffset": 2500
+                        "byteOffset": 1618
                       },
                       "insertedContent": {
                         "text": ""
@@ -4634,9 +4634,9 @@
                 },
                 "region": {
                   "byteLength": 28,
-                  "byteOffset": 2484,
+                  "byteOffset": 1602,
                   "startColumn": 1,
-                  "startLine": 37
+                  "startLine": 84
                 }
               }
             }
@@ -4646,7 +4646,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "make-hash-table-test/35479fa9b5b47097/0",
-            "primaryLocationLineHash": "fnv1a64:d76a26ccd4ace822:0"
+            "primaryLocationLineHash": "fnv1a64:49640e8e765c65de:0"
           },
           "ruleId": "make-hash-table-test"
         },
@@ -4660,9 +4660,9 @@
                 },
                 "region": {
                   "byteLength": 7,
-                  "byteOffset": 9892,
+                  "byteOffset": 6618,
                   "startColumn": 1,
-                  "startLine": 140
+                  "startLine": 373
                 }
               }
             }
@@ -4672,7 +4672,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "zero-divisor/bb4a55b5af90f7db/0",
-            "primaryLocationLineHash": "fnv1a64:46d32820c2d19b98:0"
+            "primaryLocationLineHash": "fnv1a64:03708acf77f01e78:0"
           },
           "ruleId": "zero-divisor"
         },
@@ -4686,9 +4686,9 @@
                 },
                 "region": {
                   "byteLength": 28,
-                  "byteOffset": 9959,
+                  "byteOffset": 6642,
                   "startColumn": 1,
-                  "startLine": 141
+                  "startLine": 375
                 }
               }
             }
@@ -4698,7 +4698,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "duplicate-keyword/9a11e6557d3eae3f/0",
-            "primaryLocationLineHash": "fnv1a64:0262b9454fa3263e:0"
+            "primaryLocationLineHash": "fnv1a64:17c90107a4d6fa6e:0"
           },
           "ruleId": "duplicate-keyword"
         },
@@ -4712,9 +4712,9 @@
                 },
                 "region": {
                   "byteLength": 32,
-                  "byteOffset": 10031,
+                  "byteOffset": 6692,
                   "startColumn": 1,
-                  "startLine": 142
+                  "startLine": 377
                 }
               }
             }
@@ -4724,7 +4724,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "defpackage-quoted/c37b38bb92c1afca/0",
-            "primaryLocationLineHash": "fnv1a64:cbd05bff89b3ba69:0"
+            "primaryLocationLineHash": "fnv1a64:c7e99281f90ece69:0"
           },
           "ruleId": "defpackage-quoted"
         },
@@ -4738,9 +4738,9 @@
                 },
                 "region": {
                   "byteLength": 16,
-                  "byteOffset": 10103,
+                  "byteOffset": 6746,
                   "startColumn": 1,
-                  "startLine": 143
+                  "startLine": 379
                 }
               }
             }
@@ -4750,7 +4750,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "step-zero/d9ce2059b5b3a5cc/0",
-            "primaryLocationLineHash": "fnv1a64:190005d79758c96f:0"
+            "primaryLocationLineHash": "fnv1a64:6fe2fecda59c1c3d:0"
           },
           "ruleId": "step-zero"
         },
@@ -4765,8 +4765,8 @@
                   "replacements": [
                     {
                       "deletedRegion": {
-                        "byteLength": 17,
-                        "byteOffset": 5861
+                        "byteLength": 25,
+                        "byteOffset": 3688
                       },
                       "insertedContent": {
                         "text": "(unless iu (iue))"
@@ -4788,10 +4788,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 17,
-                  "byteOffset": 5861,
+                  "byteLength": 25,
+                  "byteOffset": 3688,
                   "startColumn": 1,
-                  "startLine": 84
+                  "startLine": 197
                 }
               }
             }
@@ -4801,7 +4801,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "if-to-unless/54bbf94ef24fbf44/0",
-            "primaryLocationLineHash": "fnv1a64:7fb6301083e69a7b:0"
+            "primaryLocationLineHash": "fnv1a64:35cac5e6203d708a:0"
           },
           "ruleId": "if-to-unless"
         },
@@ -4817,7 +4817,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 5,
-                        "byteOffset": 5929
+                        "byteOffset": 3731
                       },
                       "insertedContent": {
                         "text": "progn"
@@ -4839,10 +4839,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 19,
-                  "byteOffset": 5928,
+                  "byteLength": 23,
+                  "byteOffset": 3730,
                   "startColumn": 1,
-                  "startLine": 85
+                  "startLine": 201
                 }
               }
             }
@@ -4852,7 +4852,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "prog2-to-progn/cfc0af416a06509b/0",
-            "primaryLocationLineHash": "fnv1a64:880ff7f77631cbec:0"
+            "primaryLocationLineHash": "fnv1a64:64ad164304216e7a:0"
           },
           "ruleId": "prog2-to-progn"
         },
@@ -4868,7 +4868,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 20,
-                        "byteOffset": 5997
+                        "byteOffset": 3772
                       },
                       "insertedContent": {
                         "text": "(hcx)"
@@ -4891,9 +4891,9 @@
                 },
                 "region": {
                   "byteLength": 20,
-                  "byteOffset": 5997,
+                  "byteOffset": 3772,
                   "startColumn": 1,
-                  "startLine": 86
+                  "startLine": 205
                 }
               }
             }
@@ -4903,7 +4903,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "handler-case-no-clauses/e6eca94ec47a803d/0",
-            "primaryLocationLineHash": "fnv1a64:cbb9b0bcef091a70:0"
+            "primaryLocationLineHash": "fnv1a64:4f24f39bb9b967de:0"
           },
           "ruleId": "handler-case-no-clauses"
         },
@@ -4919,7 +4919,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 22,
-                        "byteOffset": 6075
+                        "byteOffset": 3820
                       },
                       "insertedContent": {
                         "text": "(upx)"
@@ -4942,9 +4942,9 @@
                 },
                 "region": {
                   "byteLength": 22,
-                  "byteOffset": 6075,
+                  "byteOffset": 3820,
                   "startColumn": 1,
-                  "startLine": 87
+                  "startLine": 207
                 }
               }
             }
@@ -4954,7 +4954,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "unwind-protect-no-cleanup/0517ee52f6bcfa89/0",
-            "primaryLocationLineHash": "fnv1a64:8ffbee69202c9404:0"
+            "primaryLocationLineHash": "fnv1a64:3d02561dc1d4ae9a:0"
           },
           "ruleId": "unwind-protect-no-cleanup"
         },
@@ -4970,7 +4970,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 9,
-                        "byteOffset": 4278
+                        "byteOffset": 2626
                       },
                       "insertedContent": {
                         "text": ""
@@ -4993,9 +4993,9 @@
                 },
                 "region": {
                   "byteLength": 23,
-                  "byteOffset": 4265,
+                  "byteOffset": 2613,
                   "startColumn": 1,
-                  "startLine": 62
+                  "startLine": 147
                 }
               }
             }
@@ -5005,7 +5005,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "redundant-start-zero/204c4a0fd8b6054d/0",
-            "primaryLocationLineHash": "fnv1a64:265ed6e4030ca4a6:0"
+            "primaryLocationLineHash": "fnv1a64:d667dcc409ab57e6:0"
           },
           "ruleId": "redundant-start-zero"
         },
@@ -5021,7 +5021,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 9,
-                        "byteOffset": 4353
+                        "byteOffset": 2674
                       },
                       "insertedContent": {
                         "text": ""
@@ -5044,9 +5044,9 @@
                 },
                 "region": {
                   "byteLength": 23,
-                  "byteOffset": 4340,
+                  "byteOffset": 2661,
                   "startColumn": 1,
-                  "startLine": 63
+                  "startLine": 149
                 }
               }
             }
@@ -5056,7 +5056,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "redundant-end-nil/95fb7a788caa4221/0",
-            "primaryLocationLineHash": "fnv1a64:66041a6b31ab3a16:0"
+            "primaryLocationLineHash": "fnv1a64:4fff6e90488d69d6:0"
           },
           "ruleId": "redundant-end-nil"
         },
@@ -5072,7 +5072,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 14,
-                        "byteOffset": 4425
+                        "byteOffset": 2719
                       },
                       "insertedContent": {
                         "text": ""
@@ -5095,9 +5095,9 @@
                 },
                 "region": {
                   "byteLength": 28,
-                  "byteOffset": 4412,
+                  "byteOffset": 2706,
                   "startColumn": 1,
-                  "startLine": 64
+                  "startLine": 151
                 }
               }
             }
@@ -5107,7 +5107,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "redundant-from-end-nil/74a10cdf08c695fc/0",
-            "primaryLocationLineHash": "fnv1a64:02f162094382953b:0"
+            "primaryLocationLineHash": "fnv1a64:f9ab16add3fb37df:0"
           },
           "ruleId": "redundant-from-end-nil"
         },
@@ -5123,7 +5123,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 11,
-                        "byteOffset": 4504
+                        "byteOffset": 2776
                       },
                       "insertedContent": {
                         "text": ""
@@ -5146,9 +5146,9 @@
                 },
                 "region": {
                   "byteLength": 27,
-                  "byteOffset": 4489,
+                  "byteOffset": 2761,
                   "startColumn": 1,
-                  "startLine": 65
+                  "startLine": 153
                 }
               }
             }
@@ -5158,7 +5158,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "redundant-count-nil/b4e4e8611abe92d2/0",
-            "primaryLocationLineHash": "fnv1a64:67d1a75dcc399bd9:0"
+            "primaryLocationLineHash": "fnv1a64:4b403d80585f0df9:0"
           },
           "ruleId": "redundant-count-nil"
         },
@@ -5174,7 +5174,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 51,
-                        "byteOffset": 4563
+                        "byteOffset": 2812
                       },
                       "insertedContent": {
                         "text": "(string-equal sa sb)"
@@ -5197,9 +5197,9 @@
                 },
                 "region": {
                   "byteLength": 51,
-                  "byteOffset": 4563,
+                  "byteOffset": 2812,
                   "startColumn": 1,
-                  "startLine": 66
+                  "startLine": 155
                 }
               }
             }
@@ -5225,7 +5225,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 45,
-                        "byteOffset": 4634
+                        "byteOffset": 2884
                       },
                       "insertedContent": {
                         "text": "(char-equal ca cb)"
@@ -5248,9 +5248,9 @@
                 },
                 "region": {
                   "byteLength": 45,
-                  "byteOffset": 4634,
+                  "byteOffset": 2884,
                   "startColumn": 1,
-                  "startLine": 67
+                  "startLine": 157
                 }
               }
             }
@@ -5260,7 +5260,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "char-case-fold/1151e7de6ce93524/0",
-            "primaryLocationLineHash": "fnv1a64:ec5db26fa217dc7d:0"
+            "primaryLocationLineHash": "fnv1a64:11d487eec5dfecf5:0"
           },
           "ruleId": "char-case-fold"
         },
@@ -5276,7 +5276,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 37,
-                        "byteOffset": 4703
+                        "byteOffset": 2948
                       },
                       "insertedContent": {
                         "text": "(string-upcase nsc)"
@@ -5299,9 +5299,9 @@
                 },
                 "region": {
                   "byteLength": 37,
-                  "byteOffset": 4703,
+                  "byteOffset": 2948,
                   "startColumn": 1,
-                  "startLine": 68
+                  "startLine": 159
                 }
               }
             }
@@ -5311,7 +5311,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "nested-string-case/e1b50d70e857d80e/0",
-            "primaryLocationLineHash": "fnv1a64:ef1a410c52dedcd1:0"
+            "primaryLocationLineHash": "fnv1a64:025542eb348f6ed1:0"
           },
           "ruleId": "nested-string-case"
         },
@@ -5327,7 +5327,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 27,
-                        "byteOffset": 4776
+                        "byteOffset": 3008
                       },
                       "insertedContent": {
                         "text": "ccc"
@@ -5350,9 +5350,9 @@
                 },
                 "region": {
                   "byteLength": 27,
-                  "byteOffset": 4776,
+                  "byteOffset": 3008,
                   "startColumn": 1,
-                  "startLine": 69
+                  "startLine": 161
                 }
               }
             }
@@ -5362,7 +5362,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "code-char-char-code/d64bd87a6ec1dd94/0",
-            "primaryLocationLineHash": "fnv1a64:93c30af215b8c70f:0"
+            "primaryLocationLineHash": "fnv1a64:6ae60832fbe5a56f:0"
           },
           "ruleId": "code-char-char-code"
         },
@@ -5378,7 +5378,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 2,
-                        "byteOffset": 4859
+                        "byteOffset": 3068
                       },
                       "insertedContent": {
                         "text": ""
@@ -5401,9 +5401,9 @@
                 },
                 "region": {
                   "byteLength": 12,
-                  "byteOffset": 4850,
+                  "byteOffset": 3059,
                   "startColumn": 1,
-                  "startLine": 70
+                  "startLine": 163
                 }
               }
             }
@@ -5413,7 +5413,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "last-default-count/ee8e9f6b4ebb33ac/0",
-            "primaryLocationLineHash": "fnv1a64:c4aa05876e209b07:0"
+            "primaryLocationLineHash": "fnv1a64:acc8598eecbc985b:0"
           },
           "ruleId": "last-default-count"
         },
@@ -5429,7 +5429,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 2,
-                        "byteOffset": 4935
+                        "byteOffset": 3106
                       },
                       "insertedContent": {
                         "text": ""
@@ -5452,9 +5452,9 @@
                 },
                 "region": {
                   "byteLength": 15,
-                  "byteOffset": 4923,
+                  "byteOffset": 3094,
                   "startColumn": 1,
-                  "startLine": 71
+                  "startLine": 165
                 }
               }
             }
@@ -5464,7 +5464,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "butlast-default-count/6841ef3bad2f901d/0",
-            "primaryLocationLineHash": "fnv1a64:2de496c2b2f4618e:0"
+            "primaryLocationLineHash": "fnv1a64:618bd292252980ae:0"
           },
           "ruleId": "butlast-default-count"
         },
@@ -5480,7 +5480,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 21,
-                        "byteOffset": 5013
+                        "byteOffset": 3149
                       },
                       "insertedContent": {
                         "text": ""
@@ -5503,9 +5503,9 @@
                 },
                 "region": {
                   "byteLength": 36,
-                  "byteOffset": 4999,
+                  "byteOffset": 3135,
                   "startColumn": 1,
-                  "startLine": 72
+                  "startLine": 167
                 }
               }
             }
@@ -5515,7 +5515,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "make-list-default-element/091b9e3ccae97a5b/0",
-            "primaryLocationLineHash": "fnv1a64:f134cf1ec5c57582:0"
+            "primaryLocationLineHash": "fnv1a64:c50175a4a5fa0c24:0"
           },
           "ruleId": "make-list-default-element"
         },
@@ -5531,7 +5531,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 10,
-                        "byteOffset": 5097
+                        "byteOffset": 3219
                       },
                       "insertedContent": {
                         "text": ""
@@ -5554,9 +5554,9 @@
                 },
                 "region": {
                   "byteLength": 29,
-                  "byteOffset": 5079,
+                  "byteOffset": 3201,
                   "startColumn": 1,
-                  "startLine": 73
+                  "startLine": 169
                 }
               }
             }
@@ -5566,7 +5566,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "parse-integer-default-radix/6689082ca07df47e/0",
-            "primaryLocationLineHash": "fnv1a64:3bc6cd984c53e181:0"
+            "primaryLocationLineHash": "fnv1a64:429f51e6e6fe2349:0"
           },
           "ruleId": "parse-integer-default-radix"
         },
@@ -5582,7 +5582,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 4,
-                        "byteOffset": 5175
+                        "byteOffset": 3276
                       },
                       "insertedContent": {
                         "text": ""
@@ -5605,9 +5605,9 @@
                 },
                 "region": {
                   "byteLength": 19,
-                  "byteOffset": 5161,
+                  "byteOffset": 3262,
                   "startColumn": 1,
-                  "startLine": 74
+                  "startLine": 171
                 }
               }
             }
@@ -5617,7 +5617,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "getf-default-nil/ccab3d746985ff27/0",
-            "primaryLocationLineHash": "fnv1a64:9f300e0d98fe75ca:0"
+            "primaryLocationLineHash": "fnv1a64:519e4bba8d8c6b4a:0"
           },
           "ruleId": "getf-default-nil"
         },
@@ -5633,7 +5633,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 16,
-                        "byteOffset": 5248
+                        "byteOffset": 3318
                       },
                       "insertedContent": {
                         "text": ""
@@ -5656,9 +5656,9 @@
                 },
                 "region": {
                   "byteLength": 33,
-                  "byteOffset": 5232,
+                  "byteOffset": 3302,
                   "startColumn": 1,
-                  "startLine": 75
+                  "startLine": 173
                 }
               }
             }
@@ -5668,7 +5668,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "make-array-default-keyword/5378b26260ebe135/0",
-            "primaryLocationLineHash": "fnv1a64:a2ffafa15fed183c:0"
+            "primaryLocationLineHash": "fnv1a64:5d1e346df151f1b4:0"
           },
           "ruleId": "make-array-default-keyword"
         },
@@ -5684,7 +5684,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 33,
-                        "byteOffset": 5313
+                        "byteOffset": 3366
                       },
                       "insertedContent": {
                         "text": "(char-upcase ncc)"
@@ -5707,9 +5707,9 @@
                 },
                 "region": {
                   "byteLength": 33,
-                  "byteOffset": 5313,
+                  "byteOffset": 3366,
                   "startColumn": 1,
-                  "startLine": 76
+                  "startLine": 175
                 }
               }
             }
@@ -5719,7 +5719,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "nested-char-case/e5d63774dec3163c/0",
-            "primaryLocationLineHash": "fnv1a64:08e80a03a324ed75:0"
+            "primaryLocationLineHash": "fnv1a64:dac7186c78fce6ed:0"
           },
           "ruleId": "nested-char-case"
         },
@@ -5735,7 +5735,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 5,
-                        "byteOffset": 5385
+                        "byteOffset": 3421
                       },
                       "insertedContent": {
                         "text": "list"
@@ -5744,7 +5744,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 4,
-                        "byteOffset": 5400
+                        "byteOffset": 3436
                       },
                       "insertedContent": {
                         "text": ""
@@ -5767,9 +5767,9 @@
                 },
                 "region": {
                   "byteLength": 21,
-                  "byteOffset": 5384,
+                  "byteOffset": 3420,
                   "startColumn": 1,
-                  "startLine": 77
+                  "startLine": 177
                 }
               }
             }
@@ -5779,7 +5779,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "list-star-nil/3d15900073a4c4e4/0",
-            "primaryLocationLineHash": "fnv1a64:d28afb89e5c98c47:0"
+            "primaryLocationLineHash": "fnv1a64:45c6a2a2c72bbb5f:0"
           },
           "ruleId": "list-star-nil"
         },
@@ -5792,7 +5792,7 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 10167,
+                  "byteLength": 6775,
                   "byteOffset": 0,
                   "startColumn": 1,
                   "startLine": 1
@@ -5819,9 +5819,9 @@
                 },
                 "region": {
                   "byteLength": 9,
-                  "byteOffset": 8864,
-                  "startColumn": 13,
-                  "startLine": 126
+                  "byteOffset": 5797,
+                  "startColumn": 3,
+                  "startLine": 332
                 }
               }
             }
@@ -5831,7 +5831,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "leftover-print-debug/8410f5d691961e8d/0",
-            "primaryLocationLineHash": "fnv1a64:29e9a5a3d9f5c899:0"
+            "primaryLocationLineHash": "fnv1a64:e20aba3f7adaed85:0"
           },
           "ruleId": "leftover-print-debug"
         },
@@ -5845,9 +5845,9 @@
                 },
                 "region": {
                   "byteLength": 32,
-                  "byteOffset": 10031,
+                  "byteOffset": 6692,
                   "startColumn": 1,
-                  "startLine": 142
+                  "startLine": 377
                 }
               }
             }
@@ -5857,7 +5857,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "defpackage-without-in-package/c37b38bb92c1afca/0",
-            "primaryLocationLineHash": "fnv1a64:e0002aef755c8604:0"
+            "primaryLocationLineHash": "fnv1a64:e21470825880c526:0"
           },
           "ruleId": "defpackage-without-in-package"
         },
@@ -5870,10 +5870,10 @@
                   "uri": "broad.lisp"
                 },
                 "region": {
-                  "byteLength": 21,
-                  "byteOffset": 2920,
+                  "byteLength": 23,
+                  "byteOffset": 1860,
                   "startColumn": 1,
-                  "startLine": 43
+                  "startLine": 101
                 }
               }
             }
@@ -5883,7 +5883,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "return-from-unmatched-block/83c6c0866319952f/0",
-            "primaryLocationLineHash": "fnv1a64:0e588b483baf867e:0"
+            "primaryLocationLineHash": "fnv1a64:760ad44109c6af12:0"
           },
           "ruleId": "return-from-unmatched-block"
         },
@@ -5897,9 +5897,9 @@
                 },
                 "region": {
                   "byteLength": 1,
-                  "byteOffset": 8637,
+                  "byteOffset": 5605,
                   "startColumn": 8,
-                  "startLine": 123
+                  "startLine": 319
                 }
               }
             }
@@ -5909,7 +5909,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "unused-local-binding/af63f54c86021707/0",
-            "primaryLocationLineHash": "fnv1a64:657f9c9189fd01e1:0"
+            "primaryLocationLineHash": "fnv1a64:6a3c8e0ef61da356:0"
           },
           "ruleId": "unused-local-binding"
         },
@@ -5923,9 +5923,9 @@
                 },
                 "region": {
                   "byteLength": 1,
-                  "byteOffset": 8643,
-                  "startColumn": 14,
-                  "startLine": 123
+                  "byteOffset": 5617,
+                  "startColumn": 8,
+                  "startLine": 320
                 }
               }
             }
@@ -5935,7 +5935,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "unused-local-binding/af63f44c86021554/0",
-            "primaryLocationLineHash": "fnv1a64:657f9c9189fd01e1:1"
+            "primaryLocationLineHash": "fnv1a64:d936185404eee2cf:0"
           },
           "ruleId": "unused-local-binding"
         }

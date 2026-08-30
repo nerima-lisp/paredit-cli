@@ -6,16 +6,20 @@ use crate::duplicate_slot_report::usecase::{
     DuplicateSlotPolicyOptions, collect_duplicate_slots, evaluate_duplicate_slot_policy,
     summarize_duplicate_slots,
 };
-use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::{analyze_files, note_partial_file_failures, total_file_failure};
 
 pub fn duplicate_slot_report(args: DuplicateSlotReportArgs) -> CommandResult {
+    let analysis = analyze_files(&args.files, args.dialect, |file, dialect, tree, _input| {
+        collect_duplicate_slots(file, dialect, tree)
+    });
+    if analysis.is_total_failure() {
+        return Err(total_file_failure(analysis.failed).into());
+    }
+    note_partial_file_failures(&analysis.failed);
+
     let mut definition_count = 0;
     let mut duplicates = Vec::new();
-
-    for file in &args.files {
-        let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let (file_definition_count, file_duplicates) =
-            collect_duplicate_slots(file, dialect, &tree)?;
+    for (file_definition_count, file_duplicates) in analysis.succeeded {
         definition_count += file_definition_count;
         duplicates.extend(file_duplicates);
     }

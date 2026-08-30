@@ -1,7 +1,6 @@
 ;; nested.lisp — nested/overlapping forms that exercise fix ordering and
 ;; fixpoint convergence (a fix on an outer form unlocking a fix on what the
 ;; rewrite exposes, across several `--fix` passes within one run).
-
 (defun converges-through-progn-then-boolean ()
   x)
 
@@ -14,7 +13,8 @@
 (defun deeply-nested-progn ()
   a
     b
-      c d
+      c
+        d
     e)
 
 (defun overlapping-cxr (x)

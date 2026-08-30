@@ -7,40 +7,48 @@ use crate::remove_unused_definition::usecase::{
     RemoveUnusedDefinitionInputFile, RemoveUnusedDefinitionsRequest, UnusedDefinitionDefinition,
     plan_remove_unused_definitions,
 };
-use paredit_core_cli::shared::{read_input_dialect_and_tree, write_files_with_rollback};
+use paredit_core_cli::shared::{
+    analyze_files, note_partial_file_failures, total_file_failure, write_files_with_rollback,
+};
+use paredit_feature_package::error::PackageCommandError;
 use paredit_feature_package::package_report::usecase::build_package_report;
 
 pub fn remove_unused_definitions(args: RemoveUnusedDefinitionsArgs) -> CliResult<()> {
-    let mut input_files = Vec::with_capacity(args.files.len());
-    let mut package_definitions = Vec::new();
-
-    for file in &args.files {
-        let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let (package, definitions) = collect_definition_forms(&tree, dialect)?;
-        let package_report = build_package_report(&tree, dialect).map_err(|source| {
-            paredit_feature_package::error::PackageCommandError::Inspect {
+    let analysis = analyze_files(&args.files, args.dialect, |file, dialect, tree, input| {
+        let (package, definitions) = collect_definition_forms(tree, dialect)?;
+        let package_report =
+            build_package_report(tree, dialect).map_err(|source| PackageCommandError::Inspect {
                 path: file.display().to_string(),
                 source,
-            }
-        })?;
-        package_definitions.extend(package_report.defpackages);
+            })?;
 
-        input_files.push(RemoveUnusedDefinitionInputFile {
-            path: file.clone(),
-            dialect,
-            package,
-            definitions: definitions
-                .iter()
-                .map(to_unused_definition_definition)
-                .collect(),
-            atoms: tree.atom_occurrences(),
-            text: input.text,
-        });
+        CliResult::Ok((
+            RemoveUnusedDefinitionInputFile {
+                path: file.to_path_buf(),
+                dialect,
+                package,
+                definitions: definitions
+                    .iter()
+                    .map(to_unused_definition_definition)
+                    .collect(),
+                atoms: tree.atom_occurrences(),
+                text: input.text.clone(),
+                root_view: tree.root_view(),
+            },
+            package_report.defpackages,
+        ))
+    });
+    if analysis.is_total_failure() {
+        return Err(total_file_failure(analysis.failed).into());
     }
+    note_partial_file_failures(&analysis.failed);
+
+    let (input_files, package_definitions): (Vec<_>, Vec<_>) =
+        analysis.succeeded.into_iter().unzip();
 
     let plan = plan_remove_unused_definitions(RemoveUnusedDefinitionsRequest {
         files: input_files,
-        package_definitions,
+        package_definitions: package_definitions.into_iter().flatten().collect(),
         include_protected: args.include_protected,
         include_exported: args.include_exported,
     })?;

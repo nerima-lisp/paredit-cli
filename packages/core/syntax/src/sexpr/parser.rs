@@ -277,11 +277,9 @@ impl<'a> Parser<'a> {
         if self.suppress_depth > 0 || end.get() <= start.get() {
             return;
         }
-        let text = self.input[start.get()..end.get()].to_string();
         let own_line = self.is_line_start(start.get());
         self.comments.push(Comment {
             span: ByteSpan::new(start, end),
-            text,
             own_line,
         });
     }

@@ -601,7 +601,7 @@ fn trailing_trivia_is_opaque(tree: &SyntaxTree, start: usize, end: usize) -> boo
             && node.span.start().get() < end
             && start < node.span.end().get()
     }) || tree.comments.iter().any(|comment| {
-        !comment.text.starts_with(';')
+        !comment.span.slice(tree.source()).starts_with(';')
             && comment.span.start().get() < end
             && start < comment.span.end().get()
     })

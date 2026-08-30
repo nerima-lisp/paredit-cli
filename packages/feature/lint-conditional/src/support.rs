@@ -11,7 +11,7 @@
 //! steps, not tree-many — and every rule here calls it *only once it already
 //! has a finding to report*.
 //!
-//! The two counters in [`QuoteState`] are not interchangeable and a single
+//! The two counters in `QuoteState` are not interchangeable and a single
 //! `i32` depth counter is wrong for both: a comma inside `'(…)` is a comma
 //! character in a literal list, so `hard` never clears, while a comma inside
 //! `` `(…) `` escapes back to code, so `quasi` counts up and down. A node one

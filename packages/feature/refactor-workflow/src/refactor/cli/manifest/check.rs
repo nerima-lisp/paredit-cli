@@ -24,6 +24,11 @@ pub fn build_refactor_check_result(
 
     let manifest_policy_passed = manifest.policy_passed;
     let manifest_outputs_parse = manifest.all_outputs_parse;
+    // Deliberately not converted to the `analyze_files_raw` partial-failure
+    // pattern used elsewhere in this branch: fail-fast is load-bearing here,
+    // since `can_apply` gates whether `refactor apply` is safe to run, and a
+    // manifest entry that couldn't even be read must not silently drop out of
+    // that verdict rather than fail it.
     let mut files = Vec::with_capacity(manifest.files.len());
     let mut source_bytes = 0_u64;
 

@@ -341,5 +341,5 @@ rule	contains-on-non-associative	0
 rule	reference-type-operator-mismatch	0
 rule	macro-body-destroys-argument-form	0
 rule	macrolet-expander-captures-lexical-variable	0
-finding	redundant-quote	warning	suspicious	fixable=true	suppressed.lisp	338	quoting number 6 is redundant	redundant-quote/07bb8007b4863bf0/0
+finding	redundant-quote	warning	suspicious	fixable=true	suppressed.lisp	337	quoting number 6 is redundant	redundant-quote/07bb8007b4863bf0/0
 finding	declarative-style-score	warning	suspicious	fixable=false	suppressed.lisp	0	this file's declarative-style score is 0% (5 top-level forms), below the 80% threshold	declarative-style-score/2f534fdd67304360/0

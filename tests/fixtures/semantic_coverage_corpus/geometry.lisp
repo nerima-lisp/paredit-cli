@@ -1,6 +1,7 @@
 (in-package :cl-user)
 
-(defconstant +pi-approx+ 3.14159)
+(defconstant +pi-approx+
+  3.14159)
 
 (defun circle-area (radius)
   (let ((r2 (* radius radius)))

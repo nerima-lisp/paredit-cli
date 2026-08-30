@@ -10,7 +10,7 @@
 //!
 //! Layout follows the usual split — [`model`] for the vocabulary, [`policy`]
 //! for decisions that need no tree, [`engine`] for the pass, [`registry`] for
-//! the catalogue, and [`rules`] for the rules themselves.
+//! the catalogue, and `rules` for the rules themselves.
 
 // Phase 2 facade (section 4.1). engine/model/policy/rule now live in
 // `paredit-core-lint-engine`; `registry` and `rules` stay here, because a

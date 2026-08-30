@@ -38,11 +38,13 @@ pub struct SyntaxTree {
 /// metadata the formatter needs to re-emit it without losing information.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(in crate::sexpr) struct Comment {
-    /// Byte range of the comment in the original source.
+    /// Byte range of the comment in the original source (`; ...`, `#| ... |#`,
+    /// `#; <form>`, or `#_<form>`), trailing whitespace preserved as parsed.
+    ///
+    /// The comment's own text is not stored here: `SyntaxTree` already owns
+    /// `source` for the tree's whole lifetime, so `text` is sliced from it on
+    /// demand instead of being duplicated into a `String` at parse time.
     pub(in crate::sexpr) span: ByteSpan,
-    /// Exact comment text (`; ...`, `#| ... |#`, `#; <form>`, or `#_<form>`),
-    /// trailing whitespace preserved as parsed.
-    pub(in crate::sexpr) text: String,
     /// `true` when only whitespace precedes the comment on its source line, i.e.
     /// it stands on its own line rather than trailing code.
     pub(in crate::sexpr) own_line: bool,
@@ -596,7 +598,7 @@ impl SyntaxTree {
     /// zero with `(` — the shape essentially every top-level form in
     /// formatted Lisp source has — and re-parsing from there, so every
     /// problem in the document is visible in one pass. Bounded at
-    /// [`MAX_RECOVERED_ERRORS`] so a pathological input (a syntax error on
+    /// `MAX_RECOVERED_ERRORS` so a pathological input (a syntax error on
     /// every line) does a bounded amount of work and produces a bounded
     /// report rather than one entry per line of a huge file.
     ///
@@ -735,9 +737,10 @@ impl SyntaxTree {
     /// parser's own record is the only way to ask "is this text a comment?"
     /// without re-lexing the file and getting string literals wrong.
     pub fn comments(&self) -> impl Iterator<Item = SourceComment<'_>> {
-        self.comments.iter().map(|comment| SourceComment {
+        let source = self.source();
+        self.comments.iter().map(move |comment| SourceComment {
             span: comment.span,
-            text: comment.text.as_str(),
+            text: comment.span.slice(source),
             own_line: comment.own_line,
         })
     }

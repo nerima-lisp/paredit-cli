@@ -192,9 +192,9 @@ impl Formatter {
                 // The distinguished argument: stays on the head line
                 // when it fits, breaks to distinguished_column (+4) when
                 // it does not.
-                output.push(' ');
-                let col = Self::last_line_width(output);
+                let col = Self::last_line_width(output).saturating_add(1);
                 if let Some(inline) = self.compact_node(tree, *child, col) {
+                    output.push(' ');
                     output.push_str(&inline);
                 } else {
                     Self::break_to_column(distinguished_column, output);

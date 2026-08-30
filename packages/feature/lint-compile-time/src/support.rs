@@ -17,7 +17,7 @@
 //!   down.
 //!
 //! That distinction is not incidental here, it is the whole of
-//! [`crate::macro_helper_not_compile_time`]: a helper called from a macro's
+//! `crate::macro_helper_not_compile_time`: a helper called from a macro's
 //! quasiquote *template* runs at the expansion's run time and needs nothing at
 //! compile time, while the same call one comma deeper runs at macroexpansion
 //! time and does. Both were checked against SBCL 2.6.0 and behave exactly that
@@ -67,7 +67,7 @@
 //! # `scratch_cache` is deliberately not used
 //!
 //! `RuleContext::scratch_cache` looks like the right home for
-//! [`crate::macro_helper_not_compile_time`]'s per-file set of same-file
+//! `crate::macro_helper_not_compile_time`'s per-file set of same-file
 //! `defun` names. It is not usable: the slot holds **one type per file's
 //! pass**, `paredit-feature-lint-repl-debug` already stores its evaluated-forms
 //! walk there (`packages/feature/lint-repl-debug/src/support.rs:612`), and a

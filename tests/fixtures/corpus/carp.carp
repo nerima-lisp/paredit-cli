@@ -1,50 +1,61 @@
 ;; Carp: a statically typed Lisp. Type signatures beside definitions, modules
 ;; that own their type's functions, borrowed references with `&`, copies with
 ;; `@`, and flat-pair `cond` ending in a default expression.
-
 (load "Test.carp")
 
-(deftype Account [id String, balance Int])
+(deftype Account [id String balance Int])
 
 (defmodule Account
-  (doc rich? "Whether the account holds more than the given amount.")
-  (sig rich? (Fn [&Account Int] Bool))
-  (defn rich? [account amount]
-    (> @(balance account) amount))
-
-  (sig label (Fn [&Account] String))
-  (defn label [account]
-    (fmt "%s:%d" (id account) @(balance account)))
-
-  (sig withdraw (Fn [Account Int] Account))
-  (defn withdraw [account amount]
-    (let [current @(balance &account)]
-      (set-balance account (- current amount)))))
+           (doc rich? "Whether the account holds more than the given amount.")
+           (sig rich? (Fn [&Account Int] Bool))
+           (defn rich? [account amount] (> @(balance account) amount))
+           (sig label (Fn [&Account] String))
+           (defn label [account] (fmt "%s:%d" (id account) @(balance account)))
+           (sig withdraw (Fn [Account Int] Account))
+           (defn withdraw
+                 [account amount]
+                 (let [current @(balance &account)]
+                   (set-balance account (- current amount)))))
 
 (sig classify (Fn [Int] String))
-(defn classify [n]
-  (cond
-    (< n 0) @"negative"
-    (= n 0) @"zero"
-    (> n 100) @"large"
-    @"positive"))
+
+(defn classify
+      [n]
+      (cond
+        (<
+          n
+          0)
+        @"negative"
+        (=
+          n
+          0)
+        @"zero"
+        (>
+          n
+          100)
+        @"large"
+        @"positive"))
 
 (sig total (Fn [&(Array Account)] Int))
-(defn total [accounts]
-  (let-do [running 0]
-    (foreach [account accounts]
-      (set! running (+ running @(Account.balance account))))
-    running))
 
-(defndynamic repeat-form [n form]
-  (if (= n 0)
-    '()
-    (cons form (repeat-form (- n 1) form))))
+(defn total
+      [accounts]
+      (let-do [running 0]
+              (foreach [account accounts]
+                       (set! running (+ running @(Account.balance account))))
+              running))
 
-(defn main []
-  (let [accounts [(Account.init @"alpha" 10)
-                  (Account.init @"beta" 250)]]
-    (do
-      (IO.println &(classify (total &accounts)))
-      (foreach [account &accounts]
-        (IO.println &(Account.label account))))))
+(defndynamic repeat-form
+             [n form]
+             (if (= n 0)
+                 '()
+                 (cons form (repeat-form (- n 1) form))))
+
+(defn main
+      []
+      (let [accounts [(Account.init @"alpha" 10) (Account.init @"beta" 250)]]
+        (do (IO.println
+             &(classify (total &accounts)))
+          (foreach
+            [account &accounts]
+            (IO.println &(Account.label account))))))

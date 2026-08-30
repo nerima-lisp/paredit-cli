@@ -200,7 +200,7 @@ pub struct SchemaDef {
 /// Reads every `(defschema ...)` in one file's text.
 ///
 /// `path` names the file only for the diagnostics; nothing is read from disk
-/// here, matching [`paredit_feature_migrate::recipe::parse_recipes`]'s own
+/// here, matching `paredit_feature_migrate::recipe::parse_recipes`'s own
 /// contract, so a built-in schema and a user's file would go through one code
 /// path and fail the same way.
 pub fn parse_schemas(text: &str, path: &str) -> Result<Vec<SchemaDef>, DslError> {

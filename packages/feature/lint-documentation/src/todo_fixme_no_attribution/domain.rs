@@ -50,7 +50,7 @@ use crate::support::comment_prose;
 const MARKERS: [&str; 5] = ["FIXME", "XXX", "BUG", "HACK", "TODO"];
 
 /// The attribution shapes this rule accepts, as documentation. The predicate
-/// is [`has_attribution`]; this list is what it is asserted against.
+/// is `has_attribution`; this list is what it is asserted against.
 ///
 /// | Shape | Example |
 /// | --- | --- |

@@ -10,8 +10,8 @@
       "rule": "redundant-quote",
       "severity": "warning",
       "span": {
-        "end": 340,
-        "start": 338
+        "end": 339,
+        "start": 337
       }
     },
     {
@@ -23,7 +23,7 @@
       "rule": "declarative-style-score",
       "severity": "warning",
       "span": {
-        "end": 500,
+        "end": 498,
         "start": 0
       }
     }

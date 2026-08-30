@@ -43,7 +43,7 @@
 //! positive-literal REPEAT buys, and it is linear precisely because
 //! `root_view()` is linear in the file.
 //!
-//! [`repeats`] is therefore load-bearing for cost as well as for correctness:
+//! `repeats` is therefore load-bearing for cost as well as for correctness:
 //! it is the last check that can reject without reaching the root. Across GNU
 //! Emacs's `lisp/` tree plus 2585 third-party files there are 500 timer call
 //! sites and only **33** carry a positive literal REPEAT, so the expensive

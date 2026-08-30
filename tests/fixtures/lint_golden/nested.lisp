@@ -1,9 +1,9 @@
 ;; nested.lisp — nested/overlapping forms that exercise fix ordering and
 ;; fixpoint convergence (a fix on an outer form unlocking a fix on what the
 ;; rewrite exposes, across several `--fix` passes within one run).
-
 (defun converges-through-progn-then-boolean ()
-  (progn (or x)))
+  (progn
+    (or x)))
 
 (defun triple-nested-when (a b c)
   (when a
@@ -22,7 +22,9 @@
     a
     (progn
       b
-      (progn c d))
+      (progn
+        c
+        d))
     e))
 
 (defun overlapping-cxr (x)
@@ -38,8 +40,11 @@
   (and p (and q (or r (or p q)))))
 
 (defun nested-quote-inside-progn ()
-  (progn '5))
+  (progn
+    '5))
 
 (defun stacked-redundant-lets ()
   (let* ((a 1))
-    (let () (progn a))))
+    (let ()
+      (progn
+        a))))

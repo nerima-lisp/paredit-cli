@@ -268,7 +268,7 @@ pub fn is_unevaluated_at(tree: &SyntaxTree, target: ByteSpan) -> bool {
 ///
 /// The chain starts at the top-level form rather than at the virtual document
 /// root, because materializing the root is what made this whole-file work (see
-/// [`root_child_containing`]). Nothing is lost: the root is
+/// `root_child_containing`). Nothing is lost: the root is
 /// [`ExpressionKind::Root`], so `list_head` of it is `None`, and both consumers
 /// read the chain only through `list_head` — a `with-…`/`unwind-protect` test
 /// and a `let`/`let*` test, neither of which the root could ever satisfy. A

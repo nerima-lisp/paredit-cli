@@ -58,6 +58,14 @@ pub enum ProjectAnalysisError {
 
     #[error(transparent)]
     Workspace(#[from] WorkspaceAnalysisError),
+
+    // `analyze_files` reads and parses each file itself, ahead of the
+    // per-file analysis this crate contributes; this is that read/parse
+    // failure crossing into the closure's own error type so a single
+    // unreadable file among many is data for the report rather than an
+    // error `analyze_files` has no vocabulary to carry.
+    #[error(transparent)]
+    Io(#[from] paredit_core_cli::CliError),
 }
 
 /// The result type the project-analysis passes return.
@@ -75,6 +83,7 @@ paredit_core_cli::impl_classified_refusal!(ProjectAnalysisError, |error| match e
     ProjectAnalysisError::Definitions(definitions) =>
         paredit_feature_remove_unused::error::code_of(definitions),
     ProjectAnalysisError::Workspace(_) => paredit_core_cli::diagnosis::ErrorCode::RefusalWorkspace,
+    ProjectAnalysisError::Io(io) => paredit_core_cli::diagnosis::code_for_cli_error(io),
 });
 
 // A workspace analysis failure names the file it stopped on; the failure

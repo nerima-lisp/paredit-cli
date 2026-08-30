@@ -241,6 +241,15 @@ fn formats_common_lisp_prefix_body_forms() {
 }
 
 #[test]
+fn prefix_body_break_does_not_leave_trailing_whitespace() {
+    let input = "(unwind-protect (restart-case (perform-a-very-long-operation) (retry () (perform-a-very-long-operation))) (cleanup))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let formatted = Formatter::new(2).with_max_width(40).format(&tree);
+
+    assert!(formatted.lines().all(|line| line.trim_end() == line));
+}
+
+#[test]
 fn formats_common_lisp_with_body_macros() {
     let input = "(with-input-from-string (stream text) (read stream) (finish stream))\n(with-output-to-string (stream) (write value :stream stream) (finish-output stream))\n(with-hash-table-iterator (next table) (multiple-value-bind (more key value) (next) (when more (collect key value))))\n(with-package-iterator (next package :internal :external) (multiple-value-bind (more symbol status package) (next) (when more (collect symbol status package))))";
     let tree = SyntaxTree::parse(input).expect("valid");

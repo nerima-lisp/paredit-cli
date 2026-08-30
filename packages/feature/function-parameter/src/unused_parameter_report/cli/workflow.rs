@@ -9,23 +9,21 @@ use crate::unused_parameter_report::usecase::{
     evaluate_unused_parameter_policy,
 };
 use paredit_core_cli::args::DialectArg;
-use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::{analyze_files, note_partial_file_failures, total_file_failure};
 use paredit_core_cli::{CliResult, CommandResult};
 use paredit_core_workspace::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
 
 pub fn unused_parameter_report(args: UnusedParameterReportArgs) -> CommandResult {
     let files = expand_unused_parameter_report_inputs(&args.files, args.dialect)?;
-    let mut reports = Vec::with_capacity(files.len());
-
-    for file in &files {
-        let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        reports.push(build_unused_parameter_report(
-            file.clone(),
-            dialect,
-            &tree,
-            &input.text,
-        )?);
+    // A file that will not parse is reported, not fatal — see `query find`.
+    let analysis = analyze_files(&files, args.dialect, |file, dialect, tree, input| {
+        build_unused_parameter_report(file.to_path_buf(), dialect, tree, &input.text)
+    });
+    if analysis.is_total_failure() {
+        return Err(total_file_failure(analysis.failed).into());
     }
+    note_partial_file_failures(&analysis.failed);
+    let reports = analysis.succeeded;
 
     let policy = evaluate_unused_parameter_policy(
         UnusedParameterReportPolicyOptions::new(args.fail_on_unused),

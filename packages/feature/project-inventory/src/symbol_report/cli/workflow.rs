@@ -1,6 +1,9 @@
-use paredit_core_cli::CommandResult;
+use paredit_core_cli::{CliResult, CommandResult};
 
-use paredit_core_cli::shared::{matching_symbol_occurrences, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{
+    analyze_files, matching_symbol_occurrences, note_partial_file_failures,
+    read_input_dialect_and_tree, total_file_failure,
+};
 
 use super::args::{SymbolQueryArgs, SymbolReportArgs};
 use super::render::{print_symbol_occurrences, print_symbol_report};
@@ -23,12 +26,9 @@ fn require_occurrences(found: usize, required: Option<usize>) -> CommandResult {
 }
 
 pub fn symbol_report(args: SymbolReportArgs) -> CommandResult {
-    let mut reports = Vec::with_capacity(args.files.len());
-
-    for file in &args.files {
-        let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+    let analysis = analyze_files(&args.files, args.dialect, |file, dialect, tree, _| {
         let outline = tree.outline(|head| dialect.is_definition_head(head));
-        let occurrences = matching_symbol_occurrences(&tree, &args.symbol)
+        let occurrences = matching_symbol_occurrences(tree, &args.symbol)
             .into_iter()
             .map(|occurrence| SymbolReportOccurrence {
                 path: occurrence.path.to_string(),
@@ -46,12 +46,17 @@ pub fn symbol_report(args: SymbolReportArgs) -> CommandResult {
             })
             .collect::<Vec<_>>();
 
-        reports.push(SymbolReportFile {
-            path: file.clone(),
+        CliResult::Ok(SymbolReportFile {
+            path: file.to_path_buf(),
             dialect,
             occurrences,
-        });
+        })
+    });
+    if analysis.is_total_failure() {
+        return Err(total_file_failure(analysis.failed).into());
     }
+    note_partial_file_failures(&analysis.failed);
+    let reports = analysis.succeeded;
 
     let occurrence_count = reports
         .iter()

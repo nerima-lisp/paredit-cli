@@ -26,7 +26,7 @@
 //!
 //! # Quote semantics
 //!
-//! [`QuoteState`] and [`for_each_evaluated_subview`] are copied from
+//! `QuoteState` and [`for_each_evaluated_subview`] are copied from
 //! `paredit-feature-lint-condition-system`'s `support.rs`, tests included,
 //! deliberately as a copy rather than as a dependency: a lint feature package
 //! depending on another lint feature package would be a new feature→feature

@@ -45,7 +45,7 @@ pub struct FormSite {
     /// True inside a `` ` ``/`(quasiquote …)` region that no `,`/`,@` escapes,
     /// and true unconditionally inside a `'`/`(quote …)` region — a comma there
     /// escapes nothing, because there is no backquote for it to escape. See
-    /// [`QuoteState`]. A `(defmethod …)` inside quoted data defines no method,
+    /// `QuoteState`. A `(defmethod …)` inside quoted data defines no method,
     /// and a rule that flags one is reporting on a list literal.
     pub quoted: bool,
     /// Whether the match *is* one of the file's top-level forms.

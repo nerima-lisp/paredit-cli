@@ -34,6 +34,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::thread;
 
 use serde_json::{Value, json};
 
@@ -382,49 +383,101 @@ fn read_entry(entry: &Value) -> Option<CachedDiscovery> {
     })
 }
 
+/// Below this many entries, a thread costs more than the stats it would save.
+///
+/// Each item here is one `fs::metadata` call, or for a directory one
+/// `fs::read_dir(...).count()` — cheap enough that thread setup can dominate
+/// the work it was meant to parallelize. `benches/cache_dir.rs`'s
+/// `cache-dir/warm/128` arm (8 directories, the previous threshold) measured
+/// threading at that count as ~37% *slower* than the serial path; `warm/1024`
+/// (64 directories) measured a ~28% win. This constant sits at the larger,
+/// confirmed-safe end rather than guessing at the crossover between them.
+const PARALLEL_VALIDATION_THRESHOLD: usize = 64;
+
 fn directories_are_unchanged(entry: &Value) -> bool {
     let Some(directories) = entry["directories"].as_array() else {
         return false;
     };
-    directories.iter().all(|directory| {
-        let Some(path) = directory["path"].as_str() else {
-            return false;
-        };
-        let path = Path::new(path);
-        let Ok(metadata) = fs::metadata(path) else {
-            return false;
-        };
-        if !metadata.is_dir() {
-            return false;
-        }
-        let recorded = directory["modified_nanos"].as_str();
-        let current = metadata
-            .modified()
-            .ok()
-            .and_then(|modified| modified.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|elapsed| elapsed.as_nanos().to_string());
-        if recorded.map(str::to_owned) != current {
-            return false;
-        }
-        // The entry count is not redundant with the mtime. Many filesystems
-        // record it at one-second granularity, so a file created and another
-        // deleted within the same second leaves the timestamp untouched.
-        let Some(recorded_count) = directory["entry_count"].as_u64() else {
-            return false;
-        };
-        fs::read_dir(path).is_ok_and(|entries| entries.count() as u64 == recorded_count)
-    })
+    all_parallel(directories, directory_is_unchanged)
+}
+
+fn directory_is_unchanged(directory: &Value) -> bool {
+    let Some(path) = directory["path"].as_str() else {
+        return false;
+    };
+    let path = Path::new(path);
+    let Ok(metadata) = fs::metadata(path) else {
+        return false;
+    };
+    if !metadata.is_dir() {
+        return false;
+    }
+    let recorded = directory["modified_nanos"].as_str();
+    let current = metadata
+        .modified()
+        .ok()
+        .and_then(|modified| modified.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|elapsed| elapsed.as_nanos().to_string());
+    if recorded.map(str::to_owned) != current {
+        return false;
+    }
+    // The entry count is not redundant with the mtime. Many filesystems
+    // record it at one-second granularity, so a file created and another
+    // deleted within the same second leaves the timestamp untouched.
+    let Some(recorded_count) = directory["entry_count"].as_u64() else {
+        return false;
+    };
+    fs::read_dir(path).is_ok_and(|entries| entries.count() as u64 == recorded_count)
 }
 
 fn ignore_files_are_unchanged(entry: &Value) -> bool {
     let Some(ignore_files) = entry["ignore_files"].as_array() else {
         return false;
     };
-    ignore_files.iter().all(|ignore| {
-        let Some(path) = ignore["path"].as_str() else {
-            return false;
-        };
-        ignore["stamp"].as_str() == file_stamp(Path::new(path)).as_deref()
+    all_parallel(ignore_files, ignore_file_is_unchanged)
+}
+
+fn ignore_file_is_unchanged(ignore: &Value) -> bool {
+    let Some(path) = ignore["path"].as_str() else {
+        return false;
+    };
+    ignore["stamp"].as_str() == file_stamp(Path::new(path)).as_deref()
+}
+
+/// Whether `predicate` holds for every element of `items`.
+///
+/// Below [`PARALLEL_VALIDATION_THRESHOLD`], this is `Iterator::all` with its
+/// short-circuit-on-first-false intact. Above it, `items` is split into one
+/// contiguous chunk per worker and each chunk is validated on its own thread;
+/// `predicate` reads only its own argument (one `fs::metadata`, and for a
+/// directory one `fs::read_dir(...).count()`), so no chunk touches another's
+/// state. A parallel run may do marginally more stat work than a serial
+/// short-circuit would when an early entry is already stale, since every
+/// chunk still runs to completion — an accepted tradeoff for validating a
+/// workspace with tens of thousands of entries on every cache-freshness
+/// check.
+fn all_parallel<T: Sync>(items: &[T], predicate: impl Fn(&T) -> bool + Sync) -> bool {
+    if items.len() < PARALLEL_VALIDATION_THRESHOLD {
+        return items.iter().all(&predicate);
+    }
+    let workers = paredit_core_safety::limits::effective_jobs_or_available()
+        .get()
+        .min(items.len())
+        .max(1);
+    if workers <= 1 {
+        return items.iter().all(&predicate);
+    }
+    let chunk_size = items.len().div_ceil(workers);
+    let predicate = &predicate;
+    thread::scope(|scope| {
+        let handles = items
+            .chunks(chunk_size)
+            .map(|chunk| scope.spawn(move || chunk.iter().all(predicate)))
+            .collect::<Vec<_>>();
+        handles.into_iter().all(|handle| match handle.join() {
+            Ok(result) => result,
+            Err(payload) => std::panic::resume_unwind(payload),
+        })
     })
 }
 

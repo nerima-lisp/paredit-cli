@@ -209,10 +209,7 @@ pub fn dot(graph: &Graph) -> String {
 }
 
 fn dot_node(ids: &BTreeMap<&str, String>, node: &Node) -> String {
-    let id = ids
-        .get(node.label.as_str())
-        .cloned()
-        .unwrap_or_else(|| "n?".to_owned());
+    let id = ids.get(node.label.as_str()).map_or("n?", String::as_str);
     let shape = match node.shape {
         NodeShape::Definition => "box",
         NodeShape::External => "ellipse",
@@ -283,10 +280,7 @@ pub fn mermaid(graph: &Graph) -> String {
 }
 
 fn mermaid_node(ids: &BTreeMap<&str, String>, node: &Node) -> String {
-    let id = ids
-        .get(node.label.as_str())
-        .cloned()
-        .unwrap_or_else(|| "n0".to_owned());
+    let id = ids.get(node.label.as_str()).map_or("n0", String::as_str);
     let label = mermaid_text(&node.label);
     match node.shape {
         NodeShape::Definition => format!("{id}[\"{label}\"]"),

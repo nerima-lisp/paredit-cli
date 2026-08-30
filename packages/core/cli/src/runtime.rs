@@ -148,7 +148,7 @@ pub struct RuntimeSettings {
     /// `None` keeps the existing strict-UTF-8 read path. Read-only commands
     /// work normally against a legacy (Shift_JIS, EUC-JP, ISO-8859-1, ...)
     /// source file once this is set; a write is refused instead of silently
-    /// re-encoding the file to UTF-8 — see [`writes_are_supported`].
+    /// re-encoding the file to UTF-8 — see `writes_are_supported`.
     pub source_encoding: Option<&'static encoding_rs::Encoding>,
 }
 
