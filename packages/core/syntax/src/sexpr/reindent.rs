@@ -31,7 +31,7 @@ use super::types::{ByteOffset, ByteSpan, NodeId};
 /// The count is what `lisp-indent-function` calls the form's "number of
 /// distinguished arguments": `defun` has two (name and lambda list), `when` has
 /// one (the test), `progn` has none.
-const BODY_FORMS: [(&str, usize); 70] = [
+const BODY_FORMS: [(&str, usize); 71] = [
     // ── Definition forms ──
     ("defun", 2),
     ("defmacro", 2),
@@ -111,8 +111,11 @@ const BODY_FORMS: [(&str, usize); 70] = [
     ("save-current-buffer", 0),
     ("track-mouse", 0),
     ("while", 1),
+    ("with-current-buffer", 1),
     ("condition-case", 2),
 ];
+
+const IF_FORMS: [&str; 3] = ["if", "if-let", "if-let*"];
 
 /// How many distinguished arguments `head` takes before its body, or `None`
 /// when the Emacs convention gives it no special layout.
@@ -235,12 +238,25 @@ impl SyntaxTree {
                 .get(self.node(child).symbol_offset as usize..)
         });
 
-        if let Some(distinguished) = head_text.and_then(body_form_distinguished) {
-            let position = node
-                .children
+        let position = || {
+            node.children
                 .binary_search_by_key(&content, |child| self.node(*child).span.start().get())
-                .ok();
-            return Some(match position {
+                .ok()
+        };
+
+        if head_text.is_some_and(|head| {
+            IF_FORMS
+                .iter()
+                .any(|if_form| if_form.eq_ignore_ascii_case(head))
+        }) {
+            return Some(match position() {
+                Some(1 | 2) => base + indent * 2,
+                _ => base + indent,
+            });
+        }
+
+        if let Some(distinguished) = head_text.and_then(body_form_distinguished) {
+            return Some(match position() {
                 Some(index) if index >= 1 && index <= distinguished => base + indent * 2,
                 _ => base + indent,
             });
@@ -350,6 +366,24 @@ mod tests {
         assert_eq!(
             reindent("(defun f\n  (x)\n      (list x))\n"),
             "(defun f\n    (x)\n  (list x))\n"
+        );
+    }
+
+    #[test]
+    fn emacs_lisp_buffer_and_conditional_forms_match_indent_region() {
+        assert_eq!(
+            reindent("(with-current-buffer buffer\n          (foo)\n          (bar))\n"),
+            "(with-current-buffer buffer\n  (foo)\n  (bar))\n"
+        );
+        assert_eq!(
+            reindent(
+                "(if-let ((buffer (get-buffer \"x\")))\n        (move-overlay overlay 1 2 buffer)\n        (delete-overlay overlay))\n"
+            ),
+            "(if-let ((buffer (get-buffer \"x\")))\n    (move-overlay overlay 1 2 buffer)\n  (delete-overlay overlay))\n"
+        );
+        assert_eq!(
+            reindent("(if-let* ((a 1) (b 2))\n        (foo)\n        (bar))\n"),
+            "(if-let* ((a 1) (b 2))\n    (foo)\n  (bar))\n"
         );
     }
 

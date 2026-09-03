@@ -187,10 +187,12 @@ impl Formatter {
             | "with-temp-buffer"
             | "track-mouse" => ListStyle::HeadBody,
             // indent 1 → one arg on head line, body indented
-            "while" | "when-let" | "when-let*" | "prog1" | "prog2" => ListStyle::OneArgumentBody,
+            "while" | "when-let" | "when-let*" | "with-current-buffer" | "prog1" | "prog2" => {
+                ListStyle::OneArgumentBody
+            }
             "condition-case" | "condition-case-unless-debug" => ListStyle::ConditionCase,
             // if in Elisp: test at +4 distinguished, then/else at body
-            "if" => ListStyle::If,
+            "if" | "if-let" | "if-let*" => ListStyle::If,
             // Elisp-specific clause forms
             "pcase" => ListStyle::CaseClauses,
             "cl-loop" => ListStyle::Loop,

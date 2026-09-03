@@ -27,6 +27,18 @@ fn formats_emacs_lisp_body_forms_like_emacs_indent_region() {
 }
 
 #[test]
+fn formats_emacs_lisp_buffer_and_conditional_forms_like_indent_region() {
+    let input = "(with-current-buffer buffer (foo) (bar))\n(if-let ((buffer (get-buffer \"x\"))) (move-overlay overlay 1 2 buffer) (delete-overlay overlay))\n(if-let* ((a 1) (b 2)) (foo) (bar))";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::EmacsLisp).expect("valid Elisp");
+    assert_eq!(
+        Formatter::with_dialect(2, Dialect::EmacsLisp)
+            .with_max_width(44)
+            .format(&tree),
+        "(with-current-buffer buffer\n  (foo)\n  (bar))\n\n(if-let ((buffer (get-buffer \"x\")))\n    (move-overlay overlay 1 2 buffer)\n  (delete-overlay overlay))\n\n(if-let* ((a 1) (b 2)) (foo)\n  (bar))\n"
+    );
+}
+
+#[test]
 fn formats_nested_emacs_lisp_special_forms_like_indent_region() {
     let input = "(defun load-facts (entry facts) (pcase entry (`(,(and (pred stringp) prev) ,(and (pred stringp) reading) ,(and (pred stringp) candidate)) `(study-association ,prev ,reading ,candidate)) (_ (error \"invalid\"))) (condition-case condition (prog1 (progn (clear) (dolist (fact facts) (publish fact))) (finish)) ((error quit) (rollback condition))) (cond ((missing-p) (missing)) ((invalid-p) (invalid))))";
     let tree = SyntaxTree::parse_with_dialect(input, Dialect::EmacsLisp).expect("valid Elisp");
