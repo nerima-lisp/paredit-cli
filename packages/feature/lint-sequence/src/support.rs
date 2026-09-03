@@ -4,7 +4,7 @@
 //!
 //! # Quote semantics
 //!
-//! `QuoteState`, `is_quote_form` and [`for_each_evaluated_subview`] are
+//! [`QuoteState`], [`is_quote_form`] and [`for_each_evaluated_subview`] are
 //! copied from `paredit-feature-lint-condition-system`'s `support.rs`, tests
 //! included, and [`is_unevaluated_at`] is copied from
 //! `paredit-feature-lint-testing`'s — deliberately as a copy rather than as a
@@ -206,7 +206,7 @@ pub fn is_unevaluated_at(tree: &SyntaxTree, target: ByteSpan) -> bool {
 /// exactly the macro bodies it exists to read. `'(nthcdr 0 x)` is a
 /// three-element list of symbols, and rewriting it to `'x` edits a user's *data
 /// literal* — which is why the verdict is read on the `hard` counter alone, and
-/// never on `QuoteState::is_data`.
+/// never on [`QuoteState::is_data`].
 ///
 /// The target's *own* reader prefixes count, and every rule guarded by this
 /// passes the span of the form it matched. That is deliberate: whether such a

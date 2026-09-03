@@ -1,27 +1,21 @@
-use paredit_core_cli::{CliResult, CommandResult};
+use paredit_core_cli::CommandResult;
 
 use crate::self_comparison::cli::args::SelfComparisonReportArgs;
 use crate::self_comparison::cli::render::print_self_comparison_report;
 use crate::self_comparison::usecase::{
     build_self_comparison_report, evaluate_fail_on_violation_policy,
 };
-use paredit_core_cli::shared::{
-    analyze_files_raw, note_partial_file_failures, read_input_dialect_and_tree, total_file_failure,
-};
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
 pub fn self_comparison_report(args: SelfComparisonReportArgs) -> CommandResult {
     // This command takes files, not directories: it never grew the directory
     // expansion its siblings have, and adding it here would be a user-visible
     // change of scope rather than a move onto the shared envelope.
-    let analysis = analyze_files_raw(&args.files, |file| {
+    let mut reports = Vec::with_capacity(args.files.len());
+    for file in &args.files {
         let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        CliResult::Ok(build_self_comparison_report(file, dialect, &tree)?)
-    });
-    if analysis.is_total_failure() {
-        return Err(total_file_failure(analysis.failed).into());
+        reports.push(build_self_comparison_report(file, dialect, &tree)?);
     }
-    note_partial_file_failures(&analysis.failed);
-    let reports = analysis.succeeded;
 
     let policy = evaluate_fail_on_violation_policy(args.fail_on_violation, &reports);
     let passed = policy.passed;

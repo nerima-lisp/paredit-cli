@@ -40,15 +40,15 @@
 //! binding of `step` to `x`. Naively visiting every list's children
 //! generically would report `(defun process (step x) ...)`'s lambda list as
 //! a leftover `step` call — `step` is a common loop-variable name, so this is
-//! not a hypothetical. `binding_position` names, for `defun`/`defmacro`/
+//! not a hypothetical. [`binding_position`] names, for `defun`/`defmacro`/
 //! `lambda`/`let`/`let*`/`flet`/`labels`/`macrolet`, exactly which child is a
-//! lambda-list or bindings-list, and `visit_bindings` walks it with rules
+//! lambda-list or bindings-list, and [`visit_bindings`] walks it with rules
 //! that never treat a name or parameter position as a candidate — only a
 //! `let`/`let*` binding's own init form, which is genuinely evaluated code.
 //!
 //! # A second trap: the matched head may not be the operator it names
 //!
-//! `binding_position` keeps a *binding-list* position from being misread as
+//! [`binding_position`] keeps a *binding-list* position from being misread as
 //! a call, but says nothing about the *body* of the same form. Under
 //! `(flet ((time (thunk) …)) (time fn))` the inner `(time fn)` is a call to
 //! the file's own local function, not to `cl:time` — and unwrapping it to
@@ -73,9 +73,9 @@
 //!   by a local-function binder is not detected.
 //! - **`do`/`do*`/`prog`/`prog*`/`multiple-value-bind`/`destructuring-bind`.**
 //!   These have the same call-shaped-binding ambiguity as the forms above but
-//!   are not in `binding_position`'s table, so a variable there named after
+//!   are not in [`binding_position`]'s table, so a variable there named after
 //!   a target debug head can still produce a false-positive *report*. Never a
-//!   false-positive *fix*: none of these heads is in `body_start`, so
+//!   false-positive *fix*: none of these heads is in [`body_start`], so
 //!   nothing inside one is ever [`RemovalSafety::Safe`].
 //! - **`flet`/`labels`/`macrolet` local function bodies.** Each binding
 //!   `(name lambda-list body...)` has its own implicit-progn body, but this
@@ -87,7 +87,7 @@
 //!   conservative under-approximation, never an unsafe removal.
 //! - **`&optional`/`&key` lambda-list default-value forms**, e.g. the `(foo)`
 //!   in `(x (foo))` within `(defun f (&optional (x (foo))) ...)`. A lambda
-//!   list is not descended into at all (see `BindingShape::LambdaList`), so
+//!   list is not descended into at all (see [`BindingShape::LambdaList`]), so
 //!   a leftover debug call there is silently missed — a false negative, not a
 //!   false positive.
 //! - **Vector/set reader literals** (`#(...)`, `#{...}`). Whether their
@@ -360,7 +360,7 @@ pub fn walk_evaluated_forms<'a>(
 /// seven rules ever reads past a candidate's immediate children (confirmed
 /// by grep across every `leftover_*::domain` module: the deepest access is
 /// `view.children.get(1)` / `.get(2)` read as atoms, never
-/// `.children[1].children`), so `shallow_clone` copies exactly one level —
+/// `.children[1].children`), so [`shallow_clone`] copies exactly one level —
 /// the matched node's own fields plus its immediate children's own fields —
 /// and replaces every grandchild with an empty `children` vec. A first
 /// attempt at this cache used a plain recursive `.clone()` here and
@@ -507,7 +507,7 @@ fn is_candidate_head(head: &str) -> bool {
 /// scanned-form denominator the standalone `inspect <rule>` commands report.
 ///
 /// The two are deliberately separate. `candidates` is filtered down to heads
-/// that could match (`CANDIDATE_HEADS`), but `scanned_form_count` counts
+/// that could match ([`CANDIDATE_HEADS`]), but `scanned_form_count` counts
 /// *every* node the walk visits, atoms included — which is what each rule's
 /// `collect_*` reported before the walk was shared, and what its
 /// `scanned_form_count` JSON/text field has always meant. Deriving the
@@ -592,11 +592,11 @@ pub fn compute_evaluated_forms(root: &ExpressionView) -> EvaluatedForms {
 ///
 /// 1. A first version stored each candidate with a plain `.clone()`, which
 ///    for an [`ExpressionView`] is a *whole-subtree* deep copy. See
-///    [`EvaluatedCandidate`]'s doc and `shallow_clone`.
+///    [`EvaluatedCandidate`]'s doc and [`shallow_clone`].
 /// 2. Even shallow, cloning at *every* call site still allocated far more
 ///    than the seven allocation-free walks it replaced — CI measured
 ///    +17.3%/+17.2%, worse than before the unification. See
-///    `CANDIDATE_HEADS`, the head-union filter that fixed it.
+///    [`CANDIDATE_HEADS`], the head-union filter that fixed it.
 ///
 /// With both corrections the clean path allocates nothing: no candidate is
 /// constructed unless its head could match a rule, so a file with nothing to

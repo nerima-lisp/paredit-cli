@@ -15,7 +15,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 2,
-                        "byteOffset": 337
+                        "byteOffset": 338
                       },
                       "insertedContent": {
                         "text": "6"
@@ -38,9 +38,9 @@
                 },
                 "region": {
                   "byteLength": 2,
-                  "byteOffset": 337,
+                  "byteOffset": 338,
                   "startColumn": 7,
-                  "startLine": 8
+                  "startLine": 9
                 }
               }
             }
@@ -63,7 +63,7 @@
                   "uri": "suppressed.lisp"
                 },
                 "region": {
-                  "byteLength": 498,
+                  "byteLength": 500,
                   "byteOffset": 0,
                   "startColumn": 1,
                   "startLine": 1

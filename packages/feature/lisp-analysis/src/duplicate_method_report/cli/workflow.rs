@@ -6,17 +6,15 @@ use crate::duplicate_method_report::usecase::{
     DuplicateMethodPolicyOptions, analyze_duplicate_methods, collect_declared_methods,
     evaluate_duplicate_method_policy,
 };
-use paredit_core_cli::shared::{analyze_files, note_partial_file_failures, total_file_failure};
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
 pub fn duplicate_method_report(args: DuplicateMethodReportArgs) -> CommandResult {
-    let analysis = analyze_files(&args.files, args.dialect, |file, dialect, tree, _input| {
-        collect_declared_methods(file, dialect, tree)
-    });
-    if analysis.is_total_failure() {
-        return Err(total_file_failure(analysis.failed).into());
+    let mut declared = Vec::new();
+
+    for file in &args.files {
+        let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+        declared.extend(collect_declared_methods(file, dialect, &tree)?);
     }
-    note_partial_file_failures(&analysis.failed);
-    let declared: Vec<_> = analysis.succeeded.into_iter().flatten().collect();
 
     let summary = analyze_duplicate_methods(&declared);
     let policy = evaluate_duplicate_method_policy(

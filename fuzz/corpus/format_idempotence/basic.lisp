@@ -1,2 +1,1 @@
-(defun f (x)
-  (+ x 1))
+(defun f (x) (+ x 1))

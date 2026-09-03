@@ -22,13 +22,13 @@
 //!
 //! One case gets help from the value layer: a Common Lisp `if` whose test is
 //! a `let`/`let*`-bound or `defconstant`-named constant the value layer has
-//! already proven. `if` itself is not in `policy`'s tables — nothing
+//! already proven. `if` itself is not in [`policy`]'s tables — nothing
 //! is — so ordinarily its every use defaults the verdict to `Unknown`, same as
 //! any other unrecognized head, and both branches are walked. When the test's
 //! value is provably known, the dead branch can never run, so it is skipped
 //! rather than charged against the definition's purity, and `if` no longer
 //! counts as an unresolved head. This is deliberately narrow: only two
-//! sources are trusted (see `resolve_constant`), and a test that is not one
+//! sources are trusted (see [`resolve_constant`]), and a test that is not one
 //! of them falls straight back to today's behavior, unchanged.
 
 mod policy;

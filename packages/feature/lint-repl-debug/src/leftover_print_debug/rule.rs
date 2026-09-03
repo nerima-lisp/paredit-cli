@@ -24,7 +24,7 @@ use paredit_core_syntax::sexpr::ExpressionView;
 /// The removal-safety analysis in [`crate::support`] establishes that deleting
 /// the call cannot change the *value* of its enclosing body. It cannot
 /// establish that the call was a debug leftover rather than the program's
-/// output, and in every dialect in `DIALECTS` the heads it matches are that
+/// output, and in every dialect in [`DIALECTS`] the heads it matches are that
 /// dialect's ordinary way to write to a stream: Scheme's `display`, Racket's
 /// `displayln`, Emacs Lisp's `message`, Clojure's `println`, Janet's, Fennel's
 /// and Hy's `print`, and — the case that looks most like a genuine debug

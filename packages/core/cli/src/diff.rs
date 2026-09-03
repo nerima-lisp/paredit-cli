@@ -48,7 +48,7 @@ pub struct DiffStat {
 
 /// Counts hunks and changed lines in a string [`unified_diff`] produced.
 ///
-/// Parses the rendered text rather than the internal `DiffOp` sequence:
+/// Parses the rendered text rather than the internal [`DiffOp`] sequence:
 /// `unified_diff` already has an "omitted, too large" fallback whose shape
 /// this must agree with too, and re-deriving these counts from the same
 /// text a caller can also print keeps the two forms of output from ever

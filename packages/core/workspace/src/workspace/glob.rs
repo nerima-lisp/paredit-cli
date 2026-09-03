@@ -59,7 +59,7 @@ impl GlobDecision {
 /// carries only what the pattern text itself got wrong.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum GlobParseError {
-    /// The pattern exceeded `MAX_PATTERN_BYTES`.
+    /// The pattern exceeded [`MAX_PATTERN_BYTES`].
     TooLong { actual: usize, maximum: usize },
     /// A `[` was never closed.
     UnterminatedClass,

@@ -8,7 +8,7 @@ use paredit_core_semantics::definition_reference::{
 };
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_needle;
 use paredit_core_syntax::dialect::Dialect;
-use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, SymbolName};
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, SymbolName, SyntaxTree};
 
 #[derive(Debug)]
 pub struct UnusedDefinitionItem {
@@ -36,12 +36,22 @@ pub fn collect_unused_definition_candidates(
         }
     }
 
-    let parsed_files: Vec<(&RemoveUnusedDefinitionInputFile, &ExpressionView)> =
-        files.iter().map(|file| (file, &file.root_view)).collect();
+    let parsed_files = files
+        .iter()
+        .map(|file| -> RemoveUnusedResult<_> {
+            let tree =
+                SyntaxTree::parse_with_dialect(&file.text, file.dialect).map_err(|source| {
+                    RemoveUnusedError::ParseFailed {
+                        path: file.path.display().to_string(),
+                        source,
+                    }
+                })?;
+            Ok((file, tree.root_view()))
+        })
+        .collect::<RemoveUnusedResult<Vec<_>>>()?;
 
     let package_form_spans: Vec<Vec<ByteSpan>> = parsed_files
         .iter()
-        .copied()
         .map(|(file, view)| {
             let mut spans = Vec::new();
             collect_package_form_spans(file.dialect, view, &mut spans);
@@ -50,7 +60,6 @@ pub fn collect_unused_definition_candidates(
         .collect();
     let atom_needles: Vec<std::collections::HashSet<String>> = parsed_files
         .iter()
-        .copied()
         .map(|(_, view)| {
             let mut needles = std::collections::HashSet::new();
             collect_reference_needles(view, &mut needles);
@@ -108,7 +117,7 @@ pub fn collect_unused_definition_candidates(
 
 fn file_unused_definition_candidates(
     files: &[RemoveUnusedDefinitionInputFile],
-    parsed_files: &[(&RemoveUnusedDefinitionInputFile, &ExpressionView)],
+    parsed_files: &[(&RemoveUnusedDefinitionInputFile, ExpressionView)],
     package_form_spans: &[Vec<ByteSpan>],
     atom_needles: &[std::collections::HashSet<String>],
     file_index: usize,
@@ -141,7 +150,7 @@ fn file_unused_definition_candidates(
                 .iter()
                 .enumerate()
                 .flat_map(|(other_index, other)| {
-                    let (_, other_view) = parsed_files[other_index];
+                    let (_, other_view) = &parsed_files[other_index];
                     let mut spans = Vec::new();
                     if atom_needles[other_index].contains(&needle) {
                         collect_symbol_references(

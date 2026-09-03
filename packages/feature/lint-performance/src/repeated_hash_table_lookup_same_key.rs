@@ -21,7 +21,7 @@
 //!
 //! - **Only one of them may run.** `(if p (gethash :a h) (gethash :a h))` is not
 //!   a repeat: exactly one arm executes. Every reported pair is checked with
-//!   `branches_are_exclusive`, which reads the conditional arms each lookup
+//!   [`branches_are_exclusive`], which reads the conditional arms each lookup
 //!   sits under. A lookup in an `if`'s *test* and one in its `then` arm are
 //!   still a pair, because whenever the arm runs the test ran.
 //!

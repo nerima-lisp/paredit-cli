@@ -3,7 +3,7 @@
 //!
 //! Nothing here runs per visited node. Every helper is called from inside a
 //! rule that has already matched its head, and the expensive one
-//! (`is_unevaluated_at`) is called only once a finding is otherwise ready to
+//! ([`is_unevaluated_at`]) is called only once a finding is otherwise ready to
 //! report — it descends from [`SyntaxTree::root_view`], which materializes the
 //! whole document, so calling it before the cheap head check costs orders of
 //! magnitude more per invocation than the check it guards.
@@ -40,7 +40,7 @@
 //! (`docs/Quasiquotation.md`), neither of which the reader recognizes as a
 //! prefix; that is a deliberate omission rather than an oversight, since
 //! recognizing them would make the interior of every `` ` `` template read as
-//! code and *add* findings on macro bodies. `QuoteState::quasi` therefore
+//! code and *add* findings on macro bodies. [`QuoteState::quasi`] therefore
 //! never counts back down for Carp, so everything textually inside a `` ` ``
 //! template reads as data. That suppresses findings rather than inventing
 //! them, which is the side to be wrong on.

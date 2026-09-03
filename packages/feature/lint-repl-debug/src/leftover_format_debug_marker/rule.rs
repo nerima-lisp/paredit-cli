@@ -16,7 +16,7 @@ use paredit_core_syntax::sexpr::ExpressionView;
 /// Report-only, deliberately, and for a reason distinct from its siblings: this
 /// rule's marker test is wrong, not just its safety argument.
 ///
-/// `super::domain::contains_debug_marker` requires a word boundary *before*
+/// [`super::domain::contains_debug_marker`] requires a word boundary *before*
 /// the marker and none after it. Its own doc gives `"UNDEBUGGABLE"` as the
 /// non-match, which holds only because the `U` precedes `DEBUG`. Nothing stops
 /// `DEBUG` from matching when it is the *start* of an ordinary word, so

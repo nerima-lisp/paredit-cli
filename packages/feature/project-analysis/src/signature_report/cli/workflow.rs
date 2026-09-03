@@ -5,25 +5,20 @@ use crate::signature_report::cli::render::print_signature_report;
 use crate::signature_report::usecase::{
     SignatureReportSource, build_signature_reports, evaluate_signature_report_policy,
 };
-use paredit_core_cli::CliResult;
-use paredit_core_cli::shared::{analyze_files, note_partial_file_failures, total_file_failure};
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
 pub fn signature_report(args: SignatureReportArgs) -> CommandResult {
     let symbol = args.symbol.as_ref();
+    let mut sources = Vec::with_capacity(args.files.len());
 
-    // A file that will not parse is reported, not fatal — see `query find`.
-    let analysis = analyze_files(&args.files, args.dialect, |file, dialect, tree, _| {
-        CliResult::Ok(SignatureReportSource {
-            path: file.to_path_buf(),
+    for file in &args.files {
+        let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+        sources.push(SignatureReportSource {
+            path: file.clone(),
             dialect,
-            tree: tree.clone(),
-        })
-    });
-    if analysis.is_total_failure() {
-        return Err(total_file_failure(analysis.failed).into());
+            tree,
+        });
     }
-    note_partial_file_failures(&analysis.failed);
-    let sources = analysis.succeeded;
 
     let reports = build_signature_reports(sources, symbol)?;
     let policy = evaluate_signature_report_policy(

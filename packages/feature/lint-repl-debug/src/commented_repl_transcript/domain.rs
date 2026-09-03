@@ -18,7 +18,7 @@
 //! # The heuristic, and why it stays conservative
 //!
 //! A block is a run of comment lines with nothing but a newline between them
-//! (no blank line, no code) — see `comment_blocks`. Within a block, a line
+//! (no blank line, no code) — see [`comment_blocks`]. Within a block, a line
 //! is prompt-shaped when its text (marker and leading space stripped) matches
 //! `[\w.*+-]+>\s...` (a package/prompt name, `>`, then the typed form) and
 //! result-shaped when it starts with `=>`. A block is flagged only when it

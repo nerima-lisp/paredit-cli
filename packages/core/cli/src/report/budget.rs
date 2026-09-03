@@ -91,13 +91,7 @@ impl Budget {
     /// papered over: the counts stay, and they are what a caller needs to
     /// decide how to narrow the request.
     pub fn apply(self, report: &mut Json, trimmable: &[&str]) -> Option<Truncation> {
-        // The one full serialization this function pays: every later step
-        // updates this byte count incrementally instead of reserializing the
-        // whole document again, which is what made this function cost
-        // O(document size) per halving step on a report with several large
-        // trimmable arrays.
-        let mut total_bytes = serde_json::to_string(report).map_or(0, |text| text.len());
-        if self.unlimited() || total_bytes.div_ceil(BYTES_PER_TOKEN) <= self.0 {
+        if self.unlimited() || approximate_tokens(report) <= self.0 {
             return None;
         }
 
@@ -116,7 +110,7 @@ impl Budget {
             // truncated list that still has a prefix is far more useful than
             // an empty one, and this converges in a handful of steps.
             loop {
-                if total_bytes.div_ceil(BYTES_PER_TOKEN) <= self.0 {
+                if approximate_tokens(report) <= self.0 {
                     break;
                 }
                 let Some(array) = report.get_mut(key).and_then(Json::as_array_mut) else {
@@ -125,22 +119,9 @@ impl Budget {
                 if array.is_empty() {
                     break;
                 }
-                let new_len = array.len() / 2;
-                // What halving removes from the document's serialized byte
-                // count: the dropped elements' own JSON (serialized as a
-                // slice, not the whole document), minus the two bracket
-                // characters that framed it as its own array, plus one
-                // boundary comma to reattach the surviving prefix to the
-                // array's closing bracket — except when nothing survives, in
-                // which case the array becomes `[]` and there is no comma to
-                // add back.
-                let dropped_slice =
-                    serde_json::to_string(&array[new_len..]).map_or(0, |text| text.len());
-                let boundary_comma = usize::from(new_len > 0);
-                total_bytes -= dropped_slice.saturating_sub(2) + boundary_comma;
-                array.truncate(new_len);
+                array.truncate(array.len() / 2);
             }
-            if total_bytes.div_ceil(BYTES_PER_TOKEN) <= self.0 {
+            if approximate_tokens(report) <= self.0 {
                 break;
             }
         }
@@ -158,7 +139,7 @@ impl Budget {
             .collect();
 
         Some(Truncation {
-            approximate_tokens: total_bytes.div_ceil(BYTES_PER_TOKEN),
+            approximate_tokens: approximate_tokens(report),
             budget: self.0,
             trimmed,
         })

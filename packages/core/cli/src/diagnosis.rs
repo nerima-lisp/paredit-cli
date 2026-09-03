@@ -495,7 +495,7 @@ pub struct Diagnosis {
     /// The byte position the failure names, when it names one.
     ///
     /// Populated from whichever typed variant already carries a position —
-    /// `ParseError` always does, a handful of [`StructureError`] and
+    /// [`ParseError`] always does, a handful of [`StructureError`] and
     /// [`SelectionError`] variants do — rather than by adding a span to every
     /// variant. A caller holding the source text can render a caret under it;
     /// [`render_caret`] does exactly that for the CLI's own stderr output.

@@ -50,7 +50,7 @@ use paredit_core_syntax::sexpr::ExpressionView;
 ///
 /// Three narrower remedies were measured and rejected:
 ///
-/// - **Narrowing `crate::leftover_inspect_call::domain::HEADS` to `inspect`
+/// - **Narrowing [`crate::leftover_inspect_call::domain::HEADS`] to `inspect`
 ///   alone.** That drops 2,382 of 2,388 findings and leaves 6 — all of which
 ///   are `cl-cc:inspect`/`cl-cc/debug:inspect`, a *user's own* debug library,
 ///   flagged inside that library's own test file. Narrowing leaves a rule with

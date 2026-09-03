@@ -65,12 +65,11 @@ pub fn collect_explicit_replace_call_sites(
             }
             .into());
         }
-        let site =
-            replace_call_site_from_view(&view, dialect, input, || path.to_string(), from, to)
-                .ok_or_else(|| CallSiteError::NotACall {
-                    path: path.to_string(),
-                    function: from.to_string(),
-                })?;
+        let site = replace_call_site_from_view(&view, dialect, input, path.to_string(), from, to)
+            .ok_or_else(|| CallSiteError::NotACall {
+            path: path.to_string(),
+            function: from.to_string(),
+        })?;
         calls.push(site);
     }
     calls.sort_by_key(|site| site.head_span.start());
@@ -136,7 +135,7 @@ fn collect_replace_call_sites_from_view(
             view,
             ctx.dialect,
             ctx.input,
-            || path.to_string(),
+            path.to_string(),
             ctx.from,
             ctx.to,
         ) {

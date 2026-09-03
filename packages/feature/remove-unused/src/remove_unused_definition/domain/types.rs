@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use paredit_core_syntax::definition::DefinitionCategory;
 use paredit_core_syntax::dialect::Dialect;
-use paredit_core_syntax::sexpr::{AtomOccurrence, ByteSpan, ExpressionView};
+use paredit_core_syntax::sexpr::{AtomOccurrence, ByteSpan};
 use paredit_feature_package::package_report::domain::PackageDefinitionReport;
 
 #[derive(Debug, Clone)]
@@ -13,13 +13,6 @@ pub struct RemoveUnusedDefinitionInputFile {
     pub definitions: Vec<UnusedDefinitionDefinition>,
     pub atoms: Vec<AtomOccurrence>,
     pub text: String,
-    /// The root view from the parse this file was already loaded with.
-    ///
-    /// Kept alongside `text` rather than instead of it: `text` is still read
-    /// directly for substring reference-needle scans, but this is what saves
-    /// `collect_unused_definition_candidates` from re-parsing `text` from
-    /// scratch just to get a view it already had once.
-    pub root_view: ExpressionView,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

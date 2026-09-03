@@ -49,7 +49,7 @@ pub struct DefpackageQuotedItem {
     pub span: ByteSpan,
     /// The clause keyword, lowercased (`:export`, ...).
     ///
-    /// One of `DESIGNATOR_CLAUSES`, so it is `&'static str` rather than the
+    /// One of [`DESIGNATOR_CLAUSES`], so it is `&'static str` rather than the
     /// spelling read from the source: the set is closed and the report leads
     /// each row with it.
     pub clause: &'static str,

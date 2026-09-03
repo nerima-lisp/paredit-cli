@@ -1,4 +1,4 @@
-use paredit_core_cli::shared::{analyze_files, note_partial_file_failures, total_file_failure};
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 use paredit_core_cli::{CliResult, CommandResult};
 use std::collections::BTreeSet;
 use std::fs;
@@ -14,16 +14,17 @@ use paredit_core_workspace::workspace::{WorkspaceDiscoveryOptions, discover_work
 
 pub fn unused_local_callable_report(args: UnusedLocalCallableReportArgs) -> CommandResult {
     let files = expand_unused_local_callable_report_inputs(&args.files, args.dialect)?;
+    let mut reports = Vec::with_capacity(files.len());
 
-    // A file that will not parse is reported, not fatal — see `query find`.
-    let analysis = analyze_files(&files, args.dialect, |file, dialect, tree, input| {
-        build_unused_local_callable_report(file.to_path_buf(), dialect, &input.text, tree)
-    });
-    if analysis.is_total_failure() {
-        return Err(total_file_failure(analysis.failed).into());
+    for file in &files {
+        let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+        reports.push(build_unused_local_callable_report(
+            file.clone(),
+            dialect,
+            &input.text,
+            &tree,
+        )?);
     }
-    note_partial_file_failures(&analysis.failed);
-    let reports = analysis.succeeded;
 
     let policy = evaluate_unused_local_callable_policy(
         UnusedLocalCallablePolicyOptions::new(args.fail_on_unused),

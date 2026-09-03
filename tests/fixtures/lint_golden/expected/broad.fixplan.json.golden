@@ -8,14 +8,14 @@
       "replacements": [
         {
           "byte_length": 19,
-          "byte_offset": 2282,
+          "byte_offset": 3644,
           "text": "(incf ctr)"
         }
       ],
       "rule": "manual-incf",
       "span": {
-        "end": 2301,
-        "start": 2282
+        "end": 3663,
+        "start": 3644
       }
     },
     {
@@ -25,14 +25,14 @@
       "replacements": [
         {
           "byte_length": 23,
-          "byte_offset": 2317,
+          "byte_offset": 3710,
           "text": "(push e lst)"
         }
       ],
       "rule": "manual-push",
       "span": {
-        "end": 2340,
-        "start": 2317
+        "end": 3733,
+        "start": 3710
       }
     },
     {
@@ -42,14 +42,14 @@
       "replacements": [
         {
           "byte_length": 23,
-          "byte_offset": 2356,
+          "byte_offset": 3776,
           "text": "(pushnew e st)"
         }
       ],
       "rule": "manual-pushnew",
       "span": {
-        "end": 2379,
-        "start": 2356
+        "end": 3799,
+        "start": 3776
       }
     },
     {
@@ -59,14 +59,14 @@
       "replacements": [
         {
           "byte_length": 14,
-          "byte_offset": 1786,
+          "byte_offset": 2773,
           "text": "(incf tally)"
         }
       ],
       "rule": "explicit-step-delta",
       "span": {
-        "end": 1800,
-        "start": 1786
+        "end": 2787,
+        "start": 2773
       }
     },
     {
@@ -76,14 +76,14 @@
       "replacements": [
         {
           "byte_length": 13,
-          "byte_offset": 1824,
+          "byte_offset": 2847,
           "text": "(decf nsd 3)"
         }
       ],
       "rule": "negated-step-delta",
       "span": {
-        "end": 1837,
-        "start": 1824
+        "end": 2860,
+        "start": 2847
       }
     },
     {
@@ -92,15 +92,15 @@
       "path": "broad.lisp",
       "replacements": [
         {
-          "byte_length": 23,
-          "byte_offset": 1860,
+          "byte_length": 21,
+          "byte_offset": 2920,
           "text": "(return-from blk)"
         }
       ],
       "rule": "explicit-nil-return",
       "span": {
-        "end": 1883,
-        "start": 1860
+        "end": 2941,
+        "start": 2920
       }
     },
     {
@@ -110,14 +110,14 @@
       "replacements": [
         {
           "byte_length": 12,
-          "byte_offset": 916,
+          "byte_offset": 1223,
           "text": "(list e)"
         }
       ],
       "rule": "cons-to-list",
       "span": {
-        "end": 928,
-        "start": 916
+        "end": 1235,
+        "start": 1223
       }
     },
     {
@@ -127,14 +127,14 @@
       "replacements": [
         {
           "byte_length": 22,
-          "byte_offset": 945,
+          "byte_offset": 1290,
           "text": "(copy-seq dr)"
         }
       ],
       "rule": "double-reverse",
       "span": {
-        "end": 967,
-        "start": 945
+        "end": 1312,
+        "start": 1290
       }
     },
     {
@@ -144,14 +144,14 @@
       "replacements": [
         {
           "byte_length": 2,
-          "byte_offset": 437,
+          "byte_offset": 438,
           "text": "5"
         }
       ],
       "rule": "redundant-quote",
       "span": {
-        "end": 439,
-        "start": 437
+        "end": 440,
+        "start": 438
       }
     },
     {
@@ -160,15 +160,15 @@
       "path": "broad.lisp",
       "replacements": [
         {
-          "byte_length": 14,
-          "byte_offset": 460,
+          "byte_length": 12,
+          "byte_offset": 502,
           "text": "only"
         }
       ],
       "rule": "redundant-progn",
       "span": {
-        "end": 474,
-        "start": 460
+        "end": 514,
+        "start": 502
       }
     },
     {
@@ -177,15 +177,15 @@
       "path": "broad.lisp",
       "replacements": [
         {
-          "byte_length": 19,
-          "byte_offset": 507,
-          "text": "b\n    c"
+          "byte_length": 11,
+          "byte_offset": 581,
+          "text": "b c"
         }
       ],
       "rule": "nested-progn",
       "span": {
-        "end": 526,
-        "start": 507
+        "end": 592,
+        "start": 581
       }
     },
     {
@@ -194,15 +194,15 @@
       "path": "broad.lisp",
       "replacements": [
         {
-          "byte_length": 30,
-          "byte_offset": 2004,
+          "byte_length": 24,
+          "byte_offset": 3135,
           "text": "(when (and wa wb) (wc))"
         }
       ],
       "rule": "nested-when",
       "span": {
-        "end": 2034,
-        "start": 2004
+        "end": 3159,
+        "start": 3135
       }
     },
     {
@@ -211,15 +211,15 @@
       "path": "broad.lisp",
       "replacements": [
         {
-          "byte_length": 34,
-          "byte_offset": 2050,
+          "byte_length": 28,
+          "byte_offset": 3201,
           "text": "(unless (or ua ub) (uc))"
         }
       ],
       "rule": "nested-unless",
       "span": {
-        "end": 2084,
-        "start": 2050
+        "end": 3229,
+        "start": 3201
       }
     },
     {
@@ -229,14 +229,14 @@
       "replacements": [
         {
           "byte_length": 10,
-          "byte_offset": 1974,
+          "byte_offset": 3073,
           "text": "pb qc"
         }
       ],
       "rule": "nested-boolean",
       "span": {
-        "end": 1984,
-        "start": 1974
+        "end": 3083,
+        "start": 3073
       }
     },
     {
@@ -246,14 +246,14 @@
       "replacements": [
         {
           "byte_length": 13,
-          "byte_offset": 2398,
+          "byte_offset": 3845,
           "text": "(cadr z)"
         }
       ],
       "rule": "nested-cxr",
       "span": {
-        "end": 2411,
-        "start": 2398
+        "end": 3858,
+        "start": 3845
       }
     },
     {
@@ -263,14 +263,14 @@
       "replacements": [
         {
           "byte_length": 10,
-          "byte_offset": 2426,
+          "byte_offset": 3910,
           "text": "(first zs)"
         }
       ],
       "rule": "nth-constant-index",
       "span": {
-        "end": 2436,
-        "start": 2426
+        "end": 3920,
+        "start": 3910
       }
     },
     {
@@ -280,14 +280,14 @@
       "replacements": [
         {
           "byte_length": 13,
-          "byte_offset": 2459,
+          "byte_offset": 3983,
           "text": "nz"
         }
       ],
       "rule": "nthcdr-zero",
       "span": {
-        "end": 2472,
-        "start": 2459
+        "end": 3996,
+        "start": 3983
       }
     },
     {
@@ -297,14 +297,14 @@
       "replacements": [
         {
           "byte_length": 13,
-          "byte_offset": 2488,
+          "byte_offset": 4049,
           "text": "(cddr ns)"
         }
       ],
       "rule": "nthcdr-small-index",
       "span": {
-        "end": 2501,
-        "start": 2488
+        "end": 4062,
+        "start": 4049
       }
     },
     {
@@ -313,15 +313,15 @@
       "path": "broad.lisp",
       "replacements": [
         {
-          "byte_length": 19,
-          "byte_offset": 572,
-          "text": "s\n    t"
+          "byte_length": 11,
+          "byte_offset": 665,
+          "text": "s t"
         }
       ],
       "rule": "redundant-body-progn",
       "span": {
-        "end": 591,
-        "start": 572
+        "end": 676,
+        "start": 665
       }
     },
     {
@@ -331,14 +331,14 @@
       "replacements": [
         {
           "byte_length": 7,
-          "byte_offset": 617,
+          "byte_offset": 732,
           "text": "(progn"
         }
       ],
       "rule": "empty-let",
       "span": {
-        "end": 641,
-        "start": 617
+        "end": 752,
+        "start": 732
       }
     },
     {
@@ -347,15 +347,15 @@
       "path": "broad.lisp",
       "replacements": [
         {
-          "byte_length": 8,
-          "byte_offset": 666,
+          "byte_length": 4,
+          "byte_offset": 803,
           "text": ""
         }
       ],
       "rule": "redundant-if-nil",
       "span": {
-        "end": 675,
-        "start": 655
+        "end": 808,
+        "start": 796
       }
     },
     {
@@ -365,14 +365,14 @@
       "replacements": [
         {
           "byte_length": 4,
-          "byte_offset": 1656,
+          "byte_offset": 2560,
           "text": "let"
         }
       ],
       "rule": "redundant-let-star",
       "span": {
-        "end": 1673,
-        "start": 1655
+        "end": 2575,
+        "start": 2559
       }
     },
     {
@@ -382,14 +382,14 @@
       "replacements": [
         {
           "byte_length": 10,
-          "byte_offset": 697,
+          "byte_offset": 868,
           "text": ""
         }
       ],
       "rule": "redundant-funcall",
       "span": {
-        "end": 711,
-        "start": 696
+        "end": 882,
+        "start": 867
       }
     },
     {
@@ -399,14 +399,14 @@
       "replacements": [
         {
           "byte_length": 16,
-          "byte_offset": 733,
+          "byte_offset": 939,
           "text": "whatever"
         }
       ],
       "rule": "redundant-the",
       "span": {
-        "end": 749,
-        "start": 733
+        "end": 955,
+        "start": 939
       }
     },
     {
@@ -415,15 +415,15 @@
       "path": "broad.lisp",
       "replacements": [
         {
-          "byte_length": 9,
-          "byte_offset": 768,
+          "byte_length": 8,
+          "byte_offset": 1008,
           "text": ""
         }
       ],
       "rule": "funcall-lambda",
       "span": {
-        "end": 800,
-        "start": 767
+        "end": 1035,
+        "start": 1007
       }
     },
     {
@@ -432,15 +432,15 @@
       "path": "broad.lisp",
       "replacements": [
         {
-          "byte_length": 23,
-          "byte_offset": 828,
-          "text": "(lambda (sq)\n     sq)"
+          "byte_length": 18,
+          "byte_offset": 1084,
+          "text": "(lambda (sq) sq)"
         }
       ],
       "rule": "sharp-quoted-lambda",
       "span": {
-        "end": 851,
-        "start": 828
+        "end": 1102,
+        "start": 1084
       }
     },
     {
@@ -450,14 +450,14 @@
       "replacements": [
         {
           "byte_length": 12,
-          "byte_offset": 881,
+          "byte_offset": 1150,
           "text": "h"
         }
       ],
       "rule": "redundant-identity",
       "span": {
-        "end": 893,
-        "start": 881
+        "end": 1162,
+        "start": 1150
       }
     },
     {
@@ -467,14 +467,14 @@
       "replacements": [
         {
           "byte_length": 20,
-          "byte_offset": 2524,
+          "byte_offset": 4122,
           "text": "(g m)"
         }
       ],
       "rule": "redundant-apply",
       "span": {
-        "end": 2544,
-        "start": 2524
+        "end": 4142,
+        "start": 4122
       }
     },
     {
@@ -484,14 +484,14 @@
       "replacements": [
         {
           "byte_length": 12,
-          "byte_offset": 2577,
+          "byte_offset": 4205,
           "text": ""
         }
       ],
       "rule": "redundant-eql-test",
       "span": {
-        "end": 2590,
-        "start": 2564
+        "end": 4218,
+        "start": 4192
       }
     },
     {
@@ -501,14 +501,14 @@
       "replacements": [
         {
           "byte_length": 16,
-          "byte_offset": 3472,
+          "byte_offset": 5465,
           "text": ""
         }
       ],
       "rule": "redundant-identity-key",
       "span": {
-        "end": 3489,
-        "start": 3459
+        "end": 5482,
+        "start": 5452
       }
     },
     {
@@ -518,19 +518,19 @@
       "replacements": [
         {
           "byte_length": 4,
-          "byte_offset": 2212,
+          "byte_offset": 3504,
           "text": "unless"
         },
         {
           "byte_length": 7,
-          "byte_offset": 2217,
+          "byte_offset": 3509,
           "text": "r"
         }
       ],
       "rule": "negated-when-unless",
       "span": {
-        "end": 2229,
-        "start": 2211
+        "end": 3519,
+        "start": 3503
       }
     },
     {
@@ -540,14 +540,14 @@
       "replacements": [
         {
           "byte_length": 13,
-          "byte_offset": 3547,
+          "byte_offset": 5599,
           "text": "(>= a b)"
         }
       ],
       "rule": "negated-comparison",
       "span": {
-        "end": 3560,
-        "start": 3547
+        "end": 5612,
+        "start": 5599
       }
     },
     {
@@ -556,15 +556,15 @@
       "path": "broad.lisp",
       "replacements": [
         {
-          "byte_length": 24,
-          "byte_offset": 3583,
+          "byte_length": 16,
+          "byte_offset": 5672,
           "text": "(if c b a)"
         }
       ],
       "rule": "negated-if",
       "span": {
-        "end": 3607,
-        "start": 3583
+        "end": 5688,
+        "start": 5672
       }
     },
     {
@@ -573,15 +573,15 @@
       "path": "broad.lisp",
       "replacements": [
         {
-          "byte_length": 21,
-          "byte_offset": 3622,
+          "byte_length": 13,
+          "byte_offset": 5737,
           "text": "(or iv jv)"
         }
       ],
       "rule": "if-to-or",
       "span": {
-        "end": 3643,
-        "start": 3622
+        "end": 5750,
+        "start": 5737
       }
     },
     {
@@ -590,15 +590,15 @@
       "path": "broad.lisp",
       "replacements": [
         {
-          "byte_length": 21,
-          "byte_offset": 3656,
+          "byte_length": 13,
+          "byte_offset": 5800,
           "text": "(not iw)"
         }
       ],
       "rule": "if-not",
       "span": {
-        "end": 3677,
-        "start": 3656
+        "end": 5813,
+        "start": 5800
       }
     },
     {
@@ -608,14 +608,14 @@
       "replacements": [
         {
           "byte_length": 9,
-          "byte_offset": 3872,
+          "byte_offset": 6155,
           "text": "(1+ osa)"
         }
       ],
       "rule": "one-step-arithmetic",
       "span": {
-        "end": 3881,
-        "start": 3872
+        "end": 6164,
+        "start": 6155
       }
     },
     {
@@ -625,14 +625,14 @@
       "replacements": [
         {
           "byte_length": 2,
-          "byte_offset": 2254,
+          "byte_offset": 3578,
           "text": "when"
         }
       ],
       "rule": "one-armed-if",
       "span": {
-        "end": 2265,
-        "start": 2253
+        "end": 3585,
+        "start": 3577
       }
     },
     {
@@ -642,14 +642,14 @@
       "replacements": [
         {
           "byte_length": 13,
-          "byte_offset": 4062,
+          "byte_offset": 6518,
           "text": "(null w)"
         }
       ],
       "rule": "nil-comparison",
       "span": {
-        "end": 4075,
-        "start": 4062
+        "end": 6531,
+        "start": 6518
       }
     },
     {
@@ -658,15 +658,15 @@
       "path": "broad.lisp",
       "replacements": [
         {
-          "byte_length": 21,
-          "byte_offset": 3905,
+          "byte_length": 13,
+          "byte_offset": 6229,
           "text": "on"
         }
       ],
       "rule": "constant-if-test",
       "span": {
-        "end": 3926,
-        "start": 3905
+        "end": 6242,
+        "start": 6229
       }
     },
     {
@@ -676,14 +676,14 @@
       "replacements": [
         {
           "byte_length": 7,
-          "byte_offset": 3947,
+          "byte_offset": 6300,
           "text": "(progn"
         }
       ],
       "rule": "constant-when-test",
       "span": {
-        "end": 3962,
-        "start": 3947
+        "end": 6313,
+        "start": 6300
       }
     },
     {
@@ -693,14 +693,14 @@
       "replacements": [
         {
           "byte_length": 21,
-          "byte_offset": 986,
+          "byte_offset": 1359,
           "text": "(cons al ar)"
         }
       ],
       "rule": "append-list-to-cons",
       "span": {
-        "end": 1007,
-        "start": 986
+        "end": 1380,
+        "start": 1359
       }
     },
     {
@@ -710,14 +710,14 @@
       "replacements": [
         {
           "byte_length": 20,
-          "byte_offset": 1031,
+          "byte_offset": 1433,
           "text": "(princ-to-string fs)"
         }
       ],
       "rule": "format-to-string",
       "span": {
-        "end": 1051,
-        "start": 1031
+        "end": 1453,
+        "start": 1433
       }
     },
     {
@@ -727,14 +727,14 @@
       "replacements": [
         {
           "byte_length": 15,
-          "byte_offset": 1072,
+          "byte_offset": 1504,
           "text": "(terpri)"
         }
       ],
       "rule": "format-newline",
       "span": {
-        "end": 1087,
-        "start": 1072
+        "end": 1519,
+        "start": 1504
       }
     },
     {
@@ -744,14 +744,14 @@
       "replacements": [
         {
           "byte_length": 12,
-          "byte_offset": 1106,
+          "byte_offset": 1573,
           "text": "(floor fq)"
         }
       ],
       "rule": "redundant-divisor",
       "span": {
-        "end": 1118,
-        "start": 1106
+        "end": 1585,
+        "start": 1573
       }
     },
     {
@@ -761,14 +761,14 @@
       "replacements": [
         {
           "byte_length": 11,
-          "byte_offset": 3985,
+          "byte_offset": 6373,
           "text": "(and p q)"
         }
       ],
       "rule": "redundant-boolean-identity",
       "span": {
-        "end": 3996,
-        "start": 3985
+        "end": 6384,
+        "start": 6373
       }
     },
     {
@@ -778,14 +778,14 @@
       "replacements": [
         {
           "byte_length": 21,
-          "byte_offset": 4027,
+          "byte_offset": 6454,
           "text": "(not (or p q))"
         }
       ],
       "rule": "de-morgan",
       "span": {
-        "end": 4048,
-        "start": 4027
+        "end": 6475,
+        "start": 6454
       }
     },
     {
@@ -795,14 +795,14 @@
       "replacements": [
         {
           "byte_length": 7,
-          "byte_offset": 2102,
+          "byte_offset": 3269,
           "text": "x"
         }
       ],
       "rule": "single-operand-boolean",
       "span": {
-        "end": 2109,
-        "start": 2102
+        "end": 3276,
+        "start": 3269
       }
     },
     {
@@ -812,14 +812,14 @@
       "replacements": [
         {
           "byte_length": 13,
-          "byte_offset": 2136,
+          "byte_offset": 3346,
           "text": "solo"
         }
       ],
       "rule": "single-operand-list-op",
       "span": {
-        "end": 2149,
-        "start": 2136
+        "end": 3359,
+        "start": 3346
       }
     },
     {
@@ -829,14 +829,14 @@
       "replacements": [
         {
           "byte_length": 5,
-          "byte_offset": 2176,
+          "byte_offset": 3423,
           "text": "x"
         }
       ],
       "rule": "single-operand-arithmetic",
       "span": {
-        "end": 2181,
-        "start": 2176
+        "end": 3428,
+        "start": 3423
       }
     },
     {
@@ -846,14 +846,14 @@
       "replacements": [
         {
           "byte_length": 2,
-          "byte_offset": 4095,
+          "byte_offset": 6588,
           "text": "eql"
         }
       ],
       "rule": "eq-number-comparison",
       "span": {
-        "end": 4102,
-        "start": 4094
+        "end": 6595,
+        "start": 6587
       }
     },
     {
@@ -863,14 +863,14 @@
       "replacements": [
         {
           "byte_length": 2,
-          "byte_offset": 4128,
+          "byte_offset": 6663,
           "text": "eql"
         }
       ],
       "rule": "eq-char-comparison",
       "span": {
-        "end": 4137,
-        "start": 4127
+        "end": 6672,
+        "start": 6662
       }
     },
     {
@@ -880,14 +880,14 @@
       "replacements": [
         {
           "byte_length": 11,
-          "byte_offset": 3516,
+          "byte_offset": 5529,
           "text": "(zerop tally)"
         }
       ],
       "rule": "sign-comparison",
       "span": {
-        "end": 3527,
-        "start": 3516
+        "end": 5540,
+        "start": 5529
       }
     },
     {
@@ -896,15 +896,15 @@
       "path": "broad.lisp",
       "replacements": [
         {
-          "byte_length": 19,
-          "byte_offset": 1696,
+          "byte_length": 17,
+          "byte_offset": 2632,
           "text": "(when ok (run))"
         }
       ],
       "rule": "single-clause-cond",
       "span": {
-        "end": 1715,
-        "start": 1696
+        "end": 2649,
+        "start": 2632
       }
     },
     {
@@ -913,15 +913,15 @@
       "path": "broad.lisp",
       "replacements": [
         {
-          "byte_length": 30,
-          "byte_offset": 1738,
-          "text": "(progn (r1)\n    (r2))"
+          "byte_length": 20,
+          "byte_offset": 2705,
+          "text": "(progn (r1) (r2))"
         }
       ],
       "rule": "cond-t-clause",
       "span": {
-        "end": 1768,
-        "start": 1738
+        "end": 2725,
+        "start": 2705
       }
     },
     {
@@ -930,15 +930,15 @@
       "path": "broad.lisp",
       "replacements": [
         {
-          "byte_length": 38,
-          "byte_offset": 1907,
+          "byte_length": 36,
+          "byte_offset": 2994,
           "text": "(let ((mv (vals))) mv)"
         }
       ],
       "rule": "single-value-bind",
       "span": {
-        "end": 1945,
-        "start": 1907
+        "end": 3030,
+        "start": 2994
       }
     },
     {
@@ -948,14 +948,14 @@
       "replacements": [
         {
           "byte_length": 9,
-          "byte_offset": 1140,
+          "byte_offset": 1645,
           "text": "(- amt)"
         }
       ],
       "rule": "verbose-negation",
       "span": {
-        "end": 1149,
-        "start": 1140
+        "end": 1654,
+        "start": 1645
       }
     },
     {
@@ -965,14 +965,14 @@
       "replacements": [
         {
           "byte_length": 13,
-          "byte_offset": 1170,
+          "byte_offset": 1716,
           "text": "(cons la lb)"
         }
       ],
       "rule": "list-star-to-cons",
       "span": {
-        "end": 1183,
-        "start": 1170
+        "end": 1729,
+        "start": 1716
       }
     },
     {
@@ -982,14 +982,14 @@
       "replacements": [
         {
           "byte_length": 26,
-          "byte_offset": 1205,
+          "byte_offset": 1788,
           "text": "(values va vb)"
         }
       ],
       "rule": "values-list-of-list",
       "span": {
-        "end": 1231,
-        "start": 1205
+        "end": 1814,
+        "start": 1788
       }
     },
     {
@@ -998,15 +998,15 @@
       "path": "broad.lisp",
       "replacements": [
         {
-          "byte_length": 15,
-          "byte_offset": 1255,
+          "byte_length": 13,
+          "byte_offset": 1862,
           "text": "(p1x)"
         }
       ],
       "rule": "redundant-prog1",
       "span": {
-        "end": 1270,
-        "start": 1255
+        "end": 1875,
+        "start": 1862
       }
     },
     {
@@ -1016,14 +1016,14 @@
       "replacements": [
         {
           "byte_length": 13,
-          "byte_offset": 1290,
+          "byte_offset": 1932,
           "text": "(copy-seq sz)"
         }
       ],
       "rule": "subseq-zero",
       "span": {
-        "end": 1303,
-        "start": 1290
+        "end": 1945,
+        "start": 1932
       }
     },
     {
@@ -1033,14 +1033,14 @@
       "replacements": [
         {
           "byte_length": 20,
-          "byte_offset": 1319,
+          "byte_offset": 1998,
           "text": "(nth cn cx)"
         }
       ],
       "rule": "car-nthcdr",
       "span": {
-        "end": 1339,
-        "start": 1319
+        "end": 2018,
+        "start": 1998
       }
     },
     {
@@ -1050,14 +1050,14 @@
       "replacements": [
         {
           "byte_length": 19,
-          "byte_offset": 1354,
+          "byte_offset": 2063,
           "text": "(car (last crx))"
         }
       ],
       "rule": "car-reverse",
       "span": {
-        "end": 1373,
-        "start": 1354
+        "end": 2082,
+        "start": 2063
       }
     },
     {
@@ -1067,14 +1067,14 @@
       "replacements": [
         {
           "byte_length": 16,
-          "byte_offset": 1389,
+          "byte_offset": 2129,
           "text": "(copy-list anx)"
         }
       ],
       "rule": "append-nil",
       "span": {
-        "end": 1405,
-        "start": 1389
+        "end": 2145,
+        "start": 2129
       }
     },
     {
@@ -1084,14 +1084,14 @@
       "replacements": [
         {
           "byte_length": 38,
-          "byte_offset": 1420,
+          "byte_offset": 2194,
           "text": "(list mva mvb)"
         }
       ],
       "rule": "multiple-value-list-of-values",
       "span": {
-        "end": 1458,
-        "start": 1420
+        "end": 2232,
+        "start": 2194
       }
     },
     {
@@ -1101,14 +1101,14 @@
       "replacements": [
         {
           "byte_length": 19,
-          "byte_offset": 1492,
+          "byte_offset": 2278,
           "text": "(stringp tpx)"
         }
       ],
       "rule": "typep-predicate",
       "span": {
-        "end": 1511,
-        "start": 1492
+        "end": 2297,
+        "start": 2278
       }
     },
     {
@@ -1118,14 +1118,14 @@
       "replacements": [
         {
           "byte_length": 14,
-          "byte_offset": 1531,
+          "byte_offset": 2348,
           "text": "ctx"
         }
       ],
       "rule": "coerce-to-t",
       "span": {
-        "end": 1545,
-        "start": 1531
+        "end": 2362,
+        "start": 2348
       }
     },
     {
@@ -1135,14 +1135,14 @@
       "replacements": [
         {
           "byte_length": 4,
-          "byte_offset": 1577,
+          "byte_offset": 2430,
           "text": ""
         }
       ],
       "rule": "gethash-default",
       "span": {
-        "end": 1582,
-        "start": 1561
+        "end": 2435,
+        "start": 2414
       }
     },
     {
@@ -1152,14 +1152,14 @@
       "replacements": [
         {
           "byte_length": 11,
-          "byte_offset": 1618,
+          "byte_offset": 2500,
           "text": ""
         }
       ],
       "rule": "make-hash-table-test",
       "span": {
-        "end": 1630,
-        "start": 1602
+        "end": 2512,
+        "start": 2484
       }
     },
     {
@@ -1168,15 +1168,15 @@
       "path": "broad.lisp",
       "replacements": [
         {
-          "byte_length": 25,
-          "byte_offset": 3688,
+          "byte_length": 17,
+          "byte_offset": 5861,
           "text": "(unless iu (iue))"
         }
       ],
       "rule": "if-to-unless",
       "span": {
-        "end": 3713,
-        "start": 3688
+        "end": 5878,
+        "start": 5861
       }
     },
     {
@@ -1186,14 +1186,14 @@
       "replacements": [
         {
           "byte_length": 5,
-          "byte_offset": 3731,
+          "byte_offset": 5929,
           "text": "progn"
         }
       ],
       "rule": "prog2-to-progn",
       "span": {
-        "end": 3753,
-        "start": 3730
+        "end": 5947,
+        "start": 5928
       }
     },
     {
@@ -1203,14 +1203,14 @@
       "replacements": [
         {
           "byte_length": 20,
-          "byte_offset": 3772,
+          "byte_offset": 5997,
           "text": "(hcx)"
         }
       ],
       "rule": "handler-case-no-clauses",
       "span": {
-        "end": 3792,
-        "start": 3772
+        "end": 6017,
+        "start": 5997
       }
     },
     {
@@ -1220,14 +1220,14 @@
       "replacements": [
         {
           "byte_length": 22,
-          "byte_offset": 3820,
+          "byte_offset": 6075,
           "text": "(upx)"
         }
       ],
       "rule": "unwind-protect-no-cleanup",
       "span": {
-        "end": 3842,
-        "start": 3820
+        "end": 6097,
+        "start": 6075
       }
     },
     {
@@ -1237,14 +1237,14 @@
       "replacements": [
         {
           "byte_length": 9,
-          "byte_offset": 2626,
+          "byte_offset": 4278,
           "text": ""
         }
       ],
       "rule": "redundant-start-zero",
       "span": {
-        "end": 2636,
-        "start": 2613
+        "end": 4288,
+        "start": 4265
       }
     },
     {
@@ -1254,14 +1254,14 @@
       "replacements": [
         {
           "byte_length": 9,
-          "byte_offset": 2674,
+          "byte_offset": 4353,
           "text": ""
         }
       ],
       "rule": "redundant-end-nil",
       "span": {
-        "end": 2684,
-        "start": 2661
+        "end": 4363,
+        "start": 4340
       }
     },
     {
@@ -1271,14 +1271,14 @@
       "replacements": [
         {
           "byte_length": 14,
-          "byte_offset": 2719,
+          "byte_offset": 4425,
           "text": ""
         }
       ],
       "rule": "redundant-from-end-nil",
       "span": {
-        "end": 2734,
-        "start": 2706
+        "end": 4440,
+        "start": 4412
       }
     },
     {
@@ -1288,14 +1288,14 @@
       "replacements": [
         {
           "byte_length": 11,
-          "byte_offset": 2776,
+          "byte_offset": 4504,
           "text": ""
         }
       ],
       "rule": "redundant-count-nil",
       "span": {
-        "end": 2788,
-        "start": 2761
+        "end": 4516,
+        "start": 4489
       }
     },
     {
@@ -1305,14 +1305,14 @@
       "replacements": [
         {
           "byte_length": 51,
-          "byte_offset": 2812,
+          "byte_offset": 4563,
           "text": "(string-equal sa sb)"
         }
       ],
       "rule": "string-case-fold",
       "span": {
-        "end": 2863,
-        "start": 2812
+        "end": 4614,
+        "start": 4563
       }
     },
     {
@@ -1322,14 +1322,14 @@
       "replacements": [
         {
           "byte_length": 45,
-          "byte_offset": 2884,
+          "byte_offset": 4634,
           "text": "(char-equal ca cb)"
         }
       ],
       "rule": "char-case-fold",
       "span": {
-        "end": 2929,
-        "start": 2884
+        "end": 4679,
+        "start": 4634
       }
     },
     {
@@ -1339,14 +1339,14 @@
       "replacements": [
         {
           "byte_length": 37,
-          "byte_offset": 2948,
+          "byte_offset": 4703,
           "text": "(string-upcase nsc)"
         }
       ],
       "rule": "nested-string-case",
       "span": {
-        "end": 2985,
-        "start": 2948
+        "end": 4740,
+        "start": 4703
       }
     },
     {
@@ -1356,14 +1356,14 @@
       "replacements": [
         {
           "byte_length": 27,
-          "byte_offset": 3008,
+          "byte_offset": 4776,
           "text": "ccc"
         }
       ],
       "rule": "code-char-char-code",
       "span": {
-        "end": 3035,
-        "start": 3008
+        "end": 4803,
+        "start": 4776
       }
     },
     {
@@ -1373,14 +1373,14 @@
       "replacements": [
         {
           "byte_length": 2,
-          "byte_offset": 3068,
+          "byte_offset": 4859,
           "text": ""
         }
       ],
       "rule": "last-default-count",
       "span": {
-        "end": 3071,
-        "start": 3059
+        "end": 4862,
+        "start": 4850
       }
     },
     {
@@ -1390,14 +1390,14 @@
       "replacements": [
         {
           "byte_length": 2,
-          "byte_offset": 3106,
+          "byte_offset": 4935,
           "text": ""
         }
       ],
       "rule": "butlast-default-count",
       "span": {
-        "end": 3109,
-        "start": 3094
+        "end": 4938,
+        "start": 4923
       }
     },
     {
@@ -1407,14 +1407,14 @@
       "replacements": [
         {
           "byte_length": 21,
-          "byte_offset": 3149,
+          "byte_offset": 5013,
           "text": ""
         }
       ],
       "rule": "make-list-default-element",
       "span": {
-        "end": 3171,
-        "start": 3135
+        "end": 5035,
+        "start": 4999
       }
     },
     {
@@ -1424,14 +1424,14 @@
       "replacements": [
         {
           "byte_length": 10,
-          "byte_offset": 3219,
+          "byte_offset": 5097,
           "text": ""
         }
       ],
       "rule": "parse-integer-default-radix",
       "span": {
-        "end": 3230,
-        "start": 3201
+        "end": 5108,
+        "start": 5079
       }
     },
     {
@@ -1441,14 +1441,14 @@
       "replacements": [
         {
           "byte_length": 4,
-          "byte_offset": 3276,
+          "byte_offset": 5175,
           "text": ""
         }
       ],
       "rule": "getf-default-nil",
       "span": {
-        "end": 3281,
-        "start": 3262
+        "end": 5180,
+        "start": 5161
       }
     },
     {
@@ -1458,14 +1458,14 @@
       "replacements": [
         {
           "byte_length": 16,
-          "byte_offset": 3318,
+          "byte_offset": 5248,
           "text": ""
         }
       ],
       "rule": "make-array-default-keyword",
       "span": {
-        "end": 3335,
-        "start": 3302
+        "end": 5265,
+        "start": 5232
       }
     },
     {
@@ -1475,14 +1475,14 @@
       "replacements": [
         {
           "byte_length": 33,
-          "byte_offset": 3366,
+          "byte_offset": 5313,
           "text": "(char-upcase ncc)"
         }
       ],
       "rule": "nested-char-case",
       "span": {
-        "end": 3399,
-        "start": 3366
+        "end": 5346,
+        "start": 5313
       }
     },
     {
@@ -1492,19 +1492,19 @@
       "replacements": [
         {
           "byte_length": 5,
-          "byte_offset": 3421,
+          "byte_offset": 5385,
           "text": "list"
         },
         {
           "byte_length": 4,
-          "byte_offset": 3436,
+          "byte_offset": 5400,
           "text": ""
         }
       ],
       "rule": "list-star-nil",
       "span": {
-        "end": 3441,
-        "start": 3420
+        "end": 5405,
+        "start": 5384
       }
     }
   ],

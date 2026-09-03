@@ -262,7 +262,7 @@ fn destroyed_variable(view: &ExpressionView) -> Option<&str> {
     atom_text(argument)
 }
 
-/// `destroyed_variable`, for the corpus audit's funnel.
+/// [`destroyed_variable`], for the corpus audit's funnel.
 ///
 /// The audit needs to count condition 1's survivors independently of the rule's
 /// dispatch, so that a zero-finding sweep can say *which* condition did the

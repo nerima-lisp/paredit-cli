@@ -656,9 +656,6 @@ fn rejected_by_globs(
     absolute: &Path,
     is_directory: bool,
 ) -> bool {
-    if options.exclude_globs.is_empty() && options.include_globs.is_empty() {
-        return false;
-    }
     let Some(relative) = relative_to_root(&context.root_absolute, absolute) else {
         return false;
     };

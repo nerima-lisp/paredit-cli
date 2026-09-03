@@ -181,7 +181,7 @@ pub struct NodeContext {
     /// when the node is top level or its parent has no symbol head.
     pub parent_head: Option<String>,
     /// Some ancestor of the node is a macro-defining form, so the node is part
-    /// of a template rather than of code. See `MACRO_DEFINITION_HEADS`.
+    /// of a template rather than of code. See [`MACRO_DEFINITION_HEADS`].
     pub in_macro_template: bool,
 }
 

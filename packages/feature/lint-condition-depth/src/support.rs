@@ -4,7 +4,7 @@
 //!
 //! # Copied, deliberately
 //!
-//! The `QuoteState` quote model and [`is_unevaluated_at`] are copied from
+//! The [`QuoteState`] quote model and [`is_unevaluated_at`] are copied from
 //! `paredit-feature-lint-condition-system::support`, which is what the other
 //! lint packages do with it. A consolidation of that helper into
 //! `packages/core` is in flight; when it lands this module should be deleted
@@ -325,7 +325,7 @@ fn mentions_define_condition(source: &str) -> bool {
 
 impl ConditionHierarchy {
     /// Reads every `define-condition` reachable as code in one file, guarded by
-    /// `mentions_define_condition` so a file that defines none pays one byte
+    /// [`mentions_define_condition`] so a file that defines none pays one byte
     /// scan instead of a walk.
     #[must_use]
     pub fn collect(tree: &SyntaxTree) -> Self {

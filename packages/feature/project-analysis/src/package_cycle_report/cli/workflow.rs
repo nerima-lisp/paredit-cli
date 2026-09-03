@@ -6,18 +6,15 @@ use crate::package_cycle_report::usecase::{
     PackageCyclePolicyOptions, analyze_package_cycles, collect_package_dependency_edges,
     evaluate_package_cycle_policy,
 };
-use paredit_core_cli::shared::{analyze_files, note_partial_file_failures, total_file_failure};
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
 pub fn package_cycle_report(args: PackageCycleReportArgs) -> CommandResult {
-    // A file that will not parse is reported, not fatal — see `query find`.
-    let analysis = analyze_files(&args.files, args.dialect, |_file, dialect, tree, _| {
-        collect_package_dependency_edges(dialect, tree)
-    });
-    if analysis.is_total_failure() {
-        return Err(total_file_failure(analysis.failed).into());
+    let mut edges = Vec::new();
+
+    for file in &args.files {
+        let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+        edges.extend(collect_package_dependency_edges(dialect, &tree)?);
     }
-    note_partial_file_failures(&analysis.failed);
-    let edges: Vec<(String, String)> = analysis.succeeded.into_iter().flatten().collect();
 
     let summary = analyze_package_cycles(&edges);
     let policy =

@@ -15,7 +15,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 2,
-                        "byteOffset": 863
+                        "byteOffset": 840
                       },
                       "insertedContent": {
                         "text": "5"
@@ -38,9 +38,9 @@
                 },
                 "region": {
                   "byteLength": 2,
-                  "byteOffset": 863,
-                  "startColumn": 5,
-                  "startLine": 44
+                  "byteOffset": 840,
+                  "startColumn": 10,
+                  "startLine": 41
                 }
               }
             }
@@ -50,7 +50,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "redundant-quote/07bb8307b4864109/0",
-            "primaryLocationLineHash": "fnv1a64:669a337f498e6ef1:0"
+            "primaryLocationLineHash": "fnv1a64:8ed26b11c3482ced:0"
           },
           "ruleId": "redundant-quote"
         },
@@ -65,8 +65,8 @@
                   "replacements": [
                     {
                       "deletedRegion": {
-                        "byteLength": 18,
-                        "byteOffset": 267
+                        "byteLength": 14,
+                        "byteOffset": 268
                       },
                       "insertedContent": {
                         "text": "(or x)"
@@ -88,10 +88,10 @@
                   "uri": "nested.lisp"
                 },
                 "region": {
-                  "byteLength": 18,
-                  "byteOffset": 267,
+                  "byteLength": 14,
+                  "byteOffset": 268,
                   "startColumn": 3,
-                  "startLine": 5
+                  "startLine": 6
                 }
               }
             }
@@ -101,7 +101,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "redundant-progn/9715182cb9f63314/0",
-            "primaryLocationLineHash": "fnv1a64:8b06e00bd2adf89b:0"
+            "primaryLocationLineHash": "fnv1a64:91ba0538b0d7d0f3:0"
           },
           "ruleId": "redundant-progn"
         },
@@ -116,8 +116,8 @@
                   "replacements": [
                     {
                       "deletedRegion": {
-                        "byteLength": 14,
-                        "byteOffset": 852
+                        "byteLength": 10,
+                        "byteOffset": 833
                       },
                       "insertedContent": {
                         "text": "'5"
@@ -139,10 +139,10 @@
                   "uri": "nested.lisp"
                 },
                 "region": {
-                  "byteLength": 14,
-                  "byteOffset": 852,
+                  "byteLength": 10,
+                  "byteOffset": 833,
                   "startColumn": 3,
-                  "startLine": 43
+                  "startLine": 41
                 }
               }
             }
@@ -152,7 +152,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "redundant-progn/8d949e5fcf0552a8/0",
-            "primaryLocationLineHash": "fnv1a64:8b06e00bd2adf89b:1"
+            "primaryLocationLineHash": "fnv1a64:02cbc6d47036a437:0"
           },
           "ruleId": "redundant-progn"
         },
@@ -167,8 +167,8 @@
                   "replacements": [
                     {
                       "deletedRegion": {
-                        "byteLength": 17,
-                        "byteOffset": 936
+                        "byteLength": 9,
+                        "byteOffset": 907
                       },
                       "insertedContent": {
                         "text": "a"
@@ -190,10 +190,10 @@
                   "uri": "nested.lisp"
                 },
                 "region": {
-                  "byteLength": 17,
-                  "byteOffset": 936,
-                  "startColumn": 7,
-                  "startLine": 49
+                  "byteLength": 9,
+                  "byteOffset": 907,
+                  "startColumn": 13,
+                  "startLine": 45
                 }
               }
             }
@@ -203,7 +203,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "redundant-progn/d76c6d3cd567aa37/0",
-            "primaryLocationLineHash": "fnv1a64:8b06e00bd2adf89b:2"
+            "primaryLocationLineHash": "fnv1a64:f4153aecbc2fd048:0"
           },
           "ruleId": "redundant-progn"
         },
@@ -218,11 +218,11 @@
                   "replacements": [
                     {
                       "deletedRegion": {
-                        "byteLength": 49,
-                        "byteOffset": 523
+                        "byteLength": 33,
+                        "byteOffset": 520
                       },
                       "insertedContent": {
-                        "text": "b\n      (progn\n        c\n        d)"
+                        "text": "b\n      (progn c d)"
                       }
                     }
                   ]
@@ -241,8 +241,8 @@
                   "uri": "nested.lisp"
                 },
                 "region": {
-                  "byteLength": 49,
-                  "byteOffset": 523,
+                  "byteLength": 33,
+                  "byteOffset": 520,
                   "startColumn": 5,
                   "startLine": 23
                 }
@@ -269,11 +269,11 @@
                   "replacements": [
                     {
                       "deletedRegion": {
-                        "byteLength": 27,
-                        "byteOffset": 544
+                        "byteLength": 11,
+                        "byteOffset": 541
                       },
                       "insertedContent": {
-                        "text": "c\n        d"
+                        "text": "c d"
                       }
                     }
                   ]
@@ -292,8 +292,8 @@
                   "uri": "nested.lisp"
                 },
                 "region": {
-                  "byteLength": 27,
-                  "byteOffset": 544,
+                  "byteLength": 11,
+                  "byteOffset": 541,
                   "startColumn": 7,
                   "startLine": 25
                 }
@@ -305,7 +305,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "nested-progn/92784ad7b319e3e5/0",
-            "primaryLocationLineHash": "fnv1a64:237c01a0c789050b:1"
+            "primaryLocationLineHash": "fnv1a64:5ca6525a04ba0d58:0"
           },
           "ruleId": "nested-progn"
         },
@@ -321,7 +321,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 50,
-                        "byteOffset": 324
+                        "byteOffset": 321
                       },
                       "insertedContent": {
                         "text": "(when (and a b) (when c\n        (act)))"
@@ -344,7 +344,7 @@
                 },
                 "region": {
                   "byteLength": 50,
-                  "byteOffset": 324,
+                  "byteOffset": 321,
                   "startColumn": 3,
                   "startLine": 9
                 }
@@ -372,7 +372,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 37,
-                        "byteOffset": 336
+                        "byteOffset": 333
                       },
                       "insertedContent": {
                         "text": "(when (and b c) (act))"
@@ -395,7 +395,7 @@
                 },
                 "region": {
                   "byteLength": 37,
-                  "byteOffset": 336,
+                  "byteOffset": 333,
                   "startColumn": 5,
                   "startLine": 10
                 }
@@ -423,7 +423,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 56,
-                        "byteOffset": 415
+                        "byteOffset": 412
                       },
                       "insertedContent": {
                         "text": "(unless (or a b) (unless c\n        (act)))"
@@ -446,7 +446,7 @@
                 },
                 "region": {
                   "byteLength": 56,
-                  "byteOffset": 415,
+                  "byteOffset": 412,
                   "startColumn": 3,
                   "startLine": 15
                 }
@@ -474,7 +474,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 41,
-                        "byteOffset": 429
+                        "byteOffset": 426
                       },
                       "insertedContent": {
                         "text": "(unless (or b c) (act))"
@@ -497,7 +497,7 @@
                 },
                 "region": {
                   "byteLength": 41,
-                  "byteOffset": 429,
+                  "byteOffset": 426,
                   "startColumn": 5,
                   "startLine": 16
                 }
@@ -525,7 +525,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 23,
-                        "byteOffset": 787
+                        "byteOffset": 768
                       },
                       "insertedContent": {
                         "text": "q (or r (or p q))"
@@ -548,9 +548,9 @@
                 },
                 "region": {
                   "byteLength": 23,
-                  "byteOffset": 787,
+                  "byteOffset": 768,
                   "startColumn": 10,
-                  "startLine": 40
+                  "startLine": 38
                 }
               }
             }
@@ -576,7 +576,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 8,
-                        "byteOffset": 800
+                        "byteOffset": 781
                       },
                       "insertedContent": {
                         "text": "p q"
@@ -599,9 +599,9 @@
                 },
                 "region": {
                   "byteLength": 8,
-                  "byteOffset": 800,
+                  "byteOffset": 781,
                   "startColumn": 23,
-                  "startLine": 40
+                  "startLine": 38
                 }
               }
             }
@@ -627,7 +627,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 19,
-                        "byteOffset": 611
+                        "byteOffset": 592
                       },
                       "insertedContent": {
                         "text": "(cadr (cdr x))"
@@ -650,9 +650,9 @@
                 },
                 "region": {
                   "byteLength": 19,
-                  "byteOffset": 611,
+                  "byteOffset": 592,
                   "startColumn": 3,
-                  "startLine": 31
+                  "startLine": 29
                 }
               }
             }
@@ -678,7 +678,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 13,
-                        "byteOffset": 616
+                        "byteOffset": 597
                       },
                       "insertedContent": {
                         "text": "(cddr x)"
@@ -701,9 +701,9 @@
                 },
                 "region": {
                   "byteLength": 13,
-                  "byteOffset": 616,
+                  "byteOffset": 597,
                   "startColumn": 8,
-                  "startLine": 31
+                  "startLine": 29
                 }
               }
             }
@@ -728,11 +728,11 @@
                   "replacements": [
                     {
                       "deletedRegion": {
-                        "byteLength": 73,
-                        "byteOffset": 506
+                        "byteLength": 57,
+                        "byteOffset": 503
                       },
                       "insertedContent": {
-                        "text": "a\n    (progn\n      b\n      (progn\n        c\n        d))\n    e"
+                        "text": "a\n    (progn\n      b\n      (progn c d))\n    e"
                       }
                     }
                   ]
@@ -751,8 +751,8 @@
                   "uri": "nested.lisp"
                 },
                 "region": {
-                  "byteLength": 73,
-                  "byteOffset": 506,
+                  "byteLength": 57,
+                  "byteOffset": 503,
                   "startColumn": 3,
                   "startLine": 21
                 }
@@ -780,7 +780,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 41,
-                        "byteOffset": 697
+                        "byteOffset": 678
                       },
                       "insertedContent": {
                         "text": "(step-one)\n      (step-two)"
@@ -803,9 +803,9 @@
                 },
                 "region": {
                   "byteLength": 41,
-                  "byteOffset": 697,
+                  "byteOffset": 678,
                   "startColumn": 5,
-                  "startLine": 35
+                  "startLine": 33
                 }
               }
             }
@@ -831,7 +831,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 7,
-                        "byteOffset": 922
+                        "byteOffset": 899
                       },
                       "insertedContent": {
                         "text": "(progn"
@@ -853,10 +853,10 @@
                   "uri": "nested.lisp"
                 },
                 "region": {
-                  "byteLength": 32,
-                  "byteOffset": 922,
+                  "byteLength": 18,
+                  "byteOffset": 899,
                   "startColumn": 5,
-                  "startLine": 48
+                  "startLine": 45
                 }
               }
             }
@@ -866,7 +866,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "empty-let/dc954b1687c1363e/0",
-            "primaryLocationLineHash": "fnv1a64:5ead522e3c909d98:0"
+            "primaryLocationLineHash": "fnv1a64:ccff5780c7da5635:0"
           },
           "ruleId": "empty-let"
         },
@@ -882,7 +882,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 4,
-                        "byteOffset": 905
+                        "byteOffset": 882
                       },
                       "insertedContent": {
                         "text": "let"
@@ -904,10 +904,10 @@
                   "uri": "nested.lisp"
                 },
                 "region": {
-                  "byteLength": 51,
-                  "byteOffset": 904,
+                  "byteLength": 37,
+                  "byteOffset": 881,
                   "startColumn": 3,
-                  "startLine": 47
+                  "startLine": 44
                 }
               }
             }
@@ -933,7 +933,7 @@
                     {
                       "deletedRegion": {
                         "byteLength": 6,
-                        "byteOffset": 278
+                        "byteOffset": 275
                       },
                       "insertedContent": {
                         "text": "x"
@@ -956,8 +956,8 @@
                 },
                 "region": {
                   "byteLength": 6,
-                  "byteOffset": 278,
-                  "startColumn": 5,
+                  "byteOffset": 275,
+                  "startColumn": 10,
                   "startLine": 6
                 }
               }
@@ -968,7 +968,7 @@
           },
           "partialFingerprints": {
             "pareditFindingId": "single-operand-boolean/242e39c274656eed/0",
-            "primaryLocationLineHash": "fnv1a64:ad3545be4619bc78:0"
+            "primaryLocationLineHash": "fnv1a64:f917ea298e23b0e6:0"
           },
           "ruleId": "single-operand-boolean"
         }

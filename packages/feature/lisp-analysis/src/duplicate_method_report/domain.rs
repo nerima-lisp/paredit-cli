@@ -5,7 +5,7 @@
 //! overloading (which requires a *different* specializer list to select
 //! between methods at dispatch time).
 //!
-//! `paredit_feature_project_analysis::redefinition_report::domain` deliberately excludes
+//! [`paredit_feature_project_analysis::redefinition_report::domain`] deliberately excludes
 //! `Method`-category definitions entirely, since two methods sharing a
 //! name with different specializers is completely normal CLOS dispatch;
 //! this report narrows back in on the one shape that IS a bug — the same

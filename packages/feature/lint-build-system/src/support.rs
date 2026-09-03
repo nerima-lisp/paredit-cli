@@ -4,7 +4,7 @@
 //!
 //! # Evaluation context
 //!
-//! The quote machinery below (`QuoteState`, [`for_each_evaluated_subview`],
+//! The quote machinery below ([`QuoteState`], [`for_each_evaluated_subview`],
 //! [`is_unevaluated_at`]) is a deliberate copy of
 //! `paredit-feature-lint-condition-system`'s `support.rs`, not a new design and
 //! not a cross-package dependency. Two independent counters are required

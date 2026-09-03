@@ -16,7 +16,7 @@
 //! reporting `(dolist (block blocks) …)`, `(let (ll (do t)) …)`,
 //! `(mapcar (lambda (case) …) …)` and `(defun mail-comma-list-regexp (labels)
 //! …)` — binding pairs and lambda lists, none of them evaluated as a call.
-//! `could_be_a_call` asks the two questions that can be answered from the
+//! [`could_be_a_call`] asks the two questions that can be answered from the
 //! node alone: does the form have an operand *and* a body, and does its first
 //! argument have the shape the macro's lambda list required.
 //!

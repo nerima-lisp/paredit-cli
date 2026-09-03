@@ -141,7 +141,7 @@ const SUPPORT_SEGMENTS: [&str; 12] = [
 ///   `cl-prolog2.swi.test`, `cffi-examples`, `named-readtables-test`. ASDF
 ///   calls each of these a *primary* system, so the `/` rule never saw them.
 ///   Recognized by segment instead: the name is split on `-`, `.` and `/`, and
-///   any segment in `SUPPORT_SEGMENTS` exempts it.
+///   any segment in [`SUPPORT_SEGMENTS`] exempts it.
 ///
 /// Matching *any* segment rather than only the last is deliberate — it exempts
 /// `dref-test-package-inferred` as well as `dref-test` — and so is the

@@ -8,14 +8,14 @@
       "replacements": [
         {
           "byte_length": 2,
-          "byte_offset": 863,
+          "byte_offset": 840,
           "text": "5"
         }
       ],
       "rule": "redundant-quote",
       "span": {
-        "end": 865,
-        "start": 863
+        "end": 842,
+        "start": 840
       }
     },
     {
@@ -24,15 +24,15 @@
       "path": "nested.lisp",
       "replacements": [
         {
-          "byte_length": 18,
-          "byte_offset": 267,
+          "byte_length": 14,
+          "byte_offset": 268,
           "text": "(or x)"
         }
       ],
       "rule": "redundant-progn",
       "span": {
-        "end": 285,
-        "start": 267
+        "end": 282,
+        "start": 268
       }
     },
     {
@@ -41,15 +41,15 @@
       "path": "nested.lisp",
       "replacements": [
         {
-          "byte_length": 14,
-          "byte_offset": 852,
+          "byte_length": 10,
+          "byte_offset": 833,
           "text": "'5"
         }
       ],
       "rule": "redundant-progn",
       "span": {
-        "end": 866,
-        "start": 852
+        "end": 843,
+        "start": 833
       }
     },
     {
@@ -58,15 +58,15 @@
       "path": "nested.lisp",
       "replacements": [
         {
-          "byte_length": 17,
-          "byte_offset": 936,
+          "byte_length": 9,
+          "byte_offset": 907,
           "text": "a"
         }
       ],
       "rule": "redundant-progn",
       "span": {
-        "end": 953,
-        "start": 936
+        "end": 916,
+        "start": 907
       }
     },
     {
@@ -75,15 +75,15 @@
       "path": "nested.lisp",
       "replacements": [
         {
-          "byte_length": 49,
-          "byte_offset": 523,
-          "text": "b\n      (progn\n        c\n        d)"
+          "byte_length": 33,
+          "byte_offset": 520,
+          "text": "b\n      (progn c d)"
         }
       ],
       "rule": "nested-progn",
       "span": {
-        "end": 572,
-        "start": 523
+        "end": 553,
+        "start": 520
       }
     },
     {
@@ -92,15 +92,15 @@
       "path": "nested.lisp",
       "replacements": [
         {
-          "byte_length": 27,
-          "byte_offset": 544,
-          "text": "c\n        d"
+          "byte_length": 11,
+          "byte_offset": 541,
+          "text": "c d"
         }
       ],
       "rule": "nested-progn",
       "span": {
-        "end": 571,
-        "start": 544
+        "end": 552,
+        "start": 541
       }
     },
     {
@@ -110,14 +110,14 @@
       "replacements": [
         {
           "byte_length": 50,
-          "byte_offset": 324,
+          "byte_offset": 321,
           "text": "(when (and a b) (when c\n        (act)))"
         }
       ],
       "rule": "nested-when",
       "span": {
-        "end": 374,
-        "start": 324
+        "end": 371,
+        "start": 321
       }
     },
     {
@@ -127,14 +127,14 @@
       "replacements": [
         {
           "byte_length": 37,
-          "byte_offset": 336,
+          "byte_offset": 333,
           "text": "(when (and b c) (act))"
         }
       ],
       "rule": "nested-when",
       "span": {
-        "end": 373,
-        "start": 336
+        "end": 370,
+        "start": 333
       }
     },
     {
@@ -144,14 +144,14 @@
       "replacements": [
         {
           "byte_length": 56,
-          "byte_offset": 415,
+          "byte_offset": 412,
           "text": "(unless (or a b) (unless c\n        (act)))"
         }
       ],
       "rule": "nested-unless",
       "span": {
-        "end": 471,
-        "start": 415
+        "end": 468,
+        "start": 412
       }
     },
     {
@@ -161,14 +161,14 @@
       "replacements": [
         {
           "byte_length": 41,
-          "byte_offset": 429,
+          "byte_offset": 426,
           "text": "(unless (or b c) (act))"
         }
       ],
       "rule": "nested-unless",
       "span": {
-        "end": 470,
-        "start": 429
+        "end": 467,
+        "start": 426
       }
     },
     {
@@ -178,14 +178,14 @@
       "replacements": [
         {
           "byte_length": 23,
-          "byte_offset": 787,
+          "byte_offset": 768,
           "text": "q (or r (or p q))"
         }
       ],
       "rule": "nested-boolean",
       "span": {
-        "end": 810,
-        "start": 787
+        "end": 791,
+        "start": 768
       }
     },
     {
@@ -195,14 +195,14 @@
       "replacements": [
         {
           "byte_length": 8,
-          "byte_offset": 800,
+          "byte_offset": 781,
           "text": "p q"
         }
       ],
       "rule": "nested-boolean",
       "span": {
-        "end": 808,
-        "start": 800
+        "end": 789,
+        "start": 781
       }
     },
     {
@@ -212,14 +212,14 @@
       "replacements": [
         {
           "byte_length": 19,
-          "byte_offset": 611,
+          "byte_offset": 592,
           "text": "(cadr (cdr x))"
         }
       ],
       "rule": "nested-cxr",
       "span": {
-        "end": 630,
-        "start": 611
+        "end": 611,
+        "start": 592
       }
     },
     {
@@ -229,14 +229,14 @@
       "replacements": [
         {
           "byte_length": 13,
-          "byte_offset": 616,
+          "byte_offset": 597,
           "text": "(cddr x)"
         }
       ],
       "rule": "nested-cxr",
       "span": {
-        "end": 629,
-        "start": 616
+        "end": 610,
+        "start": 597
       }
     },
     {
@@ -245,15 +245,15 @@
       "path": "nested.lisp",
       "replacements": [
         {
-          "byte_length": 73,
-          "byte_offset": 506,
-          "text": "a\n    (progn\n      b\n      (progn\n        c\n        d))\n    e"
+          "byte_length": 57,
+          "byte_offset": 503,
+          "text": "a\n    (progn\n      b\n      (progn c d))\n    e"
         }
       ],
       "rule": "redundant-body-progn",
       "span": {
-        "end": 579,
-        "start": 506
+        "end": 560,
+        "start": 503
       }
     },
     {
@@ -263,14 +263,14 @@
       "replacements": [
         {
           "byte_length": 41,
-          "byte_offset": 697,
+          "byte_offset": 678,
           "text": "(step-one)\n      (step-two)"
         }
       ],
       "rule": "redundant-body-progn",
       "span": {
-        "end": 738,
-        "start": 697
+        "end": 719,
+        "start": 678
       }
     },
     {
@@ -280,14 +280,14 @@
       "replacements": [
         {
           "byte_length": 7,
-          "byte_offset": 922,
+          "byte_offset": 899,
           "text": "(progn"
         }
       ],
       "rule": "empty-let",
       "span": {
-        "end": 954,
-        "start": 922
+        "end": 917,
+        "start": 899
       }
     },
     {
@@ -297,14 +297,14 @@
       "replacements": [
         {
           "byte_length": 4,
-          "byte_offset": 905,
+          "byte_offset": 882,
           "text": "let"
         }
       ],
       "rule": "redundant-let-star",
       "span": {
-        "end": 955,
-        "start": 904
+        "end": 918,
+        "start": 881
       }
     },
     {
@@ -314,14 +314,14 @@
       "replacements": [
         {
           "byte_length": 6,
-          "byte_offset": 278,
+          "byte_offset": 275,
           "text": "x"
         }
       ],
       "rule": "single-operand-boolean",
       "span": {
-        "end": 284,
-        "start": 278
+        "end": 281,
+        "start": 275
       }
     }
   ],
