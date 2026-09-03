@@ -1,3 +1,4 @@
+use crate::dialect::Dialect;
 use crate::sexpr::formatter::Formatter;
 use crate::sexpr::tree::{NodeKind, SyntaxTree};
 use crate::sexpr::types::NodeId;
@@ -82,7 +83,12 @@ impl Formatter {
     ) {
         let node = tree.node(node_id);
         let delimiter = self.list_delimiter(node);
-        let body_column = self.add_indent(Self::last_line_width(output));
+        let base_column = Self::last_line_width(output);
+        let body_column = if self.dialect == Dialect::EmacsLisp {
+            base_column.saturating_add(1)
+        } else {
+            self.add_indent(base_column)
+        };
         output.push(delimiter.open());
 
         for (position, child) in node.children.iter().enumerate() {

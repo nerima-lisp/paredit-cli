@@ -187,7 +187,7 @@ impl Formatter {
             | "with-temp-buffer"
             | "track-mouse" => ListStyle::HeadBody,
             // indent 1 → one arg on head line, body indented
-            "while" | "when-let" | "when-let*" => ListStyle::OneArgumentBody,
+            "while" | "when-let" | "when-let*" | "prog1" | "prog2" => ListStyle::OneArgumentBody,
             "condition-case" | "condition-case-unless-debug" => ListStyle::ConditionCase,
             // if in Elisp: test at +4 distinguished, then/else at body
             "if" => ListStyle::If,

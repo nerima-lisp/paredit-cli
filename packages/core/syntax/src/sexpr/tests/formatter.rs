@@ -27,6 +27,18 @@ fn formats_emacs_lisp_body_forms_like_emacs_indent_region() {
 }
 
 #[test]
+fn formats_nested_emacs_lisp_special_forms_like_indent_region() {
+    let input = "(defun load-facts (entry facts) (pcase entry (`(,(and (pred stringp) prev) ,(and (pred stringp) reading) ,(and (pred stringp) candidate)) `(study-association ,prev ,reading ,candidate)) (_ (error \"invalid\"))) (condition-case condition (prog1 (progn (clear) (dolist (fact facts) (publish fact))) (finish)) ((error quit) (rollback condition))) (cond ((missing-p) (missing)) ((invalid-p) (invalid))))";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::EmacsLisp).expect("valid Elisp");
+    assert_eq!(
+        Formatter::with_dialect(2, Dialect::EmacsLisp)
+            .with_max_width(72)
+            .format(&tree),
+        "(defun load-facts (entry facts)\n  (pcase entry\n    (`(,(and (pred stringp) prev) ,(and (pred stringp) reading)\n       ,(and (pred stringp) candidate))\n     `(study-association ,prev ,reading ,candidate))\n    (_ (error \"invalid\")))\n  (condition-case condition\n      (prog1\n          (progn\n            (clear)\n            (dolist (fact facts)\n              (publish fact)))\n        (finish))\n    ((error quit) (rollback condition)))\n  (cond\n   ((missing-p) (missing))\n   ((invalid-p) (invalid))))\n"
+    );
+}
+
+#[test]
 fn preserves_escaped_question_mark_symbols_in_emacs_lisp() {
     let input = r"(list '\?class `((kind ,'\?detail)))";
     let tree = SyntaxTree::parse_with_dialect(input, Dialect::EmacsLisp).expect("valid Elisp");

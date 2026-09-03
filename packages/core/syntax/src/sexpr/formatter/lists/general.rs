@@ -23,6 +23,10 @@ impl Formatter {
         // delimiter — the same fallback `reindent.rs` uses.
         let mut first_arg_column: Option<usize> = None;
         let mut head_line_count: Option<usize> = None;
+        let has_symbol_head = node
+            .children
+            .first()
+            .is_some_and(|child| tree.node(*child).kind == NodeKind::Atom);
 
         for (position, child) in node.children.iter().enumerate() {
             match position {
@@ -53,7 +57,9 @@ impl Formatter {
                         output.push(' ');
                         let col = Self::last_line_width(output);
                         output.push_str(&inline);
-                        if head_line_count.is_some_and(|hl| output.lines().count() == hl) {
+                        if has_symbol_head
+                            && head_line_count.is_some_and(|hl| output.lines().count() == hl)
+                        {
                             first_arg_column = Some(col);
                         }
                     } else {
