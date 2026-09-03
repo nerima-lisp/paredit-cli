@@ -524,6 +524,32 @@ fn normalize_quotes_shortens_a_quote_list_to_its_prefix() {
 }
 
 #[test]
+fn normalize_quotes_shortens_every_query_match_with_all() {
+    assert_eq!(
+        edit(
+            &["edit", "normalize-quotes", "--query", "(quote ?x)", "--all"],
+            "(list (quote x) (quote y))\n"
+        ),
+        "(list 'x 'y)\n"
+    );
+    assert_eq!(
+        edit(
+            &[
+                "edit",
+                "normalize-quotes",
+                "--query",
+                "(function ?x)",
+                "--all",
+                "--dialect",
+                "emacs-lisp"
+            ],
+            "(list (function car) (function cdr))\n"
+        ),
+        "(list #'car #'cdr)\n"
+    );
+}
+
+#[test]
 fn normalize_quotes_expands_a_prefix_into_its_list() {
     assert_eq!(
         edit(

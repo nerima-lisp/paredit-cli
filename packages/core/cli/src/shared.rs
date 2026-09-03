@@ -348,6 +348,16 @@ pub fn edit_target(
     args: EditTargetArgs,
     f: fn(&str, &SyntaxTree, Selection<'_>) -> SexprResult<String>,
 ) -> CliResult<()> {
+    edit_target_in_dialect(args, move |source, tree, selection, _| {
+        f(source, tree, selection)
+    })
+}
+
+/// Runs one dialect-aware structural edit over every form the selector names.
+pub fn edit_target_in_dialect(
+    args: EditTargetArgs,
+    f: impl Fn(&str, &SyntaxTree, Selection<'_>, Dialect) -> SexprResult<String>,
+) -> CliResult<()> {
     edit_target_with(args, f, |_| Ok(()))
 }
 
@@ -363,7 +373,7 @@ pub fn edit_target(
 /// first.
 pub fn edit_target_with(
     args: EditTargetArgs,
-    f: fn(&str, &SyntaxTree, Selection<'_>) -> SexprResult<String>,
+    f: impl Fn(&str, &SyntaxTree, Selection<'_>, Dialect) -> SexprResult<String>,
     mut observe: impl FnMut(Selection<'_>) -> CliResult<()>,
 ) -> CliResult<()> {
     let target = args.target;
@@ -409,7 +419,7 @@ pub fn edit_target_with(
             .into());
         }
         observe(selection)?;
-        let rewritten = f(&current, &tree, selection)?;
+        let rewritten = f(&current, &tree, selection, dialect)?;
         let (normalized, reusable) =
             Edit::normalize_changed_line_trivia_reusing_parse(&current, rewritten, dialect)?;
         // An edit that rewrote the document to itself leaves the parse in hand

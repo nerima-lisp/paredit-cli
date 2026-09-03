@@ -16,10 +16,10 @@ use paredit_core_syntax::sexpr::{
 use std::path::Path;
 
 use crate::presentation::cli::shared::{
-    AggregateDiffStat, DiffStat, analyze_files, diff_stat, edit_target, edit_target_with,
-    emit_document, expand_input_files, note_partial_file_failures, read_input_and_dialect,
-    read_input_dialect_and_tree, resolve_compact, resolve_one, resolve_targets, total_file_failure,
-    unified_diff,
+    AggregateDiffStat, DiffStat, analyze_files, diff_stat, edit_target, edit_target_in_dialect,
+    edit_target_with, emit_document, expand_input_files, note_partial_file_failures,
+    read_input_and_dialect, read_input_dialect_and_tree, resolve_compact, resolve_one,
+    resolve_targets, total_file_failure, unified_diff,
 };
 use paredit_core_cli::error::ArgumentError;
 use paredit_core_cli::kill_ring::{KillRingEntry, read_ring, ring_path, write_ring};
@@ -495,7 +495,7 @@ pub(in crate::presentation::cli) fn kill(args: KillArgs) -> CliResult<()> {
             write,
             diff,
         },
-        Edit::kill,
+        |source, tree, selection, _| Edit::kill(source, tree, selection),
         |selection| {
             if to_ring {
                 // Exactly what `kill` removes, which is the form and not the
@@ -582,24 +582,18 @@ pub(in crate::presentation::cli) fn raise(args: RaiseArgs) -> CliResult<()> {
     emit_document(&input, dialect, args.write, args.diff, rewritten)
 }
 
-/// Rewrites the selected quote into the requested spelling.
-///
-/// Not routed through `edit_target`, which takes a bare
-/// `fn(&str, &SyntaxTree, Selection) -> _` and so has no room for the style
-/// argument. `raise --levels` is the same shape for the same reason.
 pub(in crate::presentation::cli) fn normalize_quotes(args: NormalizeQuotesArgs) -> CliResult<()> {
-    let (input, dialect, tree) =
-        read_input_dialect_and_tree(args.target.file, args.target.dialect)?;
-    let selection = resolve_one(
-        &tree,
-        dialect,
-        &args.target.selector,
-        "edit normalize-quotes",
-    )?;
-    let rewritten =
-        Edit::normalize_quotes(&input.text, &tree, selection, args.style.into(), dialect)?;
-    let rewritten = Edit::normalize_changed_line_trivia(&input.text, rewritten, dialect)?;
-    emit_document(&input, dialect, args.write, args.diff, rewritten)
+    let style = args.style.into();
+    edit_target_in_dialect(
+        EditTargetArgs {
+            target: args.target,
+            write: args.write,
+            diff: args.diff,
+        },
+        move |source, tree, selection, dialect| {
+            Edit::normalize_quotes(source, tree, selection, style, dialect)
+        },
+    )
 }
 
 pub(in crate::presentation::cli) fn transpose_forward(args: EditTargetArgs) -> CliResult<()> {
