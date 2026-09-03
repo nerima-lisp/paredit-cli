@@ -709,6 +709,24 @@ mod tests {
     }
 
     #[test]
+    fn preserves_escaped_question_mark_symbols_in_elisp_rewrites() {
+        let dialect = Dialect::EmacsLisp;
+        let source = r"(old value)";
+        let tree = SyntaxTree::parse_with_dialect(source, dialect).expect("parse source");
+        let pattern = Pattern::parse("(old ?value)", dialect).expect("parse pattern");
+        let template = Template::parse(r"(new '\?class ?value)", dialect).expect("parse template");
+        template.check_against(&pattern).expect("template checks");
+        let plan = plan_rewrite(
+            &tree,
+            &pattern,
+            &template,
+            dialect,
+            RewriteAllowances::default(),
+        );
+        assert_eq!(apply_plan(tree.source(), &plan), r"(new '\?class value)");
+    }
+
+    #[test]
     fn a_captured_float_keeps_its_common_lisp_exponent_marker() {
         // Re-printing a parsed value is how `1.0d0` becomes `1`. Splicing
         // source text cannot lose the marker, and this pins that.

@@ -9,6 +9,7 @@ pub(super) enum ListStyle {
     SystemDefinition,
     Defmethod,
     DefinitionNameBody,
+    CustomVariable,
     Lambda,
     NamedLambda,
     Binding,
@@ -18,6 +19,7 @@ pub(super) enum ListStyle {
     ClauseForm,
     CondClauses,
     CaseClauses,
+    ConditionCase,
     Do,
     Prog,
     Declaration,
@@ -170,22 +172,23 @@ impl Formatter {
         let normalized_head = normalize_common_lisp_operator_head(head);
         match normalized_head.to_ascii_lowercase().as_str() {
             // def* forms with 'defun indent → name on head line, body indented
+            "defcustom" => ListStyle::CustomVariable,
             "defvar"
             | "defconst"
-            | "defcustom"
             | "defgroup"
             | "defalias"
             | "defvaralias"
             | "define-derived-mode"
             | "define-minor-mode" => ListStyle::DefinitionNameBody,
             // progn-like (indent 0) → all children at body-indent
-            "save-excursion" | "save-restriction" | "save-current-buffer" | "track-mouse" => {
-                ListStyle::HeadBody
-            }
+            "save-excursion"
+            | "save-restriction"
+            | "save-current-buffer"
+            | "with-temp-buffer"
+            | "track-mouse" => ListStyle::HeadBody,
             // indent 1 → one arg on head line, body indented
-            "while" => ListStyle::OneArgumentBody,
-            // indent 2 → two-component special (then at +4, else at +2)
-            "condition-case" => ListStyle::TwoArgumentBody,
+            "while" | "when-let" | "when-let*" => ListStyle::OneArgumentBody,
+            "condition-case" | "condition-case-unless-debug" => ListStyle::ConditionCase,
             // if in Elisp: test at +4 distinguished, then/else at body
             "if" => ListStyle::If,
             // Elisp-specific clause forms

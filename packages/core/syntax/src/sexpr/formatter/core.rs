@@ -878,6 +878,9 @@ impl Formatter {
                         ListStyle::DefinitionNameBody => {
                             self.format_prefix_body(tree, node_id, depth, 1, output);
                         }
+                        ListStyle::CustomVariable => {
+                            self.format_custom_variable(tree, node_id, depth, output);
+                        }
                         ListStyle::Lambda => {
                             self.format_prefix_body(tree, node_id, depth, 1, output);
                         }
@@ -904,6 +907,9 @@ impl Formatter {
                         }
                         ListStyle::CaseClauses => {
                             self.format_case_clauses(tree, node_id, depth, output);
+                        }
+                        ListStyle::ConditionCase => {
+                            self.format_condition_case(tree, node_id, depth, output);
                         }
                         ListStyle::Do => {
                             self.format_do_form(tree, node_id, depth, output);

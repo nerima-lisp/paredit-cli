@@ -15,6 +15,25 @@ fn formats_short_atom_lists_inline() {
 }
 
 #[test]
+fn formats_emacs_lisp_body_forms_like_emacs_indent_region() {
+    let input = "(condition-case err (foo) (error (bar)))\n(with-temp-buffer (insert \"x\") (buffer-string))\n(when-let ((x (foo))) (bar x))\n(defcustom thing 42 \"Doc\" :type 'integer)";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::EmacsLisp).expect("valid Elisp");
+    assert_eq!(
+        Formatter::with_dialect(2, Dialect::EmacsLisp)
+            .with_max_width(24)
+            .format(&tree),
+        "(condition-case err\n    (foo)\n  (error (bar)))\n\n(with-temp-buffer\n  (insert \"x\")\n  (buffer-string))\n\n(when-let ((x (foo)))\n  (bar x))\n\n(defcustom thing\n  42\n  \"Doc\"\n  :type 'integer)\n"
+    );
+}
+
+#[test]
+fn preserves_escaped_question_mark_symbols_in_emacs_lisp() {
+    let input = r"(list '\?class `((kind ,'\?detail)))";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::EmacsLisp).expect("valid Elisp");
+    assert_eq!(Formatter::new(2).format(&tree), format!("{input}\n"));
+}
+
+#[test]
 fn formats_binding_forms_with_aligned_bindings() {
     let input = "(let ((x 1) (y (+ x 2))) (list x y))";
     let tree = SyntaxTree::parse(input).expect("valid");

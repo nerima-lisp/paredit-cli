@@ -209,6 +209,79 @@ impl Formatter {
         output.push(delimiter.close());
     }
 
+    pub(in crate::sexpr::formatter) fn format_condition_case(
+        &self,
+        tree: &SyntaxTree,
+        node_id: NodeId,
+        depth: usize,
+        output: &mut String,
+    ) {
+        let node = tree.node(node_id);
+        let delimiter = self.list_delimiter(node);
+        let base_column = Self::last_line_width(output);
+        let handler_column = self.add_indent(base_column);
+        let body_column = self.add_indent(handler_column);
+        output.push(delimiter.open());
+
+        for (position, child) in node.children.iter().enumerate() {
+            match position {
+                0 => self.format_node(tree, *child, depth + 1, output),
+                1 => {
+                    output.push(' ');
+                    self.format_inline_or_node(tree, *child, depth + 1, output);
+                }
+                2 => {
+                    Self::break_to_column(body_column, output);
+                    self.format_node(tree, *child, depth + 1, output);
+                }
+                _ => {
+                    Self::break_to_column(handler_column, output);
+                    self.format_node(tree, *child, depth + 1, output);
+                }
+            }
+        }
+
+        output.push(delimiter.close());
+    }
+
+    pub(in crate::sexpr::formatter) fn format_custom_variable(
+        &self,
+        tree: &SyntaxTree,
+        node_id: NodeId,
+        depth: usize,
+        output: &mut String,
+    ) {
+        let node = tree.node(node_id);
+        let delimiter = self.list_delimiter(node);
+        let body_column = self.add_indent(Self::last_line_width(output));
+        output.push(delimiter.open());
+
+        for (position, child) in node.children.iter().take(4).enumerate() {
+            match position {
+                0 => self.format_node(tree, *child, depth + 1, output),
+                1 => {
+                    output.push(' ');
+                    self.format_inline_or_node(tree, *child, depth + 1, output);
+                }
+                _ => {
+                    Self::break_to_column(body_column, output);
+                    self.format_node(tree, *child, depth + 1, output);
+                }
+            }
+        }
+
+        for pair in node.children.get(4..).unwrap_or_default().chunks(2) {
+            Self::break_to_column(body_column, output);
+            self.format_inline_or_node(tree, pair[0], depth + 1, output);
+            if let Some(value) = pair.get(1) {
+                output.push(' ');
+                self.format_inline_or_node(tree, *value, depth + 1, output);
+            }
+        }
+
+        output.push(delimiter.close());
+    }
+
     /// `if` in Common Lisp: the test shares the head line and all branches
     /// (then, else) align at the same distinguished column — two indent
     /// steps from the form's opening delimiter.
