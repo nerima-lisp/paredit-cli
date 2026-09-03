@@ -697,6 +697,17 @@ fn reindent_defun_leaves_a_conventional_definition_byte_identical() {
     );
 }
 
+#[test]
+fn reindent_defun_moves_a_top_level_definition_to_column_zero() {
+    assert_eq!(
+        edit(
+            &["edit", "reindent-defun", "--path", "0"],
+            "  (defun f (x)\n      (list x))\n"
+        ),
+        "(defun f (x)\n  (list x))\n"
+    );
+}
+
 // --- K10: raise --levels ---
 
 #[test]

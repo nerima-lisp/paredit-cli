@@ -772,7 +772,30 @@ pub(in crate::presentation::cli) fn reindent_defun(args: ReindentArgs) -> CliRes
     let (input, dialect, tree) =
         read_input_dialect_and_tree(args.target.file, args.target.dialect)?;
     let selection = resolve_one(&tree, dialect, &args.target.selector, "edit reindent-defun")?;
-    let rewritten = tree.reindent(selection.span(), args.indent);
+    let rewritten = if selection.path().indexes().len() == 1 {
+        let start = selection.span().start().get();
+        let line_start = input.text[..start]
+            .rfind('\n')
+            .map_or(0, |offset| offset + 1);
+        if input.text[line_start..start]
+            .chars()
+            .all(char::is_whitespace)
+        {
+            let mut normalized = input.text.clone();
+            normalized.replace_range(line_start..start, "");
+            let normalized_tree = SyntaxTree::parse_with_dialect(&normalized, dialect).map_err(|_| {
+                paredit_core_cli::error::FeatureRefusal::message(
+                    paredit_core_cli::diagnosis::ErrorCode::RefusalRewriteDoesNotReparse,
+                    "top-level indentation normalization produced a document that does not reparse",
+                )
+            })?;
+            normalized_tree.reindent_form_at(line_start, args.indent)
+        } else {
+            tree.reindent(selection.span(), args.indent)
+        }
+    } else {
+        tree.reindent(selection.span(), args.indent)
+    };
     validated(&rewritten, dialect)?;
     emit_document(&input, dialect, args.write, args.diff, rewritten)
 }
