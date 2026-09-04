@@ -297,7 +297,8 @@ pub const SCHEMA: [KeySchema; KEY_COUNT] = [
         kind: ValueKind::Integer { min: 0, max: 16 },
         default: DefaultValue::Unset,
         summary: "Most consecutive blank lines to preserve between top-level forms. Unset \
-                  always collapses every gap to exactly one.",
+                  renders every gap as exactly one blank line, except in Emacs Lisp, which \
+                  defaults to 1 and so leaves adjacent top-level forms adjacent.",
     },
     KeySchema {
         key: "format.indent-table",

@@ -71,8 +71,10 @@ pub struct FormatArgs {
     )]
     pub comment_column: Option<usize>,
     /// Most consecutive blank lines to preserve from the source between
-    /// top-level forms. 0 never inserts a blank line. Unset keeps the
-    /// default of collapsing every gap to exactly one blank line.
+    /// top-level forms. 0 never inserts a blank line. Unset renders every
+    /// gap as exactly one blank line whatever the source had, except in
+    /// Emacs Lisp, which defaults to 1 and so leaves two adjacent
+    /// top-level forms adjacent.
     #[arg(long, value_name = "COUNT")]
     pub max_blank_lines: Option<usize>,
     /// Per-symbol indent style override, `SYMBOL=STYLE` (repeatable), taking
