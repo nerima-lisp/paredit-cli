@@ -66,9 +66,9 @@ The examples above follow the latest default branch. For CI, production
 automation, or a reproducible developer environment, pin a release tag:
 
 ```sh
-nix run github:nerima-lisp/paredit-cli/v1.6.2 -- --help
-nix profile install github:nerima-lisp/paredit-cli/v1.6.2
-cargo install --git https://github.com/nerima-lisp/paredit-cli --tag v1.6.2 --locked
+nix run github:nerima-lisp/paredit-cli/v1.6.3 -- --help
+nix profile install github:nerima-lisp/paredit-cli/v1.6.3
+cargo install --git https://github.com/nerima-lisp/paredit-cli --tag v1.6.3 --locked
 ```
 
 A tag is the release artifact — the crate is not published to a package
