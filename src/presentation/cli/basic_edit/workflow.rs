@@ -239,8 +239,6 @@ fn format_diff_stat_many(args: FormatArgs) -> CliResult<()> {
     Ok(())
 }
 
-/// Every width/style knob `FormatArgs` and `format_diff_stat_many` share,
-/// bundled so [`build_formatter`] takes one argument instead of nine.
 struct FormatOptions<'a> {
     indent: usize,
     dialect: Dialect,
@@ -257,17 +255,6 @@ struct FormatOptions<'a> {
     trim_trailing_whitespace: bool,
 }
 
-/// Builds the [`Formatter`] `edit format` renders with, threading through
-/// every width/style knob `FormatArgs` and `format_diff_stat_many` share.
-///
-/// Fallible only because `--indent-table`/`--width-profile` are plain
-/// strings at the argument-parser boundary (`SYMBOL=STYLE`/`STYLE=WIDTH`,
-/// not something `clap` can shape-check on its own): a malformed entry or an
-/// unrecognised style name is refused here with a message naming the flag,
-/// rather than reaching [`Formatter`] itself. A value that came from
-/// `paredit.toml` already passed this same shape and vocabulary check in
-/// `packages/core/config`'s schema validation, so in practice this only ever
-/// rejects a flag typed directly on the command line.
 fn build_formatter(options: FormatOptions<'_>) -> CliResult<Formatter> {
     let FormatOptions {
         indent,
@@ -296,6 +283,8 @@ fn build_formatter(options: FormatOptions<'_>) -> CliResult<Formatter> {
     if let Some(comment_column) = comment_column {
         formatter = formatter.with_comment_column(comment_column);
     }
+    let max_blank_lines =
+        max_blank_lines.or_else(|| matches!(dialect, Dialect::EmacsLisp).then_some(1));
     if let Some(max_blank_lines) = max_blank_lines {
         formatter = formatter.with_max_blank_lines(max_blank_lines);
     }

@@ -34,8 +34,23 @@ fn formats_emacs_lisp_buffer_and_conditional_forms_like_indent_region() {
         Formatter::with_dialect(2, Dialect::EmacsLisp)
             .with_max_width(44)
             .format(&tree),
-        "(with-current-buffer buffer\n  (foo)\n  (bar))\n\n(if-let ((buffer (get-buffer \"x\")))\n    (move-overlay overlay 1 2 buffer)\n  (delete-overlay overlay))\n\n(if-let* ((a 1) (b 2)) (foo)\n  (bar))\n"
+        "(with-current-buffer buffer\n  (foo)\n  (bar))\n\n(if-let ((buffer (get-buffer \"x\")))\n    (move-overlay overlay 1 2 buffer)\n  (delete-overlay overlay))\n\n(if-let* ((a 1) (b 2))\n    (foo)\n  (bar))\n"
     );
+}
+
+#[test]
+fn formats_emacs_lisp_indent_properties_at_narrow_width() {
+    let input = "(if condition (then-branch) (else-branch))\n(pcase-let ((`(,first ,second) pair)) (list first second))\n(pcase-let* ((`(,first ,second) pair)) (list first second))\n(pcase-dolist (`(,first ,second) pairs) (list first second))\n(save-match-data (if nested-condition (nested-then-branch) (nested-else-branch)))\n(with-eval-after-load 'very-long-library-name (message \"loaded\"))";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::EmacsLisp).expect("valid Elisp");
+    let formatter = Formatter::with_dialect(2, Dialect::EmacsLisp).with_max_width(30);
+    let formatted = formatter.format(&tree);
+    assert_eq!(
+        formatted,
+        "(if condition\n    (then-branch)\n  (else-branch))\n\n(pcase-let\n    ((`(,first ,second) pair))\n  (list first second))\n\n(pcase-let*\n    ((`(,first ,second) pair))\n  (list first second))\n\n(pcase-dolist\n    (`(,first ,second) pairs)\n  (list first second))\n\n(save-match-data\n  (if nested-condition\n      (nested-then-branch)\n    (nested-else-branch)))\n\n(with-eval-after-load\n    'very-long-library-name\n  (message \"loaded\"))\n"
+    );
+    let reparsed = SyntaxTree::parse_with_dialect(&formatted, Dialect::EmacsLisp)
+        .expect("formatted Elisp remains valid");
+    assert_eq!(formatter.format(&reparsed), formatted);
 }
 
 #[test]
@@ -319,6 +334,16 @@ fn formats_lambda_body_after_lambda_list() {
     assert_eq!(
         Formatter::new(2).format(&tree),
         "(lambda (value)\n  (validate value)\n  (render value))\n"
+    );
+}
+
+#[test]
+fn lambda_parameter_named_after_special_form_stays_inline() {
+    let input = "(lambda (do) do)\n(named-lambda worker (if) if)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(lambda (do)\n  do)\n\n(named-lambda worker (if)\n  if)\n"
     );
 }
 

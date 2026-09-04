@@ -27,6 +27,7 @@ pub(super) enum ListStyle {
     Loop,
     HeadBody,
     If,
+    ElispIf,
     /// `if` in Common Lisp: the test is on the head line and all branches
     /// (then, else) align at the same distinguished column (two indent
     /// steps from the form's opening delimiter — the equivalent of Emacs
@@ -165,35 +166,34 @@ impl Formatter {
         }
     }
 
-    /// Emacs Lisp dialect routing: recognizes Elisp-specific operators that
-    /// differ from Common Lisp conventions.  Falls back to the CL table for
-    /// everything else.
     fn elisp_style_for_head(head: &str) -> ListStyle {
         let normalized_head = normalize_common_lisp_operator_head(head);
         match normalized_head.to_ascii_lowercase().as_str() {
-            // def* forms with 'defun indent → name on head line, body indented
             "defcustom" => ListStyle::CustomVariable,
-            "defvar"
-            | "defconst"
-            | "defgroup"
+            "defvar" | "defconst" => ListStyle::Definition,
+            "defgroup"
             | "defalias"
             | "defvaralias"
             | "define-derived-mode"
             | "define-minor-mode" => ListStyle::DefinitionNameBody,
-            // progn-like (indent 0) → all children at body-indent
             "save-excursion"
             | "save-restriction"
             | "save-current-buffer"
+            | "save-match-data"
             | "with-temp-buffer"
             | "track-mouse" => ListStyle::HeadBody,
-            // indent 1 → one arg on head line, body indented
-            "while" | "when-let" | "when-let*" | "with-current-buffer" | "prog1" | "prog2" => {
-                ListStyle::OneArgumentBody
-            }
+            "while"
+            | "when-let"
+            | "when-let*"
+            | "with-current-buffer"
+            | "with-eval-after-load"
+            | "pcase-let"
+            | "pcase-let*"
+            | "pcase-dolist"
+            | "prog1"
+            | "prog2" => ListStyle::OneArgumentBody,
             "condition-case" | "condition-case-unless-debug" => ListStyle::ConditionCase,
-            // if in Elisp: test at +4 distinguished, then/else at body
-            "if" | "if-let" | "if-let*" => ListStyle::If,
-            // Elisp-specific clause forms
+            "if" | "if-let" | "if-let*" => ListStyle::ElispIf,
             "pcase" => ListStyle::CaseClauses,
             "cl-loop" => ListStyle::Loop,
             _ => Self::common_lisp_style_for_head(head),

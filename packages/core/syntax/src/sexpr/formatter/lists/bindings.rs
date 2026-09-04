@@ -33,7 +33,13 @@ impl Formatter {
                     );
                 }
                 _ => {
-                    Self::break_to_column(body_column, output);
+                    self.break_between_nodes(
+                        tree,
+                        node.children[position - 1],
+                        *child,
+                        body_column,
+                        output,
+                    );
                     self.format_node(tree, *child, depth + 1, output);
                 }
             }
@@ -62,7 +68,13 @@ impl Formatter {
                     self.format_local_callable_bindings(tree, *child, depth + 1, output);
                 }
                 _ => {
-                    Self::break_to_column(body_column, output);
+                    self.break_between_nodes(
+                        tree,
+                        node.children[position - 1],
+                        *child,
+                        body_column,
+                        output,
+                    );
                     self.format_node(tree, *child, depth + 1, output);
                 }
             }
@@ -92,7 +104,13 @@ impl Formatter {
         output.push(delimiter.open());
         for (position, child) in node.children.iter().enumerate() {
             if position > 0 {
-                Self::break_to_column(entry_column, output);
+                self.break_between_nodes(
+                    tree,
+                    node.children[position - 1],
+                    *child,
+                    entry_column,
+                    output,
+                );
             }
             self.format_local_callable_binding(tree, *child, depth + 1, output);
         }
@@ -126,7 +144,13 @@ impl Formatter {
                     self.format_inline_or_node(tree, *child, depth + 1, output);
                 }
                 _ => {
-                    Self::break_to_column(body_column, output);
+                    self.break_between_nodes(
+                        tree,
+                        node.children[position - 1],
+                        *child,
+                        body_column,
+                        output,
+                    );
                     self.format_node(tree, *child, depth + 1, output);
                 }
             }
@@ -159,7 +183,13 @@ impl Formatter {
                     self.format_inline_or_node(tree, *child, depth + 1, output);
                 }
                 _ => {
-                    Self::break_to_column(continuation_column, output);
+                    self.break_between_nodes(
+                        tree,
+                        node.children[position - 1],
+                        *child,
+                        continuation_column,
+                        output,
+                    );
                     self.format_inline_or_node(tree, *child, depth + 1, output);
                 }
             }

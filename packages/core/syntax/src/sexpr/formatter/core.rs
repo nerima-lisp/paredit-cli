@@ -87,50 +87,29 @@ impl Bounded {
     }
 }
 
-/// One planned unit of top-level output: either a form (with the comments that
-/// attach to it) or a run of standalone comments with no following form.
 enum TopLevelItem {
     Form {
         node_id: NodeId,
-        /// The last root node that belongs to this logical form. Metadata
-        /// descriptors and their target are separate parser nodes.
         end_node_id: NodeId,
-        /// Own-line comments emitted immediately above the form.
         leading: Vec<usize>,
-        /// A comment trailing the form on the same source line, if any.
         trailing: Option<usize>,
-        /// Render the form's original source verbatim to preserve interior
-        /// comments rather than reformatting it.
         verbatim: bool,
     },
     Comments(Vec<usize>),
 }
 
-/// A [`TopLevelItem`] with every piece of text already rendered, but not yet
-/// joined: [`Formatter::format`] needs every item's rendered width before it
-/// can decide a trailing comment's column (FR-005) or the separator before
-/// the next item (FR-006), so rendering happens in this intermediate form
-/// first and assembly happens once every item is known.
 enum RenderedItem {
     Form {
-        /// One already-rendered line per leading comment.
         leading: Vec<String>,
-        /// The form's own rendering — verbatim source slice or freshly
-        /// formatted text. May itself span multiple lines.
+        leading_blank_lines: usize,
         body: String,
-        /// Display width (via [`UnicodeWidthStr::width`]) of `body`'s last
-        /// line, i.e. the column a same-line trailing comment starts from.
         body_last_line_width: usize,
-        /// The trailing comment's own rendered text, without the leading
-        /// padding that separates it from `body`.
         trailing: Option<String>,
     },
     Comments(Vec<String>),
 }
 
 impl RenderedItem {
-    /// Whether this item is a form with a same-line trailing comment — the
-    /// only shape [`Formatter::trailing_comment_columns`] ever aligns.
     const fn has_trailing_comment(&self) -> bool {
         matches!(
             self,
@@ -141,9 +120,6 @@ impl RenderedItem {
         )
     }
 
-    /// The column `body` occupies up to, for width comparisons across a run
-    /// of items being aligned together. `0` for a standalone comment run,
-    /// which never enters an alignment group.
     const fn body_last_line_width(&self) -> usize {
         match self {
             Self::Form {
@@ -154,17 +130,11 @@ impl RenderedItem {
         }
     }
 
-    /// Appends this item's rendering to `output`, padding a trailing comment
-    /// out to `column` when one was assigned.
-    ///
-    /// `column` is `None` whenever comment-column alignment is disabled, or
-    /// this item's trailing comment (if any) sits outside every alignment
-    /// group — in both cases this falls back to the one-space separator that
-    /// is the formatter's behavior with the feature off entirely.
     fn render(&self, column: Option<usize>, output: &mut String) {
         match self {
             Self::Form {
                 leading,
+                leading_blank_lines,
                 body,
                 body_last_line_width,
                 trailing,
@@ -172,6 +142,9 @@ impl RenderedItem {
                 for line in leading {
                     output.push_str(line);
                     output.push('\n');
+                }
+                if !leading.is_empty() {
+                    output.push_str(&"\n".repeat(*leading_blank_lines));
                 }
                 // `body` was rendered into its own empty buffer, so every
                 // column inside it was measured from 0 — see
@@ -605,10 +578,37 @@ impl Formatter {
                 trailing,
                 verbatim,
             } => {
+                let leading_blank_lines = leading
+                    .last()
+                    .and_then(|comment| self.max_blank_lines.map(|max| (*comment, max)))
+                    .map_or(0, |(comment, max)| {
+                        let comment_end = comments[comment].span.end().get();
+                        let body_start = tree.node(*node_id).span.start().get();
+                        tree.source[comment_end..body_start]
+                            .matches('\n')
+                            .count()
+                            .saturating_sub(1)
+                            .min(max)
+                    });
                 let leading = leading
                     .iter()
-                    .map(|&comment| {
-                        self.render_comment_text(comments[comment].span.slice(&tree.source), 0)
+                    .enumerate()
+                    .map(|(index, &comment)| {
+                        let mut rendered =
+                            self.render_comment_text(comments[comment].span.slice(&tree.source), 0);
+                        if let (Some(max), Some(&next)) =
+                            (self.max_blank_lines, leading.get(index + 1))
+                        {
+                            let end = comments[comment].span.end().get();
+                            let start = comments[next].span.start().get();
+                            let blank_lines = tree.source[end..start]
+                                .matches('\n')
+                                .count()
+                                .saturating_sub(1)
+                                .min(max);
+                            rendered.push_str(&"\n".repeat(blank_lines));
+                        }
+                        rendered
                     })
                     .collect();
 
@@ -628,6 +628,7 @@ impl Formatter {
 
                 RenderedItem::Form {
                     leading,
+                    leading_blank_lines,
                     body,
                     body_last_line_width,
                     trailing,
@@ -671,6 +672,28 @@ impl Formatter {
             remaining -= SPACES.len();
         }
         output.push_str(&SPACES[..remaining]);
+    }
+
+    pub(super) fn break_between_nodes(
+        &self,
+        tree: &SyntaxTree,
+        previous: NodeId,
+        current: NodeId,
+        column: usize,
+        output: &mut String,
+    ) {
+        if let Some(max) = self.max_blank_lines {
+            let previous_end = tree.node(previous).span.end().get();
+            let current_start = tree.node(current).span.start().get();
+            if current_start > previous_end {
+                let gap = &tree.source[previous_end..current_start];
+                if gap.trim().is_empty() {
+                    let blank_lines = gap.matches('\n').count().saturating_sub(1).min(max);
+                    output.push_str(&"\n".repeat(blank_lines));
+                }
+            }
+        }
+        Self::break_to_column(column, output);
     }
 
     /// Trims a comment's trailing whitespace and, when enabled, realigns a
@@ -882,10 +905,10 @@ impl Formatter {
                             self.format_custom_variable(tree, node_id, depth, output);
                         }
                         ListStyle::Lambda => {
-                            self.format_prefix_body(tree, node_id, depth, 1, output);
+                            self.format_lambda(tree, node_id, depth, 1, output);
                         }
                         ListStyle::NamedLambda => {
-                            self.format_prefix_body(tree, node_id, depth, 2, output);
+                            self.format_lambda(tree, node_id, depth, 2, output);
                         }
                         ListStyle::Binding => {
                             self.format_binding_form(tree, node_id, depth, output);
@@ -931,6 +954,9 @@ impl Formatter {
                         }
                         ListStyle::If => {
                             self.format_prefix_body(tree, node_id, depth, 2, output);
+                        }
+                        ListStyle::ElispIf => {
+                            self.format_elisp_if(tree, node_id, depth, output);
                         }
                         ListStyle::IfAligned => {
                             self.format_if_aligned(tree, node_id, depth, output);

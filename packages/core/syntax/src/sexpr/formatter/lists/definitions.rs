@@ -159,7 +159,13 @@ impl Formatter {
                 output.push(' ');
                 self.format_inline_or_node(tree, *child, depth + 1, output);
             } else {
-                Self::break_to_column(body_column, output);
+                self.break_between_nodes(
+                    tree,
+                    node.children[position - 1],
+                    *child,
+                    body_column,
+                    output,
+                );
                 self.format_node(tree, *child, depth + 1, output);
             }
         }
@@ -173,6 +179,29 @@ impl Formatter {
         node_id: NodeId,
         depth: usize,
         prefix_len: usize,
+        output: &mut String,
+    ) {
+        self.format_prefix_body_children(tree, node_id, depth, prefix_len, false, output);
+    }
+
+    pub(in crate::sexpr::formatter) fn format_lambda(
+        &self,
+        tree: &SyntaxTree,
+        node_id: NodeId,
+        depth: usize,
+        prefix_len: usize,
+        output: &mut String,
+    ) {
+        self.format_prefix_body_children(tree, node_id, depth, prefix_len, true, output);
+    }
+
+    fn format_prefix_body_children(
+        &self,
+        tree: &SyntaxTree,
+        node_id: NodeId,
+        depth: usize,
+        prefix_len: usize,
+        compact_distinguished_list: bool,
         output: &mut String,
     ) {
         let node = tree.node(node_id);
@@ -193,15 +222,33 @@ impl Formatter {
                 // when it fits, breaks to distinguished_column (+4) when
                 // it does not.
                 let col = Self::last_line_width(output).saturating_add(1);
-                if let Some(inline) = self.compact_node(tree, *child, col) {
+                let inline =
+                    if compact_distinguished_list && tree.node(*child).kind == NodeKind::List {
+                        self.compact_form(tree, *child, col)
+                    } else {
+                        self.compact_node(tree, *child, col)
+                    };
+                if let Some(inline) = inline {
                     output.push(' ');
                     output.push_str(&inline);
                 } else {
-                    Self::break_to_column(distinguished_column, output);
+                    self.break_between_nodes(
+                        tree,
+                        node.children[position - 1],
+                        *child,
+                        distinguished_column,
+                        output,
+                    );
                     self.format_node(tree, *child, depth + 1, output);
                 }
             } else {
-                Self::break_to_column(body_column, output);
+                self.break_between_nodes(
+                    tree,
+                    node.children[position - 1],
+                    *child,
+                    body_column,
+                    output,
+                );
                 self.format_node(tree, *child, depth + 1, output);
             }
         }
@@ -231,11 +278,23 @@ impl Formatter {
                     self.format_inline_or_node(tree, *child, depth + 1, output);
                 }
                 2 => {
-                    Self::break_to_column(body_column, output);
+                    self.break_between_nodes(
+                        tree,
+                        node.children[position - 1],
+                        *child,
+                        body_column,
+                        output,
+                    );
                     self.format_node(tree, *child, depth + 1, output);
                 }
                 _ => {
-                    Self::break_to_column(handler_column, output);
+                    self.break_between_nodes(
+                        tree,
+                        node.children[position - 1],
+                        *child,
+                        handler_column,
+                        output,
+                    );
                     self.format_node(tree, *child, depth + 1, output);
                 }
             }
@@ -264,7 +323,13 @@ impl Formatter {
                     self.format_inline_or_node(tree, *child, depth + 1, output);
                 }
                 _ => {
-                    Self::break_to_column(body_column, output);
+                    self.break_between_nodes(
+                        tree,
+                        node.children[position - 1],
+                        *child,
+                        body_column,
+                        output,
+                    );
                     self.format_node(tree, *child, depth + 1, output);
                 }
             }
@@ -279,6 +344,52 @@ impl Formatter {
             }
         }
 
+        output.push(delimiter.close());
+    }
+
+    pub(in crate::sexpr::formatter) fn format_elisp_if(
+        &self,
+        tree: &SyntaxTree,
+        node_id: NodeId,
+        depth: usize,
+        output: &mut String,
+    ) {
+        let node = tree.node(node_id);
+        let delimiter = self.list_delimiter(node);
+        let base_column = Self::last_line_width(output);
+        let body_column = self.add_indent(base_column);
+        let then_column = self.add_indent(body_column);
+        output.push(delimiter.open());
+
+        for (position, child) in node.children.iter().enumerate() {
+            match position {
+                0 => self.format_node(tree, *child, depth + 1, output),
+                1 => {
+                    output.push(' ');
+                    self.format_inline_or_node(tree, *child, depth + 1, output);
+                }
+                2 => {
+                    self.break_between_nodes(
+                        tree,
+                        node.children[position - 1],
+                        *child,
+                        then_column,
+                        output,
+                    );
+                    self.format_node(tree, *child, depth + 1, output);
+                }
+                _ => {
+                    self.break_between_nodes(
+                        tree,
+                        node.children[position - 1],
+                        *child,
+                        body_column,
+                        output,
+                    );
+                    self.format_node(tree, *child, depth + 1, output);
+                }
+            }
+        }
         output.push(delimiter.close());
     }
 
@@ -306,7 +417,13 @@ impl Formatter {
                     self.format_inline_or_node(tree, *child, depth + 1, output);
                 }
                 _ => {
-                    Self::break_to_column(branch_column, output);
+                    self.break_between_nodes(
+                        tree,
+                        node.children[position - 1],
+                        *child,
+                        branch_column,
+                        output,
+                    );
                     self.format_node(tree, *child, depth + 1, output);
                 }
             }
@@ -330,7 +447,13 @@ impl Formatter {
             if position == 0 {
                 self.format_node(tree, *child, depth + 1, output);
             } else {
-                Self::break_to_column(body_column, output);
+                self.break_between_nodes(
+                    tree,
+                    node.children[position - 1],
+                    *child,
+                    body_column,
+                    output,
+                );
                 self.format_node(tree, *child, depth + 1, output);
             }
         }

@@ -176,6 +176,24 @@ fn capabilities_text_output_lists_full_command_paths() {
         .stdout(predicate::str::contains("paredit refactor rename-function"));
 }
 
+#[cfg(unix)]
+#[test]
+fn capabilities_accepts_a_consumer_closing_stdout_early() {
+    let status = std::process::Command::new("bash")
+        .args([
+            "-c",
+            "set -o pipefail; \"$1\" inspect capabilities --output json | true",
+            "broken-pipe",
+            env!("CARGO_BIN_EXE_paredit"),
+        ])
+        .status()
+        .expect("run capabilities through a closed pipe");
+    assert!(
+        status.success(),
+        "capabilities accepts a closed stdout consumer"
+    );
+}
+
 #[test]
 fn exit_codes_distinguish_gate_failures_from_hard_and_usage_errors() {
     // 3: a requested policy gate tripped after the report was printed.

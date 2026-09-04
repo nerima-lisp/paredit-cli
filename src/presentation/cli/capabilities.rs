@@ -5,6 +5,7 @@ use clap::builder::Command as ClapCommand;
 use clap::{Arg, ArgAction, Args, CommandFactory, ValueEnum};
 use paredit_core_cli::CliResult;
 use serde_json::{Value, json};
+use std::io::Write;
 
 mod classify;
 mod schema;
@@ -68,13 +69,9 @@ pub(super) struct CapabilitiesArgs {
 
 pub(super) fn capabilities(args: CapabilitiesArgs) -> CliResult<()> {
     if matches!(args.emit, CapabilitiesEmit::Schema) {
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&schema::capabilities_schema(
-                args.schema_version.number()
-            ))?
-        );
-        return Ok(());
+        return write_stdout(&serde_json::to_string_pretty(
+            &schema::capabilities_schema(args.schema_version.number()),
+        )?);
     }
 
     // Built, not merely constructed: `clap` copies a `global = true` argument
@@ -96,15 +93,23 @@ pub(super) fn capabilities(args: CapabilitiesArgs) -> CliResult<()> {
                 report["dialect_contract"] =
                     super::contract::dialect_contract_report(args.schema_version.number());
             }
-            println!("{}", serde_json::to_string_pretty(&report)?);
+            write_stdout(&serde_json::to_string_pretty(&report)?)?;
         }
         OutputFormat::Text => {
             let mut lines = Vec::new();
             render_text(&root, &mut Vec::new(), &mut lines);
-            println!("{}", lines.join("\n"));
+            write_stdout(&lines.join("\n"))?;
         }
     }
     Ok(())
+}
+
+fn write_stdout(text: &str) -> CliResult<()> {
+    match writeln!(std::io::stdout().lock(), "{text}") {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::BrokenPipe => Ok(()),
+        Err(error) => Err(error.into()),
+    }
 }
 
 fn subcommand_reports(
