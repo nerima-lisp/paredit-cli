@@ -216,7 +216,7 @@ pub fn control_string_index(head: &str) -> Option<usize> {
 /// `None` — meaning "there is nothing here this package can analyze" — for
 /// every one of:
 ///
-///   - a head that is not in `FORMAT_HEADS`;
+///   - a head that is not in [`FORMAT_HEADS`];
 ///   - a call too short to have a control-string slot at all;
 ///   - a *computed* control string (`(format t (banner) x)`), because a control
 ///     string that does not exist in the source cannot be read;

@@ -405,7 +405,7 @@ const MAX_LEADING_BODY_FORMS: usize = 16;
 /// the shape that makes a rule quadratic inside one large function.
 ///
 /// Costs no `ExpressionView` except for the `declare` forms themselves, and at
-/// most `MAX_LEADING_BODY_FORMS` of those.
+/// most [`MAX_LEADING_BODY_FORMS`] of those.
 pub fn with_leading_declarations<T>(
     tree: &SyntaxTree,
     target: ByteSpan,

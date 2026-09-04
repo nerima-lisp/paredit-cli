@@ -58,32 +58,32 @@ pub(super) enum ListStyle {
 /// and `format.width-profiles` (see [`Formatter::with_indent_overrides`] and
 /// [`Formatter::with_width_profiles`]).
 ///
-/// Deliberately narrower than `ListStyle`: every entry here has a single,
+/// Deliberately narrower than [`ListStyle`]: every entry here has a single,
 /// generic, dialect-independent behavior a plain string can name without
 /// ambiguity. Left out, each for its own reason:
 ///
 /// - Every `Clojure*` variant — dialect-specific, and three of them
 ///   (`ClojureThreading`, `ClojurePrefixBody`, `ClojurePairClauses`) carry an
 ///   internal `usize` a bare style name has nowhere to put.
-/// - `ListStyle::SystemDefinition` — the ASDF `defsystem` keyword/value
+/// - [`ListStyle::SystemDefinition`] — the ASDF `defsystem` keyword/value
 ///   plist header is narrow and Common-Lisp-specific enough that retargeting
 ///   an unrelated symbol onto it would almost certainly be a mistake, not an
 ///   intentional override.
-/// - `ListStyle::Defmethod` — CLOS method syntax has an optional qualifier
-///   before the lambda list that plain `ListStyle::Definition` does not;
+/// - [`ListStyle::Defmethod`] — CLOS method syntax has an optional qualifier
+///   before the lambda list that plain [`ListStyle::Definition`] does not;
 ///   an arbitrary symbol given this style would have that slot misread.
-/// - `ListStyle::NamedLambda` — renders identically to
-///   `ListStyle::TwoArgumentBody`/`ListStyle::If` (all three call
+/// - [`ListStyle::NamedLambda`] — renders identically to
+///   [`ListStyle::TwoArgumentBody`]/[`ListStyle::If`] (all three call
 ///   `format_prefix_body` with the same prefix length); a second name for
 ///   the same behavior is a synonym, not a capability worth the surface area.
-/// - `ListStyle::LocalFunctions` — the `flet`/`labels` nested
+/// - [`ListStyle::LocalFunctions`] — the `flet`/`labels` nested
 ///   binding-list-of-lists shape is specific to that pair of operators.
-/// - `ListStyle::ClauseForm`, `ListStyle::Do`, `ListStyle::Prog` —
+/// - [`ListStyle::ClauseForm`], [`ListStyle::Do`], [`ListStyle::Prog`] —
 ///   `do`/`prog`'s bindings/end-test/body shape is a fixed positional
 ///   structure, not a generic "body" a `defun`-like symbol would want.
-/// - `ListStyle::Declaration`, `ListStyle::PairAssignment` —
+/// - [`ListStyle::Declaration`], [`ListStyle::PairAssignment`] —
 ///   `declare`/`setq`'s pairing shape is specific to those forms.
-/// - `ListStyle::Loop` — has its own internal loop-keyword clause grammar,
+/// - [`ListStyle::Loop`] — has its own internal loop-keyword clause grammar,
 ///   unrelated to every other style here.
 pub const STYLE_NAMES: &[&str] = &[
     "general",

@@ -10,7 +10,7 @@
 //! `Pattern`/[`Template`] using the selector's own [`classify_atom`]
 //! tokenizer for every spelling but two, and every match, rewrite, and
 //! rewrite-hazard check downstream ([`super::pass`]) is the selector's own
-//! `match_all`, `plan_rewrite`, and [`Template::render`] — unchanged,
+//! [`match_all`], [`plan_rewrite`], and [`Template::render`] — unchanged,
 //! unduplicated.
 //!
 //! ## The two spellings kept at their old meaning
@@ -223,7 +223,7 @@ fn push(before: &mut Vec<Pattern>, after: &mut Vec<Pattern>, rest: &Option<Rest>
 /// [`paredit inspect check --paredit-config`]'s migration signal.
 ///
 /// Detected on the already-converted [`Pattern`] rather than re-walking the
-/// source view: `convert`'s literal-atom fallback for this exact case is
+/// source view: [`convert`]'s literal-atom fallback for this exact case is
 /// the only way a bare, unprefixed `Pattern::Atom` with the text `...` can
 /// appear in a pattern this module produced, so finding one *is* finding a
 /// rule still written in the old style.

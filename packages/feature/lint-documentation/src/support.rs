@@ -7,7 +7,7 @@
 //! subject by different routes:
 //!
 //! - A **docstring is a node** — a string literal sitting in a definition's
-//!   body or in a fixed slot. `docstring_of` reads it from the
+//!   body or in a fixed slot. [`docstring_of`] reads it from the
 //!   [`ExpressionView`] the dispatcher already handed the rule, so those rules
 //!   are `HeadFilter::Heads` and never look at the file as a whole.
 //! - A **comment is not a node.** The parser keeps comments in a list beside
@@ -18,7 +18,7 @@
 //!
 //! # Evaluation context
 //!
-//! The quote machinery below (`QuoteState`, [`is_unevaluated_at`]) is a
+//! The quote machinery below ([`QuoteState`], [`is_unevaluated_at`]) is a
 //! deliberate copy of `paredit-feature-lint-build-system`'s `support.rs`, not a
 //! new design and not a cross-package dependency. Two independent counters are
 //! required because `'` and `` ` `` are not the same thing:
@@ -275,7 +275,7 @@ pub fn string_literal_text(view: &ExpressionView) -> Option<String> {
 /// two whose docstring is a plain string literal a width or an example can be
 /// read out of; a `(:documentation "…")` option is read by
 /// [`documentation_option`] instead, and `defstruct`'s slot-or-docstring
-/// position is deliberately not read at all (see `docstring_of`).
+/// position is deliberately not read at all (see [`docstring_of`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DocstringPlace {
     /// At the head of the body, after the lambda list: `defun`, `defmacro`,

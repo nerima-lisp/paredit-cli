@@ -1,8 +1,6 @@
-use paredit_core_cli::{CliResult, CommandResult};
+use paredit_core_cli::CommandResult;
 
-use paredit_core_cli::shared::{
-    analyze_files, expand_input_files, note_partial_file_failures, total_file_failure,
-};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
 use crate::constant_report::cli::args::ConstantReportArgs;
 use crate::constant_report::cli::render::print_constant_report;
@@ -14,18 +12,13 @@ use crate::shared::SemanticFile;
 pub fn constant_report(args: ConstantReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
-    let analysis = analyze_files(&files, args.dialect, |file, dialect, tree, _| {
-        CliResult::Ok(build_constant_report(&SemanticFile::analyze(
-            file,
-            dialect,
-            tree.clone(),
-        )))
-    });
-    if analysis.is_total_failure() {
-        return Err(total_file_failure(analysis.failed).into());
+    let mut reports = Vec::with_capacity(files.len());
+    for file in &files {
+        let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+        reports.push(build_constant_report(&SemanticFile::analyze(
+            file, dialect, tree,
+        )));
     }
-    note_partial_file_failures(&analysis.failed);
-    let reports = analysis.succeeded;
 
     let policy = evaluate_constant_report_policy(
         ConstantReportPolicyOptions::new(args.fail_on_foldable),

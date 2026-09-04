@@ -7,15 +7,15 @@
       "path": "emacs-lisp.el",
       "replacements": [
         {
-          "byte_length": 20,
-          "byte_offset": 629,
-          "text": "(lambda (n)\n     n)"
+          "byte_length": 15,
+          "byte_offset": 621,
+          "text": "(lambda (n) n)"
         }
       ],
       "rule": "elisp-quoted-lambda",
       "span": {
-        "end": 649,
-        "start": 629
+        "end": 636,
+        "start": 621
       }
     }
   ],

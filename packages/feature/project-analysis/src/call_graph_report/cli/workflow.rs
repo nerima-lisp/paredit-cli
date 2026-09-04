@@ -6,26 +6,22 @@ use crate::call_graph_report::usecase::{
     CallGraphPolicyOptions, CallGraphReportSource, build_call_graph_report,
     evaluate_call_graph_policy,
 };
-use paredit_core_cli::CliResult;
 use paredit_core_cli::report::graph::print_graph;
-use paredit_core_cli::shared::{analyze_files, note_partial_file_failures, total_file_failure};
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
 pub fn call_graph(args: CallGraphArgs) -> CommandResult {
     let symbol = args.symbol.as_ref();
+    let mut sources = Vec::with_capacity(args.files.len());
 
-    // A file that will not parse is reported, not fatal — see `query find`.
-    let analysis = analyze_files(&args.files, args.dialect, |file, dialect, tree, _| {
-        CliResult::Ok(CallGraphReportSource {
-            path: file.to_path_buf(),
+    for file in &args.files {
+        let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+
+        sources.push(CallGraphReportSource {
+            path: file.clone(),
             dialect,
-            tree: tree.clone(),
-        })
-    });
-    if analysis.is_total_failure() {
-        return Err(total_file_failure(analysis.failed).into());
+            tree,
+        });
     }
-    note_partial_file_failures(&analysis.failed);
-    let sources = analysis.succeeded;
 
     let report = build_call_graph_report(sources, args.include_external, symbol)?;
     let policy = evaluate_call_graph_policy(

@@ -1,24 +1,18 @@
-use paredit_core_cli::{CliResult, CommandResult};
+use paredit_core_cli::CommandResult;
 
 use crate::identical_if_branches::cli::args::IdenticalIfBranchReportArgs;
 use crate::identical_if_branches::cli::render::print_identical_if_branch_report;
 use crate::identical_if_branches::usecase::{
     build_identical_if_branch_report, evaluate_fail_on_identical_policy,
 };
-use paredit_core_cli::shared::{
-    analyze_files_raw, note_partial_file_failures, read_input_dialect_and_tree, total_file_failure,
-};
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
 pub fn identical_if_branch_report(args: IdenticalIfBranchReportArgs) -> CommandResult {
-    let analysis = analyze_files_raw(&args.files, |file| {
+    let mut reports = Vec::with_capacity(args.files.len());
+    for file in &args.files {
         let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        CliResult::Ok(build_identical_if_branch_report(file, dialect, &tree)?)
-    });
-    if analysis.is_total_failure() {
-        return Err(total_file_failure(analysis.failed).into());
+        reports.push(build_identical_if_branch_report(file, dialect, &tree)?);
     }
-    note_partial_file_failures(&analysis.failed);
-    let reports = analysis.succeeded;
 
     let policy = evaluate_fail_on_identical_policy(args.fail_on_identical, &reports);
     let passed = policy.passed;

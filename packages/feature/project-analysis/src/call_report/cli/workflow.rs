@@ -4,29 +4,26 @@ use crate::call_report::cli::{
     args::CallReportArgs, render::print_call_report, types::CallReportFile,
 };
 use crate::call_report::usecase::build_call_report;
-use crate::error::ProjectAnalysisResult;
-use paredit_core_cli::shared::{analyze_files, note_partial_file_failures, total_file_failure};
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
 pub fn call_report(args: CallReportArgs) -> CommandResult {
-    // A file that will not parse is reported, not fatal — see `query find`.
-    let analysis = analyze_files(&args.files, args.dialect, |file, dialect, tree, _| {
+    let mut reports = Vec::with_capacity(args.files.len());
+
+    for file in &args.files {
+        let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
         let calls = build_call_report(
-            tree,
+            &tree,
             dialect,
             args.symbol.as_ref(),
             args.include_definitions,
         )?;
-        ProjectAnalysisResult::Ok(CallReportFile {
-            path: file.to_path_buf(),
+
+        reports.push(CallReportFile {
+            path: file.clone(),
             dialect,
             calls,
-        })
-    });
-    if analysis.is_total_failure() {
-        return Err(total_file_failure(analysis.failed).into());
+        });
     }
-    note_partial_file_failures(&analysis.failed);
-    let reports = analysis.succeeded;
 
     let call_count = reports
         .iter()

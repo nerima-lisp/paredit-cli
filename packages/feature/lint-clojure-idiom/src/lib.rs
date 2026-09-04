@@ -551,16 +551,8 @@ mod engine_pass_tests {
             total
         }
 
-        fn median_elapsed_nanos(forms: usize) -> u128 {
-            let mut samples = std::array::from_fn::<_, 5, _>(|_| elapsed_nanos(forms));
-            samples.sort_unstable();
-            samples[samples.len() / 2]
-        }
-
-        let _ = elapsed_nanos(500);
-        let _ = elapsed_nanos(1000);
-        let small = median_elapsed_nanos(500);
-        let large = median_elapsed_nanos(1000);
+        let small = elapsed_nanos(500);
+        let large = elapsed_nanos(1000);
         // 6x rather than 2x: this runs under a loaded shared sandbox alongside
         // other test binaries, and the point is to catch T×T, which is 4x on a
         // quiet machine and far more on a busy one.

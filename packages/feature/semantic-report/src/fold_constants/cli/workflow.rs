@@ -4,8 +4,8 @@ use serde_json::json;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::color::{Painter, colorize_diff};
 use paredit_core_cli::shared::{
-    analyze_files, apply_byte_span_edits, expand_input_files, note_partial_file_failures,
-    total_file_failure, unified_diff, write_files_with_rollback,
+    apply_byte_span_edits, expand_input_files, read_input_dialect_and_tree, unified_diff,
+    write_files_with_rollback,
 };
 use paredit_core_syntax::sexpr::ByteSpan;
 
@@ -46,9 +46,11 @@ struct FoldPlan {
 ///   `double-float`'s type.
 pub fn fold_constants(args: FoldConstantsArgs) -> CliResult<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
+    let mut plans = Vec::with_capacity(files.len());
 
-    let analysis = analyze_files(&files, args.dialect, |file, dialect, tree, input| {
-        let report = build_constant_report(&SemanticFile::analyze(file, dialect, tree.clone()));
+    for file in &files {
+        let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+        let report = build_constant_report(&SemanticFile::analyze(file, dialect, tree));
 
         let mut edits: Vec<(ByteSpan, String)> = Vec::new();
         let mut folds = Vec::new();
@@ -69,19 +71,14 @@ pub fn fold_constants(args: FoldConstantsArgs) -> CliResult<()> {
         } else {
             apply_byte_span_edits(&input.text, edits)?
         };
-        CliResult::Ok(FoldPlan {
-            path: file.to_path_buf(),
+        plans.push(FoldPlan {
+            path: file.clone(),
             dialect,
             before: input.text.clone(),
             rewritten,
             folds,
-        })
-    });
-    if analysis.is_total_failure() {
-        return Err(total_file_failure(analysis.failed).into());
+        });
     }
-    note_partial_file_failures(&analysis.failed);
-    let plans = analysis.succeeded;
 
     if args.diff {
         let painter = Painter::stdout();

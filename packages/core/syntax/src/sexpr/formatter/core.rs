@@ -218,7 +218,7 @@ impl Formatter {
     }
 
     /// Overrides the inline-width budget [`Formatter::with_dialect`] set to
-    /// `MAX_INLINE_WIDTH`.
+    /// [`MAX_INLINE_WIDTH`].
     ///
     /// Re-clamps `indent` to the new width: an indent wider than the line
     /// budget could never fit an inline form regardless, and every existing
@@ -245,7 +245,7 @@ impl Formatter {
     /// compiled-in single space.
     ///
     /// `0` means auto: each contiguous run of adjacent, trailing-commented
-    /// top-level forms (see `Self::trailing_comment_columns` for exactly
+    /// top-level forms (see [`Self::trailing_comment_columns`] for exactly
     /// what breaks a run) aligns to one column past its own widest form,
     /// independently of every other run. Any other value is a fixed column
     /// every trailing comment in the document aligns to, run or no run — a
@@ -594,8 +594,7 @@ impl Formatter {
                     .iter()
                     .enumerate()
                     .map(|(index, &comment)| {
-                        let mut rendered =
-                            self.render_comment_text(comments[comment].span.slice(&tree.source), 0);
+                        let mut rendered = self.render_comment_text(&comments[comment].text, 0);
                         if let (Some(max), Some(&next)) =
                             (self.max_blank_lines, leading.get(index + 1))
                         {
@@ -622,9 +621,8 @@ impl Formatter {
                 }
                 let body_last_line_width = Self::last_line_width(&body);
 
-                let trailing = trailing.map(|comment| {
-                    self.render_comment_text(comments[comment].span.slice(&tree.source), 0)
-                });
+                let trailing =
+                    trailing.map(|comment| self.render_comment_text(&comments[comment].text, 0));
 
                 RenderedItem::Form {
                     leading,
@@ -637,9 +635,7 @@ impl Formatter {
             TopLevelItem::Comments(indices) => RenderedItem::Comments(
                 indices
                     .iter()
-                    .map(|&comment| {
-                        self.render_comment_text(comments[comment].span.slice(&tree.source), 0)
-                    })
+                    .map(|&comment| self.render_comment_text(&comments[comment].text, 0))
                     .collect(),
             ),
         }

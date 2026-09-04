@@ -9,7 +9,7 @@
 //! history warns about).
 //!
 //! Removal safety (whether a fix is offered at all) is
-//! `paredit_feature_lint_repl_debug::support`'s job: a flagged call is only
+//! [`paredit_feature_lint_repl_debug::support`]'s job: a flagged call is only
 //! auto-removed when it is a bare top-level form or a non-last form of its
 //! enclosing implicit-progn/`cond`-clause body.
 

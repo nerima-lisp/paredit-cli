@@ -109,7 +109,7 @@ pub const DIALECTS: [Dialect; 1] = [Dialect::Lfe];
 /// so this table was produced by *running* that predicate over
 /// `erlang:module_info(exports)` plus every operator spelling, under the same
 /// OTP the probes used. It reported `GUARD_SET_COUNT 67`, and
-/// `tests::the_guard_table_matches_the_enumerated_size` pins that count so a
+/// [`tests::the_guard_table_matches_the_enumerated_size`] pins that count so a
 /// hand edit cannot silently drop an entry.
 ///
 /// Sorted by name then arity, which [`is_guard_bif`] relies on.

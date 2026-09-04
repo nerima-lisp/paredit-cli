@@ -28,7 +28,7 @@
 //!
 //! # Quote semantics
 //!
-//! `QuoteState` and the descent in [`context_at`] are copied from
+//! [`QuoteState`] and the descent in [`context_at`] are copied from
 //! `paredit-feature-lint-testing`'s `support.rs`, which copied them from
 //! `paredit-feature-lint-condition-system`'s, deliberately as a copy rather
 //! than as a dependency: a lint feature package depending on another lint

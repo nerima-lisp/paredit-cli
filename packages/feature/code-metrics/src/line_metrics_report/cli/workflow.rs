@@ -1,8 +1,6 @@
-use paredit_core_cli::{CliResult, CommandResult};
+use paredit_core_cli::CommandResult;
 
-use paredit_core_cli::shared::{
-    analyze_files, expand_input_files, note_partial_file_failures, total_file_failure,
-};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
 use crate::line_metrics_report::cli::args::LineMetricsReportArgs;
 use crate::line_metrics_report::cli::render::print_line_metrics_report;
@@ -14,14 +12,11 @@ pub fn line_metrics_report(args: LineMetricsReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
     let thresholds = args.thresholds();
 
-    let analysis = analyze_files(&files, args.dialect, |file, dialect, tree, _| {
-        CliResult::Ok(build_line_metrics_report(file, dialect, tree, thresholds))
-    });
-    if analysis.is_total_failure() {
-        return Err(total_file_failure(analysis.failed).into());
+    let mut reports = Vec::with_capacity(files.len());
+    for file in &files {
+        let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+        reports.push(build_line_metrics_report(file, dialect, &tree, thresholds));
     }
-    note_partial_file_failures(&analysis.failed);
-    let reports = analysis.succeeded;
 
     let policy = evaluate_line_metrics_policy(args.fail_on_overflow, &reports);
     let passed = policy.passed;

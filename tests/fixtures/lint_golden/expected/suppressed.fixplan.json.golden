@@ -8,14 +8,14 @@
       "replacements": [
         {
           "byte_length": 2,
-          "byte_offset": 337,
+          "byte_offset": 338,
           "text": "6"
         }
       ],
       "rule": "redundant-quote",
       "span": {
-        "end": 339,
-        "start": 337
+        "end": 340,
+        "start": 338
       }
     }
   ],

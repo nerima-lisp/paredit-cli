@@ -18,7 +18,7 @@
 //!
 //! # The quote model is two counters, not a depth
 //!
-//! `QuoteState` is copied from `paredit-feature-lint-condition-system::support`,
+//! [`QuoteState`] is copied from `paredit-feature-lint-condition-system::support`,
 //! as the other lint packages do with it; a consolidation into `packages/core`
 //! is in flight, and when it lands this module should be deleted.
 //!

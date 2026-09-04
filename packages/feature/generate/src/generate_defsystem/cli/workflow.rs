@@ -1,9 +1,7 @@
-use std::path::PathBuf;
-
 use paredit_core_cli::CliResult;
 
 use paredit_core_cli::shared::{
-    analyze_files, expand_input_files, total_file_failure, write_file_with_rollback,
+    expand_input_files, read_input_dialect_and_tree, write_file_with_rollback,
 };
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::SyntaxTree;
@@ -12,16 +10,6 @@ use crate::generate_defsystem::cli::args::GenerateDefsystemArgs;
 use crate::generate_defsystem::cli::render::print_defsystem_plan;
 use crate::generate_defsystem::usecase::plan_defsystem;
 
-/// One file's outcome: either it parsed as Common Lisp, or it was skipped for
-/// being another dialect.
-///
-/// A file that fails to *read or parse* is not a third variant here — see the
-/// hard-fail check below for why.
-enum FileOutcome {
-    Parsed(PathBuf, SyntaxTree),
-    SkippedDialect(PathBuf),
-}
-
 pub fn generate_defsystem(args: GenerateDefsystemArgs) -> CliResult<()> {
     let system_name = args
         .name
@@ -29,30 +17,15 @@ pub fn generate_defsystem(args: GenerateDefsystemArgs) -> CliResult<()> {
         .unwrap_or_else(|| default_system_name(&args.directory));
 
     let files = expand_input_files(std::slice::from_ref(&args.directory), args.dialect)?;
-    let analysis = analyze_files(&files, args.dialect, |file, dialect, tree, _input| {
-        CliResult::Ok(if dialect == Dialect::CommonLisp {
-            FileOutcome::Parsed(file.to_path_buf(), tree.clone())
-        } else {
-            FileOutcome::SkippedDialect(file.to_path_buf())
-        })
-    });
-    // A generated defsystem is meant to cover every file in the directory;
-    // silently excluding one that failed to read or parse (the tolerant
-    // `analyze_files` convention used by `query`/`report` commands) would
-    // produce a manifest missing a file with no visible sign why. Failing
-    // hard here preserves this command's original behavior, where the
-    // per-file read/parse `?` aborted the whole run on the first bad file.
-    if let Some(failure) = analysis.failed.into_iter().next() {
-        return Err(total_file_failure(vec![failure]).into());
-    }
-
     let mut parsed = Vec::new();
     let mut skipped_dialect = Vec::new();
-    for outcome in analysis.succeeded {
-        match outcome {
-            FileOutcome::Parsed(file, tree) => parsed.push((file, tree)),
-            FileOutcome::SkippedDialect(file) => skipped_dialect.push(file),
+    for file in &files {
+        let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+        if dialect != Dialect::CommonLisp {
+            skipped_dialect.push(file.clone());
+            continue;
         }
+        parsed.push((file.clone(), tree));
     }
 
     let plan = plan_defsystem(&system_name, &parsed);

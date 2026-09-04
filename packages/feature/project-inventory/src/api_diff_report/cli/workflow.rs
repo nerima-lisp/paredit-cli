@@ -1,8 +1,6 @@
-use paredit_core_cli::{CliError, CliResult, CommandResult};
+use paredit_core_cli::{CliError, CommandResult};
 
-use paredit_core_cli::shared::{
-    analyze_files, expand_input_files, note_partial_file_failures, total_file_failure,
-};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
 use crate::api_diff_report::cli::args::{ApiDiffReportArgs, IntendedBump};
 use crate::api_diff_report::cli::render::print_api_diff_report;
@@ -23,14 +21,11 @@ pub fn api_diff_report(args: ApiDiffReportArgs) -> CommandResult {
     let baseline = read_baseline(&document);
 
     let files = expand_input_files(&args.files, args.dialect)?;
-    let analysis = analyze_files(&files, args.dialect, |file, dialect, tree, _| {
-        CliResult::Ok(build_api_diff_report(file, dialect, tree, &baseline))
-    });
-    if analysis.is_total_failure() {
-        return Err(total_file_failure(analysis.failed).into());
+    let mut reports = Vec::with_capacity(files.len());
+    for file in &files {
+        let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+        reports.push(build_api_diff_report(file, dialect, &tree, &baseline));
     }
-    note_partial_file_failures(&analysis.failed);
-    let reports = analysis.succeeded;
 
     let policy = evaluate_api_diff_policy(args.intended_bump.map(IntendedBump::label), &reports);
     let passed = policy.passed;

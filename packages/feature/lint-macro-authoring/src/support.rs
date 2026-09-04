@@ -1,7 +1,7 @@
 //! What the macro-authoring rules share: whether a matched form is *code*, and
 //! how to read a macro lambda list.
 //!
-//! Every rule here declares `HeadFilter::Heads`, so the engine hands it one
+//! Every rule here declares [`HeadFilter::Heads`], so the engine hands it one
 //! matched form and no context whatsoever. Two things follow, and this module
 //! is both:
 //!
@@ -704,7 +704,7 @@ impl MacroLambdaList {
 /// because it is bound to an environment object rather than to a form.
 ///
 /// Nested destructuring names are not collected: only the first element of a
-/// sublist is, matching `lambda_list_names`, which under-reads rather than
+/// sublist is, matching [`lambda_list_names`], which under-reads rather than
 /// inventing names.
 #[must_use]
 pub fn caller_supplied_parameters(list: &ExpressionView) -> Vec<String> {

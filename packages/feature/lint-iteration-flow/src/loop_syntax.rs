@@ -28,13 +28,13 @@
 //!   entirely and the first pass never sees it. `(loop for i from 1 to count
 //!   collect i)` is the everyday shape that needs this: `count` there is a
 //!   parameter, not an accumulation clause. So the token following any of
-//!   `OPERAND_INTRODUCERS` is forced to [`TokenRole::Operand`] regardless of
+//!   [`OPERAND_INTRODUCERS`] is forced to [`TokenRole::Operand`] regardless of
 //!   its spelling. Like the first pass this over-collects, and like the first
 //!   pass over-collecting can only lose findings.
 //! - **An unmodelled sub-grammar aborts the whole form.** See below.
 //!
 //! A reader prefix on a token has the same effect: `'collect` is quoted data
-//! and never the `collect` clause, so `symbol_word` refuses any prefixed
+//! and never the `collect` clause, so [`symbol_word`] refuses any prefixed
 //! atom.
 //!
 //! # What this reader does not attempt
@@ -226,7 +226,7 @@ pub fn is_subclause_keyword(word: &str) -> bool {
 }
 
 /// Whether `word` opens body code, and so may appear only after every variable
-/// clause. See `BODY_CLAUSE_KEYWORDS` for why this is narrower than the
+/// clause. See [`BODY_CLAUSE_KEYWORDS`] for why this is narrower than the
 /// CLHS `main-clause` production.
 #[must_use]
 pub fn is_body_clause_keyword(word: &str) -> bool {

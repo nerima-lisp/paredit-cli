@@ -59,7 +59,7 @@ use crate::support::{
 
 /// The one place this rule's dialect is decided.
 ///
-/// Both `crate::clojure_pre_post_vacuous::rule::Rule::dialect_scope` and
+/// Both [`crate::clojure_pre_post_vacuous::rule::Rule::dialect_scope`] and
 /// [`build_clojure_pre_post_vacuous_report`]'s `dialect_modelled` flag read it,
 /// so the engine's view of which dialects this rule runs for and the standalone
 /// report's claim about which dialects it measured cannot drift apart.

@@ -50,7 +50,7 @@ use paredit_core_syntax::sexpr::ExpressionView;
 /// document the *following* form.
 ///
 /// Narrowing was measured and rejected. Dropping `untrace` from
-/// `crate::leftover_trace_call::domain::HEADS` leaves 13 fixable findings, all
+/// [`crate::leftover_trace_call::domain::HEADS`] leaves 13 fixable findings, all
 /// still false positives, so it removes no defect. Gating to one dialect is
 /// unavailable: every one of the 19 is Common Lisp, the stratum a narrowing
 /// would have to keep.

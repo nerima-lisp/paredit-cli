@@ -74,7 +74,7 @@ impl Finding for TComparisonItem {
     /// parsing JSON.
     ///
     /// A closed set of four, already normalized to lowercase `&'static str` by
-    /// `equality_operator` — the source casing is not retained, so this is
+    /// [`equality_operator`] — the source casing is not retained, so this is
     /// the canonical name rather than whatever the file spelled.
     fn kind(&self) -> &'static str {
         self.operator

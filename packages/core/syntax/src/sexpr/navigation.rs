@@ -240,14 +240,6 @@ impl SyntaxTree {
     }
 
     /// The smallest non-root node whose span contains `offset`, if any.
-    ///
-    /// Descends from the root rather than scanning the whole arena: a list's
-    /// span always includes its delimiters, so it strictly contains every
-    /// child's span, and children are non-overlapping consecutive sibling
-    /// subforms in source order (see how `children` is populated in
-    /// `parser.rs`). An offset can therefore be inside at most one child at
-    /// each level, so following that child down is already "the smallest
-    /// span containing `offset`" without needing to compare span lengths.
     pub(in crate::sexpr) fn innermost_node_at(&self, offset: usize) -> Option<NodeId> {
         self.innermost_node_at_offset(ByteOffset::new(offset))
     }

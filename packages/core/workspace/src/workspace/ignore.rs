@@ -304,7 +304,7 @@ impl IgnoreStack {
     /// Reads the ignore files that `directory` contributes and pushes them.
     ///
     /// Returns the stack depth before the push, which the caller restores with
-    /// `Self::truncate` on the way back out.
+    /// [`Self::truncate`] on the way back out.
     ///
     /// `is_repository_root` makes this directory cut the stack for gitignore
     /// purposes: a nested checkout is governed by its own files only. That is

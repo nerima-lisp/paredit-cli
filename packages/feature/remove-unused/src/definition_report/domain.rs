@@ -93,13 +93,6 @@ pub struct ParsedDefinitionFile {
     pub definitions: Vec<DefinitionReportItem>,
     pub atoms: Vec<AtomOccurrence>,
     pub text: String,
-    /// The root view from the parse this file was already loaded with.
-    ///
-    /// Kept alongside `text` rather than instead of it: `text` is still read
-    /// directly for substring reference-needle scans, but this is what saves
-    /// `collect_unused_definition_candidates` from re-parsing `text` from
-    /// scratch just to get a view it already had once.
-    pub root_view: ExpressionView,
 }
 
 #[derive(Debug, Clone)]
@@ -164,7 +157,6 @@ pub fn build_parsed_definition_file(
         definitions,
         atoms: tree.atom_occurrences(),
         text: text.to_owned(),
-        root_view: tree.root_view(),
     })
 }
 
@@ -180,14 +172,26 @@ pub fn collect_unused_definition_candidates(
         }
     }
 
-    let views: Vec<&ExpressionView> = files.iter().map(|file| &file.root_view).collect();
+    let views: Vec<Option<ExpressionView>> = files
+        .iter()
+        .map(|file| {
+            SyntaxTree::parse_with_dialect(&file.text, file.dialect)
+                .map_err(|source| RemoveUnusedError::ParseFailed {
+                    path: file.path.display().to_string(),
+                    source,
+                })
+                .map(|tree| Some(tree.root_view()))
+        })
+        .collect::<RemoveUnusedResult<_>>()?;
 
     let package_form_spans: Vec<Vec<ByteSpan>> = files
         .iter()
-        .zip(&views)
-        .map(|(file, view)| {
+        .enumerate()
+        .map(|(index, file)| {
             let mut spans = Vec::new();
-            collect_package_form_spans(file.dialect, view, &mut spans);
+            if let Some(view) = &views[index] {
+                collect_package_form_spans(file.dialect, view, &mut spans);
+            }
             spans
         })
         .collect();
@@ -195,7 +199,9 @@ pub fn collect_unused_definition_candidates(
         .iter()
         .map(|view| {
             let mut needles = HashSet::new();
-            collect_reference_needles(view, &mut needles);
+            if let Some(view) = view {
+                collect_reference_needles(view, &mut needles);
+            }
             needles
         })
         .collect();
@@ -249,7 +255,7 @@ pub fn collect_unused_definition_candidates(
 
 fn file_unused_definition_report(
     files: &[ParsedDefinitionFile],
-    views: &[&ExpressionView],
+    views: &[Option<ExpressionView>],
     package_form_spans: &[Vec<ByteSpan>],
     atom_needles: &[HashSet<String>],
     file_index: usize,
@@ -273,10 +279,13 @@ fn file_unused_definition_report(
                     .enumerate()
                     .flat_map(|(other_index, other)| {
                         let mut spans = Vec::new();
-                        if atom_needles[other_index].contains(&needle) {
+                        if let Some(view) = views[other_index]
+                            .as_ref()
+                            .filter(|_| atom_needles[other_index].contains(&needle))
+                        {
                             collect_symbol_references(
                                 other.dialect,
-                                views[other_index],
+                                view,
                                 &symbol,
                                 &other.text,
                                 &mut spans,
@@ -465,16 +474,6 @@ mod tests {
         }
     }
 
-    /// A placeholder root view for a fixture whose own text is deliberately
-    /// unparseable: the dialect check this test exercises rejects the file
-    /// before any view is ever read, so what is stored here is never
-    /// examined, and it need not correspond to `text`.
-    fn placeholder_root_view() -> ExpressionView {
-        SyntaxTree::parse_with_dialect("()", Dialect::CommonLisp)
-            .expect("placeholder must parse")
-            .root_view()
-    }
-
     #[test]
     fn rejects_unknown_dialect_before_parsing_any_file() {
         let files = vec![
@@ -485,7 +484,6 @@ mod tests {
                 definitions: Vec::new(),
                 atoms: Vec::new(),
                 text: "(defun broken ()".to_owned(),
-                root_view: placeholder_root_view(),
             },
             ParsedDefinitionFile {
                 path: PathBuf::from("unknown.lisp"),
@@ -494,7 +492,6 @@ mod tests {
                 definitions: Vec::new(),
                 atoms: Vec::new(),
                 text: "()".to_owned(),
-                root_view: placeholder_root_view(),
             },
         ];
 
@@ -504,6 +501,22 @@ mod tests {
             error.to_string(),
             "unused-definition analysis does not support dialect unknown: unknown.lisp"
         );
+    }
+
+    #[test]
+    fn propagates_malformed_input_errors() {
+        let files = vec![ParsedDefinitionFile {
+            path: PathBuf::from("broken.lisp"),
+            dialect: Dialect::CommonLisp,
+            package: None,
+            definitions: Vec::new(),
+            atoms: Vec::new(),
+            text: "(defun broken ()".to_owned(),
+        }];
+
+        let error = collect_unused_definition_candidates(&files).expect_err("input must fail");
+
+        assert_eq!(error.to_string(), "failed to parse broken.lisp");
     }
 
     #[test]

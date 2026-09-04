@@ -1,5 +1,5 @@
 //! Inline lint-suppression directives: source comments that silence
-//! `crate::domain::lint_report` findings, the way `eslint-disable-next-line`
+//! [`crate::domain::lint_report`] findings, the way `eslint-disable-next-line`
 //! or `# noqa` do elsewhere.
 //!
 //! A directive is any Lisp comment containing one of three tokens:
@@ -309,10 +309,9 @@ impl LintSuppressions {
             let line_span = (line_start, line_start + raw.len());
             line_start += raw.len();
 
-            let scan = scan_line(line, in_string);
-            in_string = scan.in_string;
-            let had_code = scan.had_code;
-            let Some(start) = scan.comment_start else {
+            let (comment_start, had_code, next_in_string) = scan_line(line, in_string);
+            in_string = next_in_string;
+            let Some(start) = comment_start else {
                 continue;
             };
             let comment = &line[start..];
@@ -710,19 +709,10 @@ fn parse_directive(comment: &str) -> Option<ParsedDirective> {
     })
 }
 
-/// The byte offset where a line's comment begins (if any), whether
-/// non-whitespace code preceded that comment, and the in-string state after
-/// the line.
-struct LineScan {
-    comment_start: Option<usize>,
-    had_code: bool,
-    in_string: bool,
-}
-
 /// Scans one line (given the incoming in-string state) and returns the byte
 /// offset where its comment begins (if any), whether non-whitespace code
 /// preceded that comment, and the in-string state after the line.
-fn scan_line(line: &str, mut in_string: bool) -> LineScan {
+fn scan_line(line: &str, mut in_string: bool) -> (Option<usize>, bool, bool) {
     let mut had_code = false;
     let mut chars = line.char_indices().peekable();
     while let Some((offset, ch)) = chars.next() {
@@ -750,13 +740,7 @@ fn scan_line(line: &str, mut in_string: bool) -> LineScan {
                 chars.next();
                 chars.next();
             }
-            ';' => {
-                return LineScan {
-                    comment_start: Some(offset),
-                    had_code,
-                    in_string,
-                };
-            }
+            ';' => return (Some(offset), had_code, in_string),
             _ => {
                 if !ch.is_whitespace() {
                     had_code = true;
@@ -764,11 +748,7 @@ fn scan_line(line: &str, mut in_string: bool) -> LineScan {
             }
         }
     }
-    LineScan {
-        comment_start: None,
-        had_code,
-        in_string,
-    }
+    (None, had_code, in_string)
 }
 
 #[cfg(test)]

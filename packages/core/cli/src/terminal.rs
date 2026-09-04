@@ -15,7 +15,7 @@ const FALLBACK_WIDTH: usize = 80;
 /// The terminal's column count for stdout, or a fallback in this order:
 /// an ioctl reading (the terminal's actual width), then `COLUMNS` (what a
 /// shell exports, and what a wrapper without a real tty can still set), then
-/// `FALLBACK_WIDTH`.
+/// [`FALLBACK_WIDTH`].
 #[must_use]
 pub fn width() -> usize {
     ioctl_width().or_else(columns_env).unwrap_or(FALLBACK_WIDTH)

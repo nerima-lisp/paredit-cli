@@ -230,7 +230,7 @@ pub struct SelectorArgs {
     /// Select the smallest expression containing byte offset.
     #[arg(long, group = "selector-base")]
     pub at: Option<usize>,
-    /// Select the smallest expression at `LINE[:COLUMN]`, both 1-based.
+    /// Select the smallest expression at LINE[:COLUMN], both 1-based.
     #[arg(long, value_name = "LINE[:COLUMN]", group = "selector-base")]
     pub line_column: Option<LinePosition>,
     /// Select the definition named SYMBOL.

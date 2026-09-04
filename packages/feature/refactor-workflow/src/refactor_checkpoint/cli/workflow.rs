@@ -2,7 +2,6 @@ use paredit_core_cli::ArgumentError;
 use paredit_core_cli::CommandResult;
 use paredit_core_cli::diagnosis::ErrorCode;
 use paredit_core_cli::error::FeatureRefusal;
-use paredit_core_cli::shared::analyze_files_raw;
 
 use paredit_core_safety::journal::{UndoJournal, UndoJournalFile};
 
@@ -67,10 +66,6 @@ pub fn create_checkpoint(args: CreateCheckpointArgs) -> CommandResult {
         .map(RefactorRootGuard::new)
         .transpose()?;
 
-    // Deliberately not converted to the `analyze_files_raw` partial-failure
-    // pattern used elsewhere in this branch: fail-fast is load-bearing here,
-    // since a checkpoint must cover every requested file or record none at
-    // all, not silently omit one a later restore would then have no record of.
     let mut entries = Vec::with_capacity(args.files.len());
     let mut resolved_paths = Vec::with_capacity(args.files.len());
     for path in &args.files {
@@ -162,48 +157,23 @@ pub fn restore_checkpoint(args: RestoreCheckpointArgs) -> CommandResult {
         .map(RefactorRootGuard::new)
         .transpose()?;
 
-    // The read is the I/O-bound half and is parallelized; `entry.restore`
-    // (a hash comparison) is cheap enough to stay serial in the zip below. The
-    // closure never fails — an unreadable file is a blocked entry, not a
-    // dropped one — so `analyze_files_raw`'s order-preserving guarantee means
-    // `read_results.succeeded` lines up 1:1 with `checkpoint.journal.files`.
-    let paths = checkpoint
-        .journal
-        .files
-        .iter()
-        .map(|entry| entry.path.clone())
-        .collect::<Vec<_>>();
-    let read_results = analyze_files_raw(&paths, |path| {
-        Result::<_, std::convert::Infallible>::Ok(
-            match read_refactor_manifest_source(path, root_guard.as_ref()) {
-                Ok((_, current, _)) => Ok(current),
-                Err(error) => Err(format!("{error:#}")),
-            },
-        )
-    });
-    debug_assert!(read_results.failed.is_empty(), "the read never fails");
-
-    let mut files = checkpoint
-        .journal
-        .files
-        .iter()
-        .zip(read_results.succeeded)
-        .map(|(entry, read_result)| {
-            let (matches_checkpoint, blocked_reason) = match read_result {
-                Ok(current) => match entry.restore(&current) {
+    let mut files = Vec::with_capacity(checkpoint.journal.files.len());
+    for entry in &checkpoint.journal.files {
+        let (matches_checkpoint, blocked_reason) =
+            match read_refactor_manifest_source(&entry.path, root_guard.as_ref()) {
+                Ok((_, current, _)) => match entry.restore(&current) {
                     Ok(_) => (true, None),
                     Err(error) => (false, Some(error.to_string())),
                 },
-                Err(error) => (false, Some(error)),
+                Err(error) => (false, Some(format!("{error:#}"))),
             };
-            CheckpointRestoreFileResult {
-                path: entry.path.clone(),
-                matches_checkpoint,
-                restored: false,
-                blocked_reason,
-            }
-        })
-        .collect::<Vec<_>>();
+        files.push(CheckpointRestoreFileResult {
+            path: entry.path.clone(),
+            matches_checkpoint,
+            restored: false,
+            blocked_reason,
+        });
+    }
 
     let blocked_file_count = files.iter().filter(|file| !file.matches_checkpoint).count();
     let restorable_file_count = files.len() - blocked_file_count;

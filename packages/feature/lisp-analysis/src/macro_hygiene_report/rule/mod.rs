@@ -36,7 +36,7 @@
 //! - Sweeping macro density 0/2/5/10/100% gives ≈0/2/5/10/77% overhead — a
 //!   clean dose-response, with the crossover into measurable cost at about
 //!   **5% macro density**. Real Lisp sits an order of magnitude below that.
-//! - `HEADS` is what contains it: at 0% macro density the delta is −2.6%
+//! - [`HEADS`] is what contains it: at 0% macro density the delta is −2.6%
 //!   (noise), so widening the head list and adding four registry entries costs
 //!   nothing on the non-macro forms that are almost all of any file.
 //!

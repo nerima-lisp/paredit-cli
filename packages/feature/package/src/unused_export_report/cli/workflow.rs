@@ -1,4 +1,4 @@
-use paredit_core_cli::{CliResult, CommandResult};
+use paredit_core_cli::CommandResult;
 
 use crate::unused_export_report::cli::args::UnusedExportReportArgs;
 use crate::unused_export_report::cli::render::print_unused_export_report;
@@ -6,25 +6,17 @@ use crate::unused_export_report::usecase::{
     UnusedExportPolicyOptions, analyze_unused_exports, collect_declared_exports,
     collect_referenced_symbols, evaluate_unused_export_policy,
 };
-use paredit_core_cli::shared::{
-    analyze_files_raw, note_partial_file_failures, read_input_dialect_and_tree, total_file_failure,
-};
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
 pub fn unused_export_report(args: UnusedExportReportArgs) -> CommandResult {
-    let analysis = analyze_files_raw(&args.files, |file| {
+    let mut declared = Vec::new();
+    let mut referenced = Vec::new();
+
+    for file in &args.files {
         let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let declared = collect_declared_exports(file, dialect, &tree)?;
-        let referenced = collect_referenced_symbols(dialect, &tree)?;
-        CliResult::Ok((declared, referenced))
-    });
-    if analysis.is_total_failure() {
-        return Err(total_file_failure(analysis.failed).into());
+        declared.extend(collect_declared_exports(file, dialect, &tree)?);
+        referenced.extend(collect_referenced_symbols(dialect, &tree)?);
     }
-    note_partial_file_failures(&analysis.failed);
-    let (declared_lists, referenced_lists): (Vec<_>, Vec<_>) =
-        analysis.succeeded.into_iter().unzip();
-    let declared: Vec<_> = declared_lists.into_iter().flatten().collect();
-    let referenced: Vec<_> = referenced_lists.into_iter().flatten().collect();
 
     let summary = analyze_unused_exports(&declared, &referenced);
     let policy = evaluate_unused_export_policy(

@@ -100,7 +100,7 @@ impl Edit {
     /// A form that is not a quote at all *is* refused, because that is a
     /// selector that missed rather than a no-op worth reporting as success.
     ///
-    /// `dialect` decides which operators count: see `quote_operators`.
+    /// `dialect` decides which operators count: see [`quote_operators`].
     pub fn normalize_quotes(
         input: &str,
         tree: &SyntaxTree,

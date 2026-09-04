@@ -30,7 +30,7 @@ pub struct GateFailure(pub String);
 
 /// Builds a gate failure, ready to return from a command entry point.
 ///
-/// Returns `CommandFailure` rather than [`GateFailure`] so that the ~30
+/// Returns [`CommandFailure`] rather than [`GateFailure`] so that the ~30
 /// existing `return Err(gate_failure(format!(...)))` sites keep compiling
 /// unchanged: `Err(...)` performs no conversion of its own, only `?` does. The
 /// bare variant is still reachable as `CommandFailure::Gate` for a caller that

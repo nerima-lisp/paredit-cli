@@ -1,4 +1,4 @@
-use paredit_core_cli::{CliResult, CommandResult};
+use paredit_core_cli::CommandResult;
 
 use crate::system_conflict_report::cli::args::SystemConflictReportArgs;
 use crate::system_conflict_report::cli::render::print_system_conflict_report;
@@ -6,20 +6,15 @@ use crate::system_conflict_report::usecase::{
     SystemConflictPolicyOptions, analyze_system_conflicts, collect_declared_systems,
     evaluate_system_conflict_policy,
 };
-use paredit_core_cli::shared::{
-    analyze_files_raw, note_partial_file_failures, read_input_dialect_and_tree, total_file_failure,
-};
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
 pub fn system_conflict_report(args: SystemConflictReportArgs) -> CommandResult {
-    let analysis = analyze_files_raw(&args.files, |file| {
+    let mut declared = Vec::new();
+
+    for file in &args.files {
         let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        CliResult::Ok(collect_declared_systems(file, dialect, &tree)?)
-    });
-    if analysis.is_total_failure() {
-        return Err(total_file_failure(analysis.failed).into());
+        declared.extend(collect_declared_systems(file, dialect, &tree)?);
     }
-    note_partial_file_failures(&analysis.failed);
-    let declared: Vec<_> = analysis.succeeded.into_iter().flatten().collect();
 
     let summary = analyze_system_conflicts(&declared);
     let policy = evaluate_system_conflict_policy(

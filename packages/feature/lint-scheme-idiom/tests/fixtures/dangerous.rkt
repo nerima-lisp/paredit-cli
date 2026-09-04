@@ -7,13 +7,15 @@
 (define (start!) (begin (open-connection)))
 
 ;; scheme-let-star-independent-bindings, bracketed
-(define (window-size)
-        (let* ([width 80]
-               [height 24])
-          (cons width height)))
+(define
+ (window-size)
+ (let* ([width 80]
+        [height 24])
+   (cons width height)))
 
 ;; scheme-named-let-never-recurs, bracketed binding list
-(define (first-item items)
-        (let scan
-          ([rest items])
-          (car rest)))
+(define
+ (first-item items)
+ (let scan
+   ([rest items])
+   (car rest)))

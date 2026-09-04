@@ -2,12 +2,13 @@
 ;; an own-line directive (protects the next line), a trailing directive
 ;; (protects its own line), a bare directive (silences every rule on the
 ;; target line), and a multi-rule comma-separated directive.
+
 ;; paredit:ignore redundant-quote
 (list '5)
 
 (list '6)
 
-(< x) ; paredit:ignore single-arg-comparison
+(< x)  ; paredit:ignore single-arg-comparison
 
 ;; paredit:ignore
 (and (eq y y) '7)

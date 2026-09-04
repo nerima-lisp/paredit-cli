@@ -1,4 +1,5 @@
 ;;;; Depth, iteration forms, and the `loop` sublanguage.
+
 (in-package #:paredit-corpus)
 
 (defun deeply-nested (x)
@@ -10,9 +11,7 @@
                       (if (> x 5)
                           (if (> x 6)
                               (if (> x 7)
-                                  (if (> x 8)
-                                      :nine
-                                      :eight)
+                                  (if (> x 8) :nine :eight)
                                   :seven)
                               :six)
                           :five)
@@ -37,12 +36,9 @@
   (let ((a 1))
     (let* ((b (1+ a))
            (c (* b b)))
-      (flet ((scale (n)
-               (* n c)))
+      (flet ((scale (n) (* n c)))
         (labels ((recurse (n acc)
-                   (if (zerop n)
-                       acc
-                       (recurse (1- n) (scale acc)))))
+                   (if (zerop n) acc (recurse (1- n) (scale acc)))))
           (multiple-value-bind (quotient remainder) (floor (recurse 3 1) 7)
             (destructuring-bind (&key (base 10) &allow-other-keys) '(:base 16)
               (list quotient remainder base))))))))
@@ -50,14 +46,7 @@
 (defun resource-shapes (path)
   (with-open-file (stream path :direction :input :if-does-not-exist nil)
     (unwind-protect
-        (restart-case (read stream nil :eof)
-          (use-value (value)
-            :report
-            "Use a value"
-            value)
-          (skip ()
-            :report
-            "Skip the file"
-            nil))
-      (when stream
-        (close stream)))))
+         (restart-case (read stream nil :eof)
+           (use-value (value) :report "Use a value" value)
+           (skip () :report "Skip the file" nil))
+      (when stream (close stream)))))

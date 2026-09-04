@@ -10,8 +10,8 @@
       "rule": "self-assignment",
       "severity": "error",
       "span": {
-        "end": 4283,
-        "start": 4273
+        "end": 6885,
+        "start": 6875
       }
     },
     {
@@ -23,8 +23,8 @@
       "rule": "duplicate-setf-places",
       "severity": "error",
       "span": {
-        "end": 4351,
-        "start": 4321
+        "end": 6983,
+        "start": 6961
       }
     },
     {
@@ -36,8 +36,8 @@
       "rule": "setf-arity",
       "severity": "error",
       "span": {
-        "end": 4410,
-        "start": 4378
+        "end": 7047,
+        "start": 7021
       }
     },
     {
@@ -49,8 +49,8 @@
       "rule": "setq-non-variable",
       "severity": "error",
       "span": {
-        "end": 4438,
-        "start": 4431
+        "end": 7099,
+        "start": 7092
       }
     },
     {
@@ -62,8 +62,8 @@
       "rule": "manual-incf",
       "severity": "warning",
       "span": {
-        "end": 2301,
-        "start": 2282
+        "end": 3663,
+        "start": 3644
       }
     },
     {
@@ -75,8 +75,8 @@
       "rule": "manual-push",
       "severity": "warning",
       "span": {
-        "end": 2340,
-        "start": 2317
+        "end": 3733,
+        "start": 3710
       }
     },
     {
@@ -88,8 +88,8 @@
       "rule": "manual-pushnew",
       "severity": "warning",
       "span": {
-        "end": 2379,
-        "start": 2356
+        "end": 3799,
+        "start": 3776
       }
     },
     {
@@ -101,8 +101,8 @@
       "rule": "explicit-step-delta",
       "severity": "warning",
       "span": {
-        "end": 1800,
-        "start": 1786
+        "end": 2787,
+        "start": 2773
       }
     },
     {
@@ -114,8 +114,8 @@
       "rule": "negated-step-delta",
       "severity": "warning",
       "span": {
-        "end": 1837,
-        "start": 1824
+        "end": 2860,
+        "start": 2847
       }
     },
     {
@@ -127,8 +127,8 @@
       "rule": "explicit-nil-return",
       "severity": "warning",
       "span": {
-        "end": 1883,
-        "start": 1860
+        "end": 2941,
+        "start": 2920
       }
     },
     {
@@ -140,8 +140,8 @@
       "rule": "cons-to-list",
       "severity": "warning",
       "span": {
-        "end": 928,
-        "start": 916
+        "end": 1235,
+        "start": 1223
       }
     },
     {
@@ -153,8 +153,8 @@
       "rule": "double-reverse",
       "severity": "warning",
       "span": {
-        "end": 967,
-        "start": 945
+        "end": 1312,
+        "start": 1290
       }
     },
     {
@@ -166,8 +166,8 @@
       "rule": "modify-macro-arity",
       "severity": "error",
       "span": {
-        "end": 4481,
-        "start": 4463
+        "end": 7176,
+        "start": 7158
       }
     },
     {
@@ -179,8 +179,8 @@
       "rule": "duplicate-parameters",
       "severity": "error",
       "span": {
-        "end": 4550,
-        "start": 4504
+        "end": 7275,
+        "start": 7231
       }
     },
     {
@@ -192,8 +192,8 @@
       "rule": "duplicate-lambda-list-keyword",
       "severity": "error",
       "span": {
-        "end": 4618,
-        "start": 4575
+        "end": 7347,
+        "start": 7306
       }
     },
     {
@@ -205,8 +205,8 @@
       "rule": "lambda-list-keyword-order",
       "severity": "error",
       "span": {
-        "end": 4692,
-        "start": 4652
+        "end": 7428,
+        "start": 7390
       }
     },
     {
@@ -218,8 +218,8 @@
       "rule": "redundant-quote",
       "severity": "warning",
       "span": {
-        "end": 439,
-        "start": 437
+        "end": 440,
+        "start": 438
       }
     },
     {
@@ -231,8 +231,8 @@
       "rule": "redundant-progn",
       "severity": "warning",
       "span": {
-        "end": 474,
-        "start": 460
+        "end": 514,
+        "start": 502
       }
     },
     {
@@ -244,8 +244,8 @@
       "rule": "nested-progn",
       "severity": "warning",
       "span": {
-        "end": 526,
-        "start": 507
+        "end": 592,
+        "start": 581
       }
     },
     {
@@ -257,8 +257,8 @@
       "rule": "nested-when",
       "severity": "warning",
       "span": {
-        "end": 2034,
-        "start": 2004
+        "end": 3159,
+        "start": 3135
       }
     },
     {
@@ -270,8 +270,8 @@
       "rule": "nested-unless",
       "severity": "warning",
       "span": {
-        "end": 2084,
-        "start": 2050
+        "end": 3229,
+        "start": 3201
       }
     },
     {
@@ -283,8 +283,8 @@
       "rule": "nested-boolean",
       "severity": "warning",
       "span": {
-        "end": 1984,
-        "start": 1974
+        "end": 3083,
+        "start": 3073
       }
     },
     {
@@ -296,8 +296,8 @@
       "rule": "nested-cxr",
       "severity": "warning",
       "span": {
-        "end": 2411,
-        "start": 2398
+        "end": 3858,
+        "start": 3845
       }
     },
     {
@@ -309,8 +309,8 @@
       "rule": "nth-constant-index",
       "severity": "warning",
       "span": {
-        "end": 2436,
-        "start": 2426
+        "end": 3920,
+        "start": 3910
       }
     },
     {
@@ -322,8 +322,8 @@
       "rule": "nthcdr-zero",
       "severity": "warning",
       "span": {
-        "end": 2472,
-        "start": 2459
+        "end": 3996,
+        "start": 3983
       }
     },
     {
@@ -335,8 +335,8 @@
       "rule": "nthcdr-small-index",
       "severity": "warning",
       "span": {
-        "end": 2501,
-        "start": 2488
+        "end": 4062,
+        "start": 4049
       }
     },
     {
@@ -348,8 +348,8 @@
       "rule": "redundant-body-progn",
       "severity": "warning",
       "span": {
-        "end": 591,
-        "start": 572
+        "end": 676,
+        "start": 665
       }
     },
     {
@@ -361,8 +361,8 @@
       "rule": "empty-let",
       "severity": "warning",
       "span": {
-        "end": 641,
-        "start": 617
+        "end": 752,
+        "start": 732
       }
     },
     {
@@ -374,8 +374,8 @@
       "rule": "redundant-if-nil",
       "severity": "warning",
       "span": {
-        "end": 675,
-        "start": 655
+        "end": 808,
+        "start": 796
       }
     },
     {
@@ -387,8 +387,8 @@
       "rule": "redundant-let-star",
       "severity": "warning",
       "span": {
-        "end": 1673,
-        "start": 1655
+        "end": 2575,
+        "start": 2559
       }
     },
     {
@@ -400,8 +400,8 @@
       "rule": "redundant-funcall",
       "severity": "warning",
       "span": {
-        "end": 711,
-        "start": 696
+        "end": 882,
+        "start": 867
       }
     },
     {
@@ -413,8 +413,8 @@
       "rule": "redundant-the",
       "severity": "warning",
       "span": {
-        "end": 749,
-        "start": 733
+        "end": 955,
+        "start": 939
       }
     },
     {
@@ -426,8 +426,8 @@
       "rule": "funcall-lambda",
       "severity": "warning",
       "span": {
-        "end": 800,
-        "start": 767
+        "end": 1035,
+        "start": 1007
       }
     },
     {
@@ -439,8 +439,8 @@
       "rule": "sharp-quoted-lambda",
       "severity": "warning",
       "span": {
-        "end": 851,
-        "start": 828
+        "end": 1102,
+        "start": 1084
       }
     },
     {
@@ -452,8 +452,8 @@
       "rule": "redundant-identity",
       "severity": "warning",
       "span": {
-        "end": 893,
-        "start": 881
+        "end": 1162,
+        "start": 1150
       }
     },
     {
@@ -465,8 +465,8 @@
       "rule": "redundant-apply",
       "severity": "warning",
       "span": {
-        "end": 2544,
-        "start": 2524
+        "end": 4142,
+        "start": 4122
       }
     },
     {
@@ -478,8 +478,8 @@
       "rule": "redundant-eql-test",
       "severity": "warning",
       "span": {
-        "end": 2590,
-        "start": 2564
+        "end": 4218,
+        "start": 4192
       }
     },
     {
@@ -491,8 +491,8 @@
       "rule": "redundant-identity-key",
       "severity": "warning",
       "span": {
-        "end": 3489,
-        "start": 3459
+        "end": 5482,
+        "start": 5452
       }
     },
     {
@@ -504,8 +504,8 @@
       "rule": "negated-when-unless",
       "severity": "warning",
       "span": {
-        "end": 2229,
-        "start": 2211
+        "end": 3519,
+        "start": 3503
       }
     },
     {
@@ -517,8 +517,8 @@
       "rule": "negated-comparison",
       "severity": "warning",
       "span": {
-        "end": 3560,
-        "start": 3547
+        "end": 5612,
+        "start": 5599
       }
     },
     {
@@ -530,8 +530,8 @@
       "rule": "negated-if",
       "severity": "warning",
       "span": {
-        "end": 3607,
-        "start": 3583
+        "end": 5688,
+        "start": 5672
       }
     },
     {
@@ -543,8 +543,8 @@
       "rule": "if-to-or",
       "severity": "warning",
       "span": {
-        "end": 3643,
-        "start": 3622
+        "end": 5750,
+        "start": 5737
       }
     },
     {
@@ -556,8 +556,8 @@
       "rule": "if-not",
       "severity": "warning",
       "span": {
-        "end": 3677,
-        "start": 3656
+        "end": 5813,
+        "start": 5800
       }
     },
     {
@@ -569,8 +569,8 @@
       "rule": "one-step-arithmetic",
       "severity": "warning",
       "span": {
-        "end": 3881,
-        "start": 3872
+        "end": 6164,
+        "start": 6155
       }
     },
     {
@@ -582,8 +582,8 @@
       "rule": "one-armed-if",
       "severity": "warning",
       "span": {
-        "end": 2265,
-        "start": 2253
+        "end": 3585,
+        "start": 3577
       }
     },
     {
@@ -595,8 +595,8 @@
       "rule": "self-comparison",
       "severity": "error",
       "span": {
-        "end": 4746,
-        "start": 4728
+        "end": 7494,
+        "start": 7476
       }
     },
     {
@@ -608,8 +608,8 @@
       "rule": "nil-comparison",
       "severity": "warning",
       "span": {
-        "end": 4075,
-        "start": 4062
+        "end": 6531,
+        "start": 6518
       }
     },
     {
@@ -621,8 +621,8 @@
       "rule": "t-comparison",
       "severity": "warning",
       "span": {
-        "end": 4809,
-        "start": 4791
+        "end": 7576,
+        "start": 7558
       }
     },
     {
@@ -634,8 +634,8 @@
       "rule": "identical-if-branches",
       "severity": "error",
       "span": {
-        "end": 4860,
-        "start": 4827
+        "end": 7632,
+        "start": 7607
       }
     },
     {
@@ -647,8 +647,8 @@
       "rule": "constant-if-test",
       "severity": "warning",
       "span": {
-        "end": 3926,
-        "start": 3905
+        "end": 6242,
+        "start": 6229
       }
     },
     {
@@ -660,8 +660,8 @@
       "rule": "constant-when-test",
       "severity": "warning",
       "span": {
-        "end": 3962,
-        "start": 3947
+        "end": 6313,
+        "start": 6300
       }
     },
     {
@@ -673,8 +673,8 @@
       "rule": "if-arity",
       "severity": "error",
       "span": {
-        "end": 4184,
-        "start": 4160
+        "end": 6747,
+        "start": 6735
       }
     },
     {
@@ -686,8 +686,8 @@
       "rule": "the-arity",
       "severity": "error",
       "span": {
-        "end": 4898,
-        "start": 4886
+        "end": 7695,
+        "start": 7683
       }
     },
     {
@@ -699,8 +699,8 @@
       "rule": "equality-arity",
       "severity": "warning",
       "span": {
-        "end": 4918,
-        "start": 4912
+        "end": 7753,
+        "start": 7747
       }
     },
     {
@@ -712,8 +712,8 @@
       "rule": "accessor-arity",
       "severity": "error",
       "span": {
-        "end": 4950,
-        "start": 4937
+        "end": 7829,
+        "start": 7816
       }
     },
     {
@@ -725,8 +725,8 @@
       "rule": "append-list-to-cons",
       "severity": "warning",
       "span": {
-        "end": 1007,
-        "start": 986
+        "end": 1380,
+        "start": 1359
       }
     },
     {
@@ -738,8 +738,8 @@
       "rule": "format-to-string",
       "severity": "warning",
       "span": {
-        "end": 1051,
-        "start": 1031
+        "end": 1453,
+        "start": 1433
       }
     },
     {
@@ -751,8 +751,8 @@
       "rule": "format-newline",
       "severity": "warning",
       "span": {
-        "end": 1087,
-        "start": 1072
+        "end": 1519,
+        "start": 1504
       }
     },
     {
@@ -764,8 +764,8 @@
       "rule": "redundant-divisor",
       "severity": "warning",
       "span": {
-        "end": 1118,
-        "start": 1106
+        "end": 1585,
+        "start": 1573
       }
     },
     {
@@ -777,8 +777,8 @@
       "rule": "duplicate-case-keys",
       "severity": "error",
       "span": {
-        "end": 5004,
-        "start": 4969
+        "end": 7914,
+        "start": 7885
       }
     },
     {
@@ -790,8 +790,8 @@
       "rule": "quoted-case-key",
       "severity": "error",
       "span": {
-        "end": 5047,
-        "start": 5041
+        "end": 7976,
+        "start": 7970
       }
     },
     {
@@ -803,8 +803,8 @@
       "rule": "quoted-case-key",
       "severity": "error",
       "span": {
-        "end": 5066,
-        "start": 5059
+        "end": 7993,
+        "start": 7986
       }
     },
     {
@@ -816,8 +816,8 @@
       "rule": "case-nil-key",
       "severity": "error",
       "span": {
-        "end": 5116,
-        "start": 5113
+        "end": 8041,
+        "start": 8038
       }
     },
     {
@@ -829,8 +829,8 @@
       "rule": "typecase-nil-key",
       "severity": "error",
       "span": {
-        "end": 5163,
-        "start": 5160
+        "end": 8112,
+        "start": 8109
       }
     },
     {
@@ -842,8 +842,8 @@
       "rule": "malformed-case-clause",
       "severity": "error",
       "span": {
-        "end": 5218,
-        "start": 5217
+        "end": 8185,
+        "start": 8184
       }
     },
     {
@@ -855,8 +855,8 @@
       "rule": "malformed-case-clause",
       "severity": "error",
       "span": {
-        "end": 5225,
-        "start": 5221
+        "end": 8190,
+        "start": 8186
       }
     },
     {
@@ -868,8 +868,8 @@
       "rule": "unreachable-case-clause",
       "severity": "error",
       "span": {
-        "end": 5292,
-        "start": 5284
+        "end": 8277,
+        "start": 8269
       }
     },
     {
@@ -881,8 +881,8 @@
       "rule": "exhaustive-case-otherwise",
       "severity": "error",
       "span": {
-        "end": 5355,
-        "start": 5343
+        "end": 8351,
+        "start": 8339
       }
     },
     {
@@ -894,8 +894,8 @@
       "rule": "duplicate-cond-tests",
       "severity": "error",
       "span": {
-        "end": 5428,
-        "start": 5386
+        "end": 8437,
+        "start": 8401
       }
     },
     {
@@ -907,8 +907,8 @@
       "rule": "unreachable-cond-clause",
       "severity": "error",
       "span": {
-        "end": 5490,
-        "start": 5481
+        "end": 8507,
+        "start": 8498
       }
     },
     {
@@ -920,8 +920,8 @@
       "rule": "malformed-cond-clause",
       "severity": "error",
       "span": {
-        "end": 5571,
-        "start": 5566
+        "end": 8600,
+        "start": 8595
       }
     },
     {
@@ -933,8 +933,8 @@
       "rule": "duplicate-let-bindings",
       "severity": "error",
       "span": {
-        "end": 5639,
-        "start": 5598
+        "end": 8657,
+        "start": 8630
       }
     },
     {
@@ -946,8 +946,8 @@
       "rule": "malformed-let-binding",
       "severity": "error",
       "span": {
-        "end": 5681,
-        "start": 5672
+        "end": 8722,
+        "start": 8713
       }
     },
     {
@@ -959,8 +959,8 @@
       "rule": "binds-constant",
       "severity": "error",
       "span": {
-        "end": 5732,
-        "start": 5725
+        "end": 8796,
+        "start": 8789
       }
     },
     {
@@ -972,8 +972,8 @@
       "rule": "binds-constant",
       "severity": "error",
       "span": {
-        "end": 5752,
-        "start": 5739
+        "end": 8810,
+        "start": 8797
       }
     },
     {
@@ -985,8 +985,8 @@
       "rule": "malformed-iteration-spec",
       "severity": "error",
       "span": {
-        "end": 5794,
-        "start": 5791
+        "end": 8863,
+        "start": 8860
       }
     },
     {
@@ -998,8 +998,8 @@
       "rule": "eval-when-situation",
       "severity": "error",
       "span": {
-        "end": 5875,
-        "start": 5866
+        "end": 8970,
+        "start": 8961
       }
     },
     {
@@ -1011,8 +1011,8 @@
       "rule": "duplicate-boolean-operands",
       "severity": "error",
       "span": {
-        "end": 5915,
-        "start": 5905
+        "end": 9015,
+        "start": 9005
       }
     },
     {
@@ -1024,8 +1024,8 @@
       "rule": "dead-boolean-operand",
       "severity": "error",
       "span": {
-        "end": 5978,
-        "start": 5946
+        "end": 9118,
+        "start": 9086
       }
     },
     {
@@ -1037,8 +1037,8 @@
       "rule": "redundant-boolean-identity",
       "severity": "warning",
       "span": {
-        "end": 3996,
-        "start": 3985
+        "end": 6384,
+        "start": 6373
       }
     },
     {
@@ -1050,8 +1050,8 @@
       "rule": "de-morgan",
       "severity": "warning",
       "span": {
-        "end": 4048,
-        "start": 4027
+        "end": 6475,
+        "start": 6454
       }
     },
     {
@@ -1063,8 +1063,8 @@
       "rule": "single-operand-boolean",
       "severity": "warning",
       "span": {
-        "end": 2109,
-        "start": 2102
+        "end": 3276,
+        "start": 3269
       }
     },
     {
@@ -1076,8 +1076,8 @@
       "rule": "single-operand-list-op",
       "severity": "warning",
       "span": {
-        "end": 2149,
-        "start": 2136
+        "end": 3359,
+        "start": 3346
       }
     },
     {
@@ -1089,8 +1089,8 @@
       "rule": "single-operand-arithmetic",
       "severity": "warning",
       "span": {
-        "end": 2181,
-        "start": 2176
+        "end": 3428,
+        "start": 3423
       }
     },
     {
@@ -1102,8 +1102,8 @@
       "rule": "eql-string-comparison",
       "severity": "error",
       "span": {
-        "end": 6026,
-        "start": 6009
+        "end": 9184,
+        "start": 9167
       }
     },
     {
@@ -1115,8 +1115,8 @@
       "rule": "eql-list-comparison",
       "severity": "error",
       "span": {
-        "end": 6079,
-        "start": 6063
+        "end": 9259,
+        "start": 9243
       }
     },
     {
@@ -1128,8 +1128,8 @@
       "rule": "eql-search-literal",
       "severity": "error",
       "span": {
-        "end": 6153,
-        "start": 6135
+        "end": 9354,
+        "start": 9336
       }
     },
     {
@@ -1141,8 +1141,8 @@
       "rule": "eq-number-comparison",
       "severity": "error",
       "span": {
-        "end": 4102,
-        "start": 4094
+        "end": 6595,
+        "start": 6587
       }
     },
     {
@@ -1154,8 +1154,8 @@
       "rule": "eq-char-comparison",
       "severity": "error",
       "span": {
-        "end": 4137,
-        "start": 4127
+        "end": 6672,
+        "start": 6662
       }
     },
     {
@@ -1167,8 +1167,8 @@
       "rule": "single-arg-comparison",
       "severity": "error",
       "span": {
-        "end": 6211,
-        "start": 6206
+        "end": 9416,
+        "start": 9411
       }
     },
     {
@@ -1180,8 +1180,8 @@
       "rule": "sign-comparison",
       "severity": "warning",
       "span": {
-        "end": 3527,
-        "start": 3516
+        "end": 5540,
+        "start": 5529
       }
     },
     {
@@ -1193,8 +1193,8 @@
       "rule": "single-clause-cond",
       "severity": "warning",
       "span": {
-        "end": 1715,
-        "start": 1696
+        "end": 2649,
+        "start": 2632
       }
     },
     {
@@ -1206,8 +1206,8 @@
       "rule": "cond-t-clause",
       "severity": "warning",
       "span": {
-        "end": 1768,
-        "start": 1738
+        "end": 2725,
+        "start": 2705
       }
     },
     {
@@ -1219,8 +1219,8 @@
       "rule": "single-value-bind",
       "severity": "warning",
       "span": {
-        "end": 1945,
-        "start": 1907
+        "end": 3030,
+        "start": 2994
       }
     },
     {
@@ -1232,8 +1232,8 @@
       "rule": "format-missing-destination",
       "severity": "error",
       "span": {
-        "end": 6290,
-        "start": 6273
+        "end": 9500,
+        "start": 9483
       }
     },
     {
@@ -1245,8 +1245,8 @@
       "rule": "literal-place",
       "severity": "error",
       "span": {
-        "end": 6351,
-        "start": 6343
+        "end": 9568,
+        "start": 9560
       }
     },
     {
@@ -1258,8 +1258,8 @@
       "rule": "destructive-literal",
       "severity": "error",
       "span": {
-        "end": 6410,
-        "start": 6391
+        "end": 9647,
+        "start": 9628
       }
     },
     {
@@ -1271,8 +1271,8 @@
       "rule": "char-op-string",
       "severity": "error",
       "span": {
-        "end": 6477,
-        "start": 6464
+        "end": 9724,
+        "start": 9711
       }
     },
     {
@@ -1284,8 +1284,8 @@
       "rule": "empty-body",
       "severity": "warning",
       "span": {
-        "end": 6546,
-        "start": 6534
+        "end": 9790,
+        "start": 9778
       }
     },
     {
@@ -1297,8 +1297,8 @@
       "rule": "identity-arithmetic",
       "severity": "warning",
       "span": {
-        "end": 6593,
-        "start": 6586
+        "end": 9847,
+        "start": 9840
       }
     },
     {
@@ -1310,8 +1310,8 @@
       "rule": "verbose-negation",
       "severity": "warning",
       "span": {
-        "end": 1149,
-        "start": 1140
+        "end": 1654,
+        "start": 1645
       }
     },
     {
@@ -1323,8 +1323,8 @@
       "rule": "list-star-to-cons",
       "severity": "warning",
       "span": {
-        "end": 1183,
-        "start": 1170
+        "end": 1729,
+        "start": 1716
       }
     },
     {
@@ -1336,8 +1336,8 @@
       "rule": "values-list-of-list",
       "severity": "warning",
       "span": {
-        "end": 1231,
-        "start": 1205
+        "end": 1814,
+        "start": 1788
       }
     },
     {
@@ -1349,8 +1349,8 @@
       "rule": "redundant-prog1",
       "severity": "warning",
       "span": {
-        "end": 1270,
-        "start": 1255
+        "end": 1875,
+        "start": 1862
       }
     },
     {
@@ -1362,8 +1362,8 @@
       "rule": "subseq-zero",
       "severity": "warning",
       "span": {
-        "end": 1303,
-        "start": 1290
+        "end": 1945,
+        "start": 1932
       }
     },
     {
@@ -1375,8 +1375,8 @@
       "rule": "car-nthcdr",
       "severity": "warning",
       "span": {
-        "end": 1339,
-        "start": 1319
+        "end": 2018,
+        "start": 1998
       }
     },
     {
@@ -1388,8 +1388,8 @@
       "rule": "car-reverse",
       "severity": "warning",
       "span": {
-        "end": 1373,
-        "start": 1354
+        "end": 2082,
+        "start": 2063
       }
     },
     {
@@ -1401,8 +1401,8 @@
       "rule": "append-nil",
       "severity": "warning",
       "span": {
-        "end": 1405,
-        "start": 1389
+        "end": 2145,
+        "start": 2129
       }
     },
     {
@@ -1414,8 +1414,8 @@
       "rule": "multiple-value-list-of-values",
       "severity": "warning",
       "span": {
-        "end": 1458,
-        "start": 1420
+        "end": 2232,
+        "start": 2194
       }
     },
     {
@@ -1427,8 +1427,8 @@
       "rule": "typep-predicate",
       "severity": "warning",
       "span": {
-        "end": 1511,
-        "start": 1492
+        "end": 2297,
+        "start": 2278
       }
     },
     {
@@ -1440,8 +1440,8 @@
       "rule": "coerce-to-t",
       "severity": "warning",
       "span": {
-        "end": 1545,
-        "start": 1531
+        "end": 2362,
+        "start": 2348
       }
     },
     {
@@ -1453,8 +1453,8 @@
       "rule": "gethash-default",
       "severity": "warning",
       "span": {
-        "end": 1582,
-        "start": 1561
+        "end": 2435,
+        "start": 2414
       }
     },
     {
@@ -1466,8 +1466,8 @@
       "rule": "make-hash-table-test",
       "severity": "warning",
       "span": {
-        "end": 1630,
-        "start": 1602
+        "end": 2512,
+        "start": 2484
       }
     },
     {
@@ -1479,8 +1479,8 @@
       "rule": "zero-divisor",
       "severity": "warning",
       "span": {
-        "end": 6625,
-        "start": 6618
+        "end": 9899,
+        "start": 9892
       }
     },
     {
@@ -1492,8 +1492,8 @@
       "rule": "duplicate-keyword",
       "severity": "warning",
       "span": {
-        "end": 6670,
-        "start": 6642
+        "end": 9987,
+        "start": 9959
       }
     },
     {
@@ -1505,8 +1505,8 @@
       "rule": "defpackage-quoted",
       "severity": "warning",
       "span": {
-        "end": 6724,
-        "start": 6692
+        "end": 10063,
+        "start": 10031
       }
     },
     {
@@ -1518,8 +1518,8 @@
       "rule": "step-zero",
       "severity": "warning",
       "span": {
-        "end": 6762,
-        "start": 6746
+        "end": 10119,
+        "start": 10103
       }
     },
     {
@@ -1531,8 +1531,8 @@
       "rule": "if-to-unless",
       "severity": "warning",
       "span": {
-        "end": 3713,
-        "start": 3688
+        "end": 5878,
+        "start": 5861
       }
     },
     {
@@ -1544,8 +1544,8 @@
       "rule": "prog2-to-progn",
       "severity": "warning",
       "span": {
-        "end": 3753,
-        "start": 3730
+        "end": 5947,
+        "start": 5928
       }
     },
     {
@@ -1557,8 +1557,8 @@
       "rule": "handler-case-no-clauses",
       "severity": "warning",
       "span": {
-        "end": 3792,
-        "start": 3772
+        "end": 6017,
+        "start": 5997
       }
     },
     {
@@ -1570,8 +1570,8 @@
       "rule": "unwind-protect-no-cleanup",
       "severity": "warning",
       "span": {
-        "end": 3842,
-        "start": 3820
+        "end": 6097,
+        "start": 6075
       }
     },
     {
@@ -1583,8 +1583,8 @@
       "rule": "redundant-start-zero",
       "severity": "warning",
       "span": {
-        "end": 2636,
-        "start": 2613
+        "end": 4288,
+        "start": 4265
       }
     },
     {
@@ -1596,8 +1596,8 @@
       "rule": "redundant-end-nil",
       "severity": "warning",
       "span": {
-        "end": 2684,
-        "start": 2661
+        "end": 4363,
+        "start": 4340
       }
     },
     {
@@ -1609,8 +1609,8 @@
       "rule": "redundant-from-end-nil",
       "severity": "warning",
       "span": {
-        "end": 2734,
-        "start": 2706
+        "end": 4440,
+        "start": 4412
       }
     },
     {
@@ -1622,8 +1622,8 @@
       "rule": "redundant-count-nil",
       "severity": "warning",
       "span": {
-        "end": 2788,
-        "start": 2761
+        "end": 4516,
+        "start": 4489
       }
     },
     {
@@ -1635,8 +1635,8 @@
       "rule": "string-case-fold",
       "severity": "warning",
       "span": {
-        "end": 2863,
-        "start": 2812
+        "end": 4614,
+        "start": 4563
       }
     },
     {
@@ -1648,8 +1648,8 @@
       "rule": "char-case-fold",
       "severity": "warning",
       "span": {
-        "end": 2929,
-        "start": 2884
+        "end": 4679,
+        "start": 4634
       }
     },
     {
@@ -1661,8 +1661,8 @@
       "rule": "nested-string-case",
       "severity": "warning",
       "span": {
-        "end": 2985,
-        "start": 2948
+        "end": 4740,
+        "start": 4703
       }
     },
     {
@@ -1674,8 +1674,8 @@
       "rule": "code-char-char-code",
       "severity": "warning",
       "span": {
-        "end": 3035,
-        "start": 3008
+        "end": 4803,
+        "start": 4776
       }
     },
     {
@@ -1687,8 +1687,8 @@
       "rule": "last-default-count",
       "severity": "warning",
       "span": {
-        "end": 3071,
-        "start": 3059
+        "end": 4862,
+        "start": 4850
       }
     },
     {
@@ -1700,8 +1700,8 @@
       "rule": "butlast-default-count",
       "severity": "warning",
       "span": {
-        "end": 3109,
-        "start": 3094
+        "end": 4938,
+        "start": 4923
       }
     },
     {
@@ -1713,8 +1713,8 @@
       "rule": "make-list-default-element",
       "severity": "warning",
       "span": {
-        "end": 3171,
-        "start": 3135
+        "end": 5035,
+        "start": 4999
       }
     },
     {
@@ -1726,8 +1726,8 @@
       "rule": "parse-integer-default-radix",
       "severity": "warning",
       "span": {
-        "end": 3230,
-        "start": 3201
+        "end": 5108,
+        "start": 5079
       }
     },
     {
@@ -1739,8 +1739,8 @@
       "rule": "getf-default-nil",
       "severity": "warning",
       "span": {
-        "end": 3281,
-        "start": 3262
+        "end": 5180,
+        "start": 5161
       }
     },
     {
@@ -1752,8 +1752,8 @@
       "rule": "make-array-default-keyword",
       "severity": "warning",
       "span": {
-        "end": 3335,
-        "start": 3302
+        "end": 5265,
+        "start": 5232
       }
     },
     {
@@ -1765,8 +1765,8 @@
       "rule": "nested-char-case",
       "severity": "warning",
       "span": {
-        "end": 3399,
-        "start": 3366
+        "end": 5346,
+        "start": 5313
       }
     },
     {
@@ -1778,8 +1778,8 @@
       "rule": "list-star-nil",
       "severity": "warning",
       "span": {
-        "end": 3441,
-        "start": 3420
+        "end": 5405,
+        "start": 5384
       }
     },
     {
@@ -1791,7 +1791,7 @@
       "rule": "declarative-style-score",
       "severity": "warning",
       "span": {
-        "end": 6775,
+        "end": 10167,
         "start": 0
       }
     },
@@ -1804,8 +1804,8 @@
       "rule": "leftover-print-debug",
       "severity": "warning",
       "span": {
-        "end": 5806,
-        "start": 5797
+        "end": 8873,
+        "start": 8864
       }
     },
     {
@@ -1817,8 +1817,8 @@
       "rule": "defpackage-without-in-package",
       "severity": "warning",
       "span": {
-        "end": 6724,
-        "start": 6692
+        "end": 10063,
+        "start": 10031
       }
     },
     {
@@ -1830,8 +1830,8 @@
       "rule": "return-from-unmatched-block",
       "severity": "warning",
       "span": {
-        "end": 1883,
-        "start": 1860
+        "end": 2941,
+        "start": 2920
       }
     },
     {
@@ -1843,8 +1843,8 @@
       "rule": "unused-local-binding",
       "severity": "warning",
       "span": {
-        "end": 5606,
-        "start": 5605
+        "end": 8638,
+        "start": 8637
       }
     },
     {
@@ -1856,8 +1856,8 @@
       "rule": "unused-local-binding",
       "severity": "warning",
       "span": {
-        "end": 5618,
-        "start": 5617
+        "end": 8644,
+        "start": 8643
       }
     }
   ],

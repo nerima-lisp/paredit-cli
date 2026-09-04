@@ -31,7 +31,7 @@
 //! files with zero findings, which is exactly that cost.
 //!
 //! [`locate`]'s top-level step uses [`SyntaxTree::root_child_span`] rather than
-//! `select_path(&Path::root_child(i))`: `Path` owns a `Vec`, so the obvious
+//! `select_path(&Path::root_child(i))`: [`Path`] owns a `Vec`, so the obvious
 //! spelling heap-allocates once per sibling scanned.
 
 use paredit_core_syntax::sexpr::{

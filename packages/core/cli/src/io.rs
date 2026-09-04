@@ -28,7 +28,7 @@ const CLEANUP_QUARANTINE_MODE: u32 = 0o700;
 ///
 /// Still the default and no longer the only possible value: a run may lower it
 /// with `--max-input-bytes` or `PAREDIT_MAX_INPUT_BYTES`, which is what
-/// `max_source_input_bytes` resolves. Kept public and unchanged because it
+/// [`max_source_input_bytes`] resolves. Kept public and unchanged because it
 /// is the documented default and several callers quote it as such.
 pub const MAX_SOURCE_INPUT_BYTES: u64 = paredit_core_safety::limits::DEFAULT_MAX_INPUT_BYTES;
 
@@ -1199,17 +1199,17 @@ pub struct WritabilityCheck {
 /// Checks whether `path` could be written to right now, changing nothing.
 ///
 /// Reuses the exact staging step a real write goes through — the same
-/// batch-level refusals (`ensure_writes_are_permitted`), the same
+/// batch-level refusals ([`ensure_writes_are_permitted`]), the same
 /// symlink/regular-file refusals, the same parent-directory permission
-/// check, the same write lock (see `acquire_write_lock`), and, because
+/// check, the same write lock (see [`acquire_write_lock`]), and, because
 /// staging writes a same-size placeholder into a sibling file on the same
 /// filesystem before ever touching `path` itself, the same evidence of
 /// whether there is room for a write of about this size — then discards the
 /// staged sibling it created instead of publishing it.
 ///
 /// The backup copy is the one staging step this deliberately skips, via
-/// `StagingIntent::Probe`: it exists only to roll a publish back, and a
-/// probe never publishes. See `StagingIntent` for what it used to cost.
+/// [`StagingIntent::Probe`]: it exists only to roll a publish back, and a
+/// probe never publishes. See [`StagingIntent`] for what it used to cost.
 ///
 /// `--dry-run` is checked *first*, before any lock or sibling file. The
 /// guarantee that flag makes — nothing is written to disk — has to hold for

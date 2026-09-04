@@ -835,7 +835,6 @@ dependencies = [
  "blake3",
  "cap-std",
  "libc",
- "paredit-core-safety",
  "paredit-core-syntax",
  "proptest",
  "serde_json",

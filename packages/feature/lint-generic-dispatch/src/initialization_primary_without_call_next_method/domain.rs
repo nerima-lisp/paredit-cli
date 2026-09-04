@@ -57,7 +57,7 @@
 //!   (CLHS 7.1.7). It reaches the protocol without the indirection.
 //! - **`shared-initialize`**, `update-instance-for-different-class` and
 //!   `update-instance-for-redefined-class` are no longer modelled at all. See
-//!   `INITIALIZATION_GENERICS`.
+//!   [`INITIALIZATION_GENERICS`].
 //!
 //! With both, the rule reports nothing anywhere in that corpus.
 //!

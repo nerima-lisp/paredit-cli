@@ -8,21 +8,23 @@ use crate::shadowed_binding_report::usecase::{
     ShadowedBindingPolicyOptions, build_shadowed_binding_report, evaluate_shadowed_binding_policy,
 };
 use paredit_core_cli::args::DialectArg;
-use paredit_core_cli::shared::{analyze_files, note_partial_file_failures, total_file_failure};
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 use paredit_core_cli::{CliResult, CommandResult};
 use paredit_core_workspace::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
 
 pub fn shadowed_binding_report(args: ShadowedBindingReportArgs) -> CommandResult {
     let files = expand_shadowed_binding_report_inputs(&args.files, args.dialect)?;
-    // A file that will not parse is reported, not fatal — see `query find`.
-    let analysis = analyze_files(&files, args.dialect, |file, dialect, tree, input| {
-        build_shadowed_binding_report(file.to_path_buf(), dialect, &input.text, tree)
-    });
-    if analysis.is_total_failure() {
-        return Err(total_file_failure(analysis.failed).into());
+    let mut reports = Vec::with_capacity(files.len());
+
+    for file in &files {
+        let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+        reports.push(build_shadowed_binding_report(
+            file.clone(),
+            dialect,
+            &input.text,
+            &tree,
+        )?);
     }
-    note_partial_file_failures(&analysis.failed);
-    let reports = analysis.succeeded;
 
     let policy = evaluate_shadowed_binding_policy(
         ShadowedBindingPolicyOptions::new(args.fail_on_shadowed),
