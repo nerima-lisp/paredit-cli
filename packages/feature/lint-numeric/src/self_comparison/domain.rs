@@ -71,8 +71,6 @@ impl Finding for SelfComparisonItem {
         ]
     }
 
-    /// The same sentence the `self-comparison` lint rule writes, so a SARIF or
-    /// JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!(
             "{} compares operand {} with itself",
@@ -118,10 +116,7 @@ pub fn examine_comparison(
 /// file, with the number of comparison calls scanned as the denominator beside
 /// them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no comparison repeats an operand" for
-/// Common Lisp and "nothing was looked for" for Fennel, and the two read
-/// identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_self_comparison_report(
     path: &Path,
     dialect: Dialect,
@@ -167,7 +162,6 @@ mod tests {
             .expect("build self comparison report")
     }
 
-    /// The `(comparison_form_count, violations)` pair the report is built from.
     fn comparisons(input: &str) -> (u64, Vec<SelfComparisonItem>) {
         let report = report(input);
         let count = report
@@ -223,8 +217,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse("(eq x x)").expect("parse input");

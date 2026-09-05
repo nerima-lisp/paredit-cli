@@ -120,8 +120,7 @@ fn defun_binding_is_unaffected_by_the_new_defmethod_arm() {
 
 /// Regression: `defgeneric` is not a method definition (`is_method_definition`
 /// excludes it) and was never dispatched by `is_defun_like` either; its
-/// binding behavior — no parameter scope opened — must stay exactly as it
-/// was before this change.
+/// binding behavior must remain unchanged: it opens no parameter scope.
 #[test]
 fn defgeneric_binding_is_unaffected_by_the_new_defmethod_arm() {
     let input = "(defgeneric handle (obj arg))";

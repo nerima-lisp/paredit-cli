@@ -1,9 +1,6 @@
 //! `slot-value-bypasses-accessor`: a `slot-value` read of a slot the file
 //! declares an accessor for.
 //!
-//! The analysis lives in [`crate::slot_value_bypasses_accessor::domain`], which
-//! also backs the standalone `inspect slot-value-bypasses-accessor` command;
-//! this module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 
@@ -24,8 +21,8 @@ pub const META: RuleMeta = RuleMeta::new(
     // `(slot-value o 'x)` to `(x-of o)` is only correct when `x-of` is not
     // shadowed at that point by an enclosing `flet`/`labels`/`macrolet` — and a
     // rule under `HeadFilter::Heads` sees one node, not its enclosing binding
-    // forms, so it cannot check that here. A previous batch shipped exactly
-    // this rewrite without the check and deleted callers' own local functions.
+    // forms, so it cannot prove that the replacement preserves calls to local
+    // functions with the accessor's name.
     Fixability::ReportOnly,
 );
 

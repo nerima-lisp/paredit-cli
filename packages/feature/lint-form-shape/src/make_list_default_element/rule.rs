@@ -1,8 +1,5 @@
 //! `make-list-default-element`: a make-list call with an explicit :initial-element nil, the default ((make-list n :initial-element nil) is (make-list n)).
 //!
-//! The analysis lives in [`crate::make_list_default_element::domain`], which also backs the
-//! standalone `inspect make-list-default-element` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

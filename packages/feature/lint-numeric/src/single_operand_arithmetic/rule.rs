@@ -1,8 +1,5 @@
 //! `single-operand-arithmetic`: a single-operand +/* ((+ X) and (* X) are just X).
 //!
-//! The analysis lives in [`crate::single_operand_arithmetic::domain`], which also backs the
-//! standalone `inspect single-operand-arithmetic` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

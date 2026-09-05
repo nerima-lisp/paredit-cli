@@ -1,8 +1,5 @@
 //! `sharp-quoted-lambda`: a lambda form with a redundant #' prefix (#'(lambda (x) x) is (lambda (x) x)).
 //!
-//! The analysis lives in [`crate::sharp_quoted_lambda::domain`], which also backs the
-//! standalone `inspect sharp-quoted-lambda` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

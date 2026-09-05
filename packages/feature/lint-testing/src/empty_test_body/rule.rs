@@ -1,8 +1,5 @@
 //! `empty-test-body`: a test definition with no body at all.
 //!
-//! The analysis lives in [`crate::empty_test_body::domain`], which also backs
-//! the standalone `inspect empty-test-body` command; this module only registers
-//! it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

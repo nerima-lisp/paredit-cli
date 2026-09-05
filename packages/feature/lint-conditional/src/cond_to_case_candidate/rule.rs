@@ -1,9 +1,6 @@
 //! `cond-to-case-candidate`: a cond whose every test compares one variable
 //! against a literal.
 //!
-//! The analysis lives in [`crate::cond_to_case_candidate::domain`], which also
-//! backs the standalone `inspect cond-to-case-candidate` command; this module
-//! only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

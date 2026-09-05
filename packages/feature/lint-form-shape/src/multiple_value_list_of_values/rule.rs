@@ -1,8 +1,5 @@
 //! `multiple-value-list-of-values`: a multiple-value-list of a values form ((multiple-value-list (values a b)) is (list a b)).
 //!
-//! The analysis lives in [`crate::multiple_value_list_of_values::domain`], which also backs the
-//! standalone `inspect multiple-value-list-of-values` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

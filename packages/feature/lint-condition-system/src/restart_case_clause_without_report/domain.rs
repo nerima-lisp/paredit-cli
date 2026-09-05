@@ -134,8 +134,6 @@ fn restart_name(clause: &ExpressionView) -> Option<String> {
     is_paren_list(lambda_list).then_some(name)
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_restart_case(
     view: &ExpressionView,
     restart_clause_count: &mut usize,
@@ -171,10 +169,7 @@ pub fn examine_restart_case(
 /// restart clauses this rule has an opinion about as the denominator beside
 /// them — every clause scanned except the [`STANDARD_RESTARTS`] ones.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "every restart here explains itself" for
-/// Common Lisp and "nothing was looked for" for Clojure, and the two read
-/// identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_restart_case_clause_without_report_report(
     path: &Path,
     dialect: Dialect,

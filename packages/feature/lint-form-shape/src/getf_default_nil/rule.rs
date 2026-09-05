@@ -1,8 +1,5 @@
 //! `getf-default-nil`: a getf call with an explicit nil default, the default ((getf p k nil) is (getf p k)).
 //!
-//! The analysis lives in [`crate::getf_default_nil::domain`], which also backs the
-//! standalone `inspect getf-default-nil` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

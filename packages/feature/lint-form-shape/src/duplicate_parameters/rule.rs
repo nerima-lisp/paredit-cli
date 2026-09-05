@@ -1,8 +1,5 @@
 //! `duplicate-parameters`: a lambda list that names the same parameter more than once.
 //!
-//! The analysis lives in [`crate::duplicate_parameters::domain`], which also backs the
-//! standalone `inspect duplicate-parameters` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

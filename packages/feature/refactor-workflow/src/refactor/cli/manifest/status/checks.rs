@@ -1,16 +1,7 @@
 //! What a manifest was checked for, as one named value.
 //!
-//! Phase 7. `refactor_manifest_decision` used to take
-//! `(bool, bool, usize, usize, usize, usize)` — two adjacent booleans followed
-//! by four adjacent counts, none of which the compiler could tell apart. A
-//! caller that swapped `stale_file_count` and `parse_error_count`, or the two
-//! booleans, produced a different user-visible verdict and a different exit
-//! code, and nothing would have caught it.
-//!
-//! This is the repository's own "request in, decision out" shape, which the
-//! architecture guide states for application use cases, applied to the one
-//! function where six positional arguments decide whether a refactor may be
-//! applied.
+//! Named inputs prevent policy flags and finding counts from being transposed
+//! when deciding whether a refactor may be applied.
 
 /// Whether the manifest's own policy gate passed.
 ///

@@ -1,8 +1,5 @@
 //! `car-reverse`: a car of a reverse, a wasteful full copy ((car (reverse x)) is (car (last x))).
 //!
-//! The analysis lives in [`crate::car_reverse::domain`], which also backs the
-//! standalone `inspect car-reverse` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

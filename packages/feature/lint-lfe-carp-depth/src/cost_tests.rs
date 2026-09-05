@@ -12,8 +12,8 @@
 //!   rule's is that rule's own work rather than the dispatcher's.
 //! - **`cost-control-eager-root-view`** is the *ordering mistake*, written out:
 //!   it calls `root_view` first and does its cheap check second. It is the
-//!   same shape an earlier batch in this workspace measured at 450843 ns/call
-//!   against 28 ns/call, and it exists so the cost of getting the order wrong
+//!   same shape measured at 450843 ns/call against 28 ns/call, and it exists
+//!   so the cost of getting the order wrong
 //!   is a number in this file rather than a warning in a comment.
 //!
 //! # What runs unattended
@@ -102,7 +102,7 @@ impl LintRule for NoopRule {
 ///
 /// Every visited head pays for a full materialization of the document, whether
 /// or not it could ever produce a finding. This is the shape that measured
-/// four orders of magnitude in an earlier batch, and its column in the report
+/// four orders of magnitude in the reference measurement, and its column in the report
 /// is what that mistake would cost here.
 #[derive(Debug)]
 struct EagerRootViewRule;

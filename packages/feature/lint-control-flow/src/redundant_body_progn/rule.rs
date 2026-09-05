@@ -1,8 +1,5 @@
 //! `redundant-body-progn`: a multi-form progn used as a when/unless/let/defun/... body (its forms splice in).
 //!
-//! The analysis lives in [`crate::redundant_body_progn::domain`], which also backs the
-//! standalone `inspect redundant-body-progn` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

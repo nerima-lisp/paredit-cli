@@ -7,8 +7,6 @@ pub mod sort_exports;
 pub mod sort_options;
 pub mod types;
 
-// Hoisted for the composition root (section 4.2): the argument type and
-// run function of each subcommand this slice owns.
 pub use add_export::add_export;
 pub use merge_options::merge_package_options;
 pub use rename::rename_package;

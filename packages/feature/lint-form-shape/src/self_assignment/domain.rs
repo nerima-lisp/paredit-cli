@@ -66,15 +66,11 @@ impl Finding for SelfAssignmentItem {
         ]
     }
 
-    /// The same sentence the `self-assignment` lint rule writes, so a SARIF or
-    /// JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!("{} assigns place {} to itself", self.operator, self.place)
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_assignment(
     view: &ExpressionView,
     assignment_form_count: &mut usize,
@@ -108,10 +104,7 @@ pub fn examine_assignment(
 /// Collects every self-assigning place in one file, with the number of
 /// assignment forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no self-assignment here" for Common Lisp
-/// and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_self_assignment_report(
     path: &Path,
     dialect: Dialect,
@@ -225,8 +218,6 @@ mod tests {
         assert!(self_assignments.is_empty());
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse("(setq x x)").expect("parse input");

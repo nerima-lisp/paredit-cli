@@ -1,8 +1,5 @@
 //! `binds-constant`: a let/let*/do/do* binding whose variable is a constant (nil, t, or a keyword).
 //!
-//! The analysis lives in [`crate::binds_constant::domain`], which also backs the
-//! standalone `inspect binds-constant` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

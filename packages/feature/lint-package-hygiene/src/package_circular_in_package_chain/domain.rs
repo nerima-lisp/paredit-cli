@@ -106,8 +106,6 @@ impl Finding for CircularInPackageChainItem {
         ]
     }
 
-    /// The same sentence the lint rule writes, so a SARIF or JUnit consumer
-    /// reading both sees one finding described one way.
     fn message(&self) -> String {
         format!(
             "package {} is entered again after the file left it for {}; its top-level forms are \
@@ -278,10 +276,7 @@ pub fn examine_in_package(
 /// Collects every re-entered package in one file, with the number of top-level
 /// package switches scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "this file never doubles back" for Common
-/// Lisp and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_circular_in_package_chain_report(
     path: &Path,
     dialect: Dialect,

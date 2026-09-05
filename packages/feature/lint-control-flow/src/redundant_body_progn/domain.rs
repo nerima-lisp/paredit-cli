@@ -20,8 +20,6 @@
 //! never body positions — so a `(progn …)` used as a binding init or a single
 //! value expression is correctly left alone.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -87,8 +85,6 @@ pub struct RedundantBodyPrognItem {
     /// The span covering just the inner progn's body forms, so a fix can splice
     /// that source in place of the wrapper.
     ///
-    /// The rewrite's input, not the report's: the lint rule slices it to build
-    /// the replacement, and the command has never printed it.
     pub body_span: ByteSpan,
     /// The inner progn's body form count (always >= 2 here).
     pub body_form_count: usize,
@@ -122,8 +118,6 @@ impl Finding for RedundantBodyPrognItem {
         ]
     }
 
-    /// The same sentence the `redundant-body-progn` lint rule writes, so a
-    /// SARIF or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!(
             "progn with {} forms is a {} body; splice its forms in",
@@ -132,8 +126,6 @@ impl Finding for RedundantBodyPrognItem {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_form(
     view: &ExpressionView,
     implicit_progn_form_count: &mut usize,
@@ -173,10 +165,7 @@ pub fn examine_form(
 /// question this report answers is "how many implicit-progn bodies were looked
 /// at, and how many of them wrap their forms needlessly".
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no redundant body progn here" for Common
-/// Lisp and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_redundant_body_progn_report(
     path: &Path,
     dialect: Dialect,
@@ -307,8 +296,6 @@ mod tests {
         assert_eq!(violations[0].parent, "when");
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(when c (progn a b))", Dialect::Clojure)

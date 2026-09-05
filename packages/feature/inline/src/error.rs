@@ -1,26 +1,7 @@
 //! Why an inline refuses to run.
 //!
-//! Section 9.2, and the largest package in the tree: 221 refusal sites, 167
-//! distinct messages. The design question it forces is the one `core/cli`
-//! asked about `.context()` — *when does a variant name the failure, and when
-//! does it name the call site?*
-//!
-//! Seventy-four of these are the `inline-function` lambda-list and
-//! destructuring reader saying some form of:
-//!
-//! ```text
-//! inline-function currently supports only simple symbol &rest parameters
-//! inline-function does not support &optional parameters after &rest or &body
-//! inline-function supports at most one &whole parameter
-//! inline-function &environment must be followed by a binding name
-//! ```
-//!
-//! Seventy-four variants would name seventy-four call sites. They all mean one
-//! thing to a caller — *this lambda list is more complex than inlining
-//! handles, so do not inline it* — and the construct that was too complex is
-//! the payload, not the kind. So [`UnsupportedLambdaList`] has eight variants
-//! and carries the construct as a `String`, in the same spirit as
-//! `CliError::Io` carrying its context.
+//! [`UnsupportedLambdaList`] groups unsupported lambda-list shapes by the
+//! caller's response and carries the rejected construct as data.
 //!
 //! The refusals that *are* distinct kinds get distinct types:
 //!
@@ -44,9 +25,8 @@ use paredit_core_syntax::sexpr::SexprError;
 /// The lambda list or destructuring pattern is more complex than inlining
 /// handles.
 ///
-/// Eight variants for seventy-four messages. The construct is the payload
-/// because a caller's response does not vary with it: this definition cannot
-/// be inlined, and the text says which part was the problem.
+/// The construct is the payload because the caller's response does not vary
+/// with it: this definition cannot be inlined, and the text identifies why.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum UnsupportedLambdaList {
     #[error("inline-function currently supports only {supported}")]

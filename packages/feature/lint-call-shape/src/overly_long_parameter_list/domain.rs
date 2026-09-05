@@ -127,9 +127,6 @@ pub fn message(form: &str, name: &str, count: usize, threshold: usize) -> String
     )
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// definition through the single dispatch pass instead of walking the tree
-/// again.
 pub fn examine_definition(
     tree: &SyntaxTree,
     view: &ExpressionView,

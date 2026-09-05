@@ -37,9 +37,6 @@ fn cli_does_not_flag_idiomatic_numbers() {
         .stdout(predicate::str::contains("\"finding_count\": 0"));
 }
 
-/// An empty finding list is ambiguous, so a dialect the value layer does not
-/// model (Clojure is not Common Lisp or Emacs Lisp) must be labelled rather
-/// than silently reported as clean.
 #[test]
 fn cli_magic_numbers_labels_a_dialect_the_rule_does_not_model() {
     let dir = fresh_temp_dir("magic-number-report-unmodelled");

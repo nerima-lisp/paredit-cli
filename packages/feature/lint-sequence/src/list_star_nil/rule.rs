@@ -1,8 +1,5 @@
 //! `list-star-nil`: a list* with a nil tail, a spelled-out list ((list* a b nil) is (list a b)).
 //!
-//! The analysis lives in [`crate::list_star_nil::domain`], which also backs the
-//! standalone `inspect list-star-nil` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

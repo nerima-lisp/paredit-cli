@@ -1,8 +1,5 @@
 //! `eql-list-comparison`: an eq/eql compared against a quoted list literal (never reliably eql).
 //!
-//! The analysis lives in [`crate::eql_list_comparison::domain`], which also backs the
-//! standalone `inspect eql-list-comparison` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

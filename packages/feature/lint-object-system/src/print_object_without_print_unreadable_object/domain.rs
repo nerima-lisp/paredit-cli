@@ -98,8 +98,6 @@ fn first_writer(body: &[ExpressionView]) -> Option<&'static str> {
         .find(|writer| body.iter().any(|form| support::calls_any(form, &[writer])))
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_print_object_without_print_unreadable_object(
     tree: &SyntaxTree,
     view: &ExpressionView,
@@ -143,8 +141,7 @@ pub fn examine_print_object_without_print_unreadable_object(
 /// Collects every unframed `print-object` method in one file, with the number
 /// of `print-object` methods scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: `print-object` and `*print-readably*` are Common Lisp's.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_print_object_without_print_unreadable_object_report(
     path: &Path,
     dialect: Dialect,

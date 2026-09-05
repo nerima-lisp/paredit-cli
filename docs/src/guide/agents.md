@@ -50,7 +50,7 @@ Every call's result carries a `structuredContent` object alongside its text:
 }
 ```
 
-Four things worth knowing:
+Four behavioral guarantees:
 
 - **`--read-only` is a promise, not a report.** A command carrying `--write`,
   `--fix`, or `--apply` is refused before the process starts, and so is one
@@ -111,7 +111,7 @@ Each cell carries one of four statuses:
 | `unsupported` | The command refuses and exits non-zero. |
 | `unknown` | Not classified. No cell answers this today. |
 
-`silent` is the one worth reading carefully. Almost every `inspect` command
+Pay particular attention to `silent`. Almost every `inspect` command
 exits `0` for every dialect, so a `finding_count` of `0` looks identical
 whether the code is clean or the tool has nothing to say about it. 288 of the
 467 commands are `silent` for at least one dialect outside Common Lisp, and
@@ -383,7 +383,7 @@ $ paredit inspect change --before old.lisp --after new.lisp --output text
 The JSON carries both that draft and the facts it was rendered from, so you
 can paste one or compute with the other.
 
-Three properties make it worth reading:
+Three properties distinguish the report:
 
 - **A rename is a rename.** A removal and an addition whose bodies match once
   the name is set aside is reported as one rename, not two changes. It is only

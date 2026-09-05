@@ -15,11 +15,9 @@
 //! [`crate::support::is_unevaluated_at`] **before** its domain check, which is
 //! what makes it materialize the whole document once per matched node.
 //!
-//! That is the comparison that actually matters. The earlier Fennel/Janet
-//! batch measured 450,843 ns/call against 28 ns/call — a 16,000x difference —
-//! and the *only* difference between the two was the order of those two lines.
-//! Every rule in this package puts the guard second; this file is the proof
-//! that it stayed that way.
+//! That comparison isolates the order of the domain check and the expensive
+//! guard. Every shipped rule in this package puts the domain check first; this
+//! file verifies that the cheaper ordering remains in place.
 //!
 //! # Reading the numbers
 //!
@@ -33,22 +31,19 @@
 //!
 //! - the **invocation counts**, which the head index and the dialect scope fix
 //!   before any `check` body runs, so they are identical idle and loaded;
-//! - the **gap to [`materializing::RULE`]**, which is four orders of magnitude
-//!   (measured 9,000x in release, 13,000x in dev) against a 10x floor. This is
-//!   the assertion that actually catches a guard moved above its domain check.
+//! - the **gap to [`materializing::RULE`]**, checked against a conservative
+//!   floor. This catches a guard moved above its domain check.
 //!
 //! The **per-call doubling ratio is a benchmark, not a test**, and is
 //! `#[ignore]`d — see [`ignored_bench_per_call_cost_does_not_grow_with_the_file`].
 //! It was asserted at `< 1.8` and failed a downstream `nix` build at 2.04 on
 //! untouched code. Two reasons it cannot be a gate:
 //!
-//! - the real rules cost 16-75 ns per call in a release build, so the ratio of
-//!   two such measurements is mostly scheduler noise;
+//! - each call is short enough that the ratio of two measurements is dominated
+//!   by scheduler noise;
 //! - doubling the file doubles the tree, so the traversal's working set stops
 //!   fitting in cache. That is constant work per call taking more time per
-//!   call, and it puts the idle-machine ratio at ~1.27 in release before any
-//!   contention — most of the budget spent on an effect that is not a
-//!   complexity change at all.
+//!   call, consuming the budget without indicating a complexity change.
 //!
 //! The property it was reaching for is not lost: a `check` that materializes
 //! the document is what
@@ -329,9 +324,8 @@ fn every_rule_stays_far_cheaper_than_a_materializing_one() {
         .max_by(|a, b| a.per_call.total_cmp(&b.per_call))
         .expect("at least one real rule");
 
-    // The ordering invariant. The earlier batch measured this gap at 16,000x;
-    // 10x is a floor loose enough to survive a loaded machine and tight enough
-    // that moving any rule's guard above its domain check trips it.
+    // The deliberately loose floor tolerates machine load while still catching
+    // a rule whose guard moves above its domain check.
     assert!(
         reference.per_call > worst.per_call * 10.0,
         "the guard-first reference rule ({:.0} ns/call) is not far more \

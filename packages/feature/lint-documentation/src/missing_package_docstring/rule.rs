@@ -1,8 +1,6 @@
 //! `missing-package-docstring`: a `defpackage` that says nothing about what
 //! the package is for.
 //!
-//! The analysis lives in [`crate::missing_package_docstring::domain`]; this
-//! module declares the rule's metadata and its head filter.
 //!
 //! `Heads`, not `WholeTree`, even though half the evidence is comments. The
 //! *subject* here is a node — a `defpackage` form — and the comment scan is

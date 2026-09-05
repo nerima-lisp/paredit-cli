@@ -1,8 +1,5 @@
 //! `redundant-divisor`: a quotient op with a redundant divisor of 1 ((floor x 1) is (floor x)).
 //!
-//! The analysis lives in [`crate::redundant_divisor::domain`], which also backs the
-//! standalone `inspect redundant-divisor` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

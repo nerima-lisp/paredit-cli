@@ -1,8 +1,5 @@
 //! `setf-arity`: a setq/setf/psetq/psetf with an odd argument count.
 //!
-//! The analysis lives in [`crate::setf_arity::domain`], which also backs the
-//! standalone `inspect setf-arity` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

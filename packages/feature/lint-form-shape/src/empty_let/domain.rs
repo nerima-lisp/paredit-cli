@@ -17,8 +17,6 @@
 //! The fix rewrites the `(let ()` prefix as `(progn`, leaving the body
 //! byte-identical, so the rule is auto-fixable.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -55,8 +53,6 @@ pub struct EmptyLetItem {
     /// The span of the `(let ()` prefix (form start through the binding list),
     /// which the fix replaces with `(progn`.
     ///
-    /// The rewrite's input, not the report's: the lint rule reads it to splice
-    /// `(progn` in, and neither the old report nor this one printed it.
     pub prefix_span: ByteSpan,
 }
 
@@ -82,15 +78,11 @@ impl Finding for EmptyLetItem {
         Vec::new()
     }
 
-    /// The same sentence the `empty-let` lint rule writes, so a SARIF or JUnit
-    /// consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         "let with no bindings is just progn; (let () body) is (progn body)".to_owned()
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_let(
     view: &ExpressionView,
     let_form_count: &mut usize,
@@ -134,10 +126,7 @@ pub fn examine_let(
 /// Collects every empty-binding `let` in one file, with the number of `let`
 /// forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no empty `let` here" for Common Lisp and
-/// "nothing was looked for" for Clojure, and the two read identically without
-/// the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_empty_let_report(
     path: &Path,
     dialect: Dialect,
@@ -183,7 +172,6 @@ mod tests {
             .expect("build empty let report")
     }
 
-    /// The `(let_form_count, violations)` pair the report is built from.
     fn lets(input: &str) -> (u64, Vec<EmptyLetItem>) {
         let report = report(input);
         let count = report
@@ -257,8 +245,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =

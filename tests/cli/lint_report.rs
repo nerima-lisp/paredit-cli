@@ -291,47 +291,7 @@ fn cli_lint_list_rules_prints_the_catalog_without_files() {
         .arg("json")
         .assert()
         .success()
-        // 252 (through the 37-rule batch) + all 20 of the 20-rule batch = 272,
-        // + 8 of the 9-rule batch = 280 — the ninth, `elisp-hook-lambda`, is
-        // `pedantic`. + all 8 of this branch's = 288, the whole suite's 303
-        // less the 15 `pedantic` rules the default `recommended` preset holds
-        // back. + all 10 of this branch's = 298, the whole suite's 313 less
-        // the same 15. Nine of the 10 are untagged and the tenth carries
-        // `RuleTag::Style`, which no preset filters on, so the rise here is
-        // again the full count. + all 3 of this branch's = 301, the whole
-        // suite's 316 less the same 15: all three are untagged, so once more
-        // the rise is the full count. + 3 of this branch's 4 = 304, which is
-        // the suite's 320 less *16* — the divisor moved for the first time in
-        // four batches, because `lfe-catch-swallows-exit` ships tagged
-        // `pedantic`. So this rises by 3 where the suite rises by 4, and the
-        // two numbers are not the same arithmetic. + this branch's 1 = 305,
-        // and the divisor holds at 16, so it is a plain +1 again. + 3, + 4 and
-        // + 6 over the loop-facility, dispatch/binding and data-structure
-        // batches = 318, the divisor still 16 throughout. + all 11 of this
-        // branch's = 329, the whole suite's 345 less the same 16: none of the
-        // 11 carries a tag, so the rise here is once more the full count, and
-        // it is the full count across three *dialects* — 5 Racket, 2 Emacs
-        // Lisp, 4 Clojure — none of which the divisor distinguishes. + 2 over
-        // the macro-authoring batch = 331. + both of this branch's
-        // `lint-condition-depth` rules = 333, the whole suite's 349 less the
-        // same 16: neither is tagged, so this is a plain +2. Note the divisor
-        // has now held at 16 for eight consecutive batches — it moves only
-        // when a batch ships something tagged `pedantic`.
-        // + both of this branch's `lint-lfe-carp-depth` rules = 335, the
-        // whole suite's 351 less the same 16. Neither is tagged, so a plain
-        // +2 again -- and note both are LFE-scoped, which the divisor, being
-        // about presets rather than dialects, does not distinguish.
-        // + this branch's single `lint-hy-depth` rule = 336, the whole
-        // suite's 352 less the same 16. This one leaves the *warning* count
-        // alone -- `hy-unreachable-except-clause` is a `Severity::Error` --
-        // so it is the mirror of the usual case: this total moves and the
-        // warning total does not.
-        // + all 5 of this branch's `lint-fennel-janet-depth` rules = 341, the
-        // whole suite's 357 less the same 16. None is tagged, so the rise is
-        // the full count again -- and all five are `Severity::Warning`, which
-        // makes this the batch where both totals move by the same 5.
-        // + this branch's single `lint-destructive-sequence` rule = 342, the
-        // whole suite's 358 less the same 16.
+        // The recommended preset excludes the sixteen pedantic rules.
         .stdout(predicate::str::contains("\"rule_count\": 342"))
         .stdout(predicate::str::contains("\"self-assignment\""))
         .stdout(predicate::str::contains(
@@ -1001,71 +961,7 @@ fn cli_lint_list_rules_marks_severity() {
     assert_eq!(severity_of("redundant-quote"), "warning");
     assert_eq!(severity_of("literal-place"), "error");
     let warnings = rules.iter().filter(|r| r["severity"] == "warning").count();
-    // The default preset is `recommended`, which holds back the sixteen
-    // `pedantic` rules; `--preset all` is what lists the whole suite.
-    // 181 (through the 37-rule batch) + 17 of the 20-rule batch = 198, + 6 of
-    // the 9-rule batch — 2 are `Severity::Error` and `elisp-hook-lambda` is
-    // `pedantic`, so the default preset holds it back — = 204. + 6 of this
-    // branch's 8, the other 2 being `with-open-returns-lazy-seq` and
-    // `def-inside-function-body`, both `Severity::Error`, and none of the 8
-    // `pedantic` — = 210. + 7 of this branch's 10, the other 3 being
-    // `fennel-each-over-non-iterator`, `janet-mutating-immutable-literal` and
-    // `declare-not-at-head-of-body`, all `Severity::Error`, and none of the 10
-    // `pedantic` — = 217, which is the suite's 232 warnings less the 15
-    // `pedantic` rules, all of them warnings. + 0 of this branch's 3: all
-    // three `lint-compile-time` rules are `Severity::Error`, so this stays at
-    // 217 and the suite total stays at 232.
-    //
-    // + 2 of this branch's 4 = 219, and this is the batch where the two
-    // subtractions come apart. Three of the four are `Severity::Warning`
-    // (`hy-identity-comparison-with-literal`, `hy-bare-except`,
-    // `lfe-catch-swallows-exit`) and `hy-mutable-default-argument` is an
-    // `Error`, so the suite's warning total rises by 3 to 235. But
-    // `lfe-catch-swallows-exit` is also tagged `pedantic`, so the default
-    // preset holds it back and only 2 of the 3 are visible here: 235 less the
-    // now-16 `pedantic` rules, all still warnings, = 219.
-    //
-    // + 1, + 2 and + 2 over the loop-facility, dispatch/binding and
-    // data-structure batches = 225, the divisor holding at 16 throughout.
-    //
-    // + 6 of this branch's 11 = 231. The 6 are both `lint-elisp-depth` rules
-    // and 4 of the 5 `lint-racket-depth` ones; the other 5 are
-    // `Severity::Error` — `racket-match-unreachable-clause` and all four
-    // `lint-clojure-depth` rules, each of which throws or deadlocks at run
-    // time. None of the 11 is tagged `pedantic`, so the two subtractions stay
-    // together this time: the suite's warning total rises by the same 6, to
-    // 247, and 247 less the still-16 `pedantic` rules, all of them warnings,
-    // = 231.
-    //
-    // + 1 of this branch's 2 `lint-condition-depth` rules.
-    // `unwind-protect-cleanup-signals` is a `Severity::Warning`;
-    // `condition-type-datum-with-string-initarg` is a `Severity::Error`,
-    // because the odd-length case means the named condition is never
-    // signalled at all. Neither is `pedantic`, so again both subtractions
-    // move together: the suite's warning total rises by 1 to 248, and 248
-    // less the still-16 `pedantic` rules = 232.
-    //
-    // + 1 of this branch's 2 `lint-lfe-carp-depth` rules.
-    // `lfe-clause-after-catch-all` is a `Severity::Warning` (the Erlang
-    // compiler warns); `lfe-illegal-guard-call` is a `Severity::Error`,
-    // because an illegal guard expression is a compile error, verified
-    // against lfec. Neither is `pedantic`, so both subtractions move
-    // together once more: the suite rises by 1 to 249, less the still-16
-    // `pedantic` rules = 233.
-    //
-    // + all 5 of this branch's `lint-fennel-janet-depth` rules = 238. Every
-    // one is a `Severity::Warning` and none is `pedantic`, so the suite's
-    // warning total and this preset-filtered count rise together by 5, to
-    // 254 and 238 respectively.
-    //
-    // + this branch's 1 = 239. `discarded-destructive-sequence-result` is a
-    // `Severity::Warning` and untagged, so both totals rise by 1 again.
-    //
-    // + 1 from demoting `equality-arity` to `Severity::Warning` = 240. It is
-    // untagged, so the suite's warning total and this preset-filtered count
-    // move together again -- 256 and 240. This is the one entry in this
-    // narrative that comes from a severity change rather than a new rule: the
-    // rule was measured at 407 findings and no true positives on 5556 files.
+    // All sixteen pedantic rules are warnings and are excluded here.
     assert_eq!(warnings, 240);
 }
 
@@ -1084,65 +980,8 @@ fn cli_lint_list_rules_marks_fixability() {
     let rules = catalog["rules"].as_array().expect("rules array");
 
     let fixable_count = rules.iter().filter(|r| r["fixable"] == true).count();
-    // The suite's 103, unreduced: none of the 15 `pedantic` rules the default
-    // `recommended` preset holds back is fixable. This sat at 99 for four
-    // batches — the `lint-scheme-idiom` four are the first fixable rules added
-    // since — and it is also the only place the *preset-filtered* fixable
-    // count is pinned, so a fixable rule that arrived tagged `pedantic` would
-    // show up here and nowhere else. Unmoved by this branch's 10: every one of
-    // them is `ReportOnly`. Unmoved by this branch's 3 for the same reason —
-    // all three `lint-compile-time` rules are `ReportOnly`, so the suite total
-    // and the preset-filtered total both stay at 103. Unmoved by this branch's
-    // 4 as well, and this one exercises the guard the comment above describes:
-    // the batch *does* add a `pedantic` rule, taking the held-back set from 15
-    // to 16, and this number still does not move — because
-    // `lfe-catch-swallows-exit` is `ReportOnly` like the other three. The
-    // sentence "none of the pedantic rules is fixable" is now load-bearing over
-    // 16 rules rather than 15.
-    //
-    // This branch finally moves it: `carp-deprecated-thread-macro` is
-    // `Fixability::Fixable` and untagged, so it lands in both the suite total
-    // and the preset-filtered one. It is the rare mechanical repair -- `=>`
-    // and `->` are byte-identical macro bodies in Carp's own stdlib, so the
-    // fix is a rename.
-    //
-    // And this branch moves it again, by 2, to 106:
-    // `racket-begin0-single-form` and `racket-case-lambda-single-clause` are
-    // both `Fixability::Fixable` and both untagged, so they land in the suite
-    // total and in this preset-filtered one alike. Both repairs copy an inner
-    // span verbatim — the sole `begin0` body form with its reader prefix, the
-    // sole `case-lambda` clause's formals and body into a `lambda` — so
-    // neither invents a decision. The other 9 rules of the branch are
-    // `ReportOnly`.
-    //
-    // These two are also why `fixable_rules_match_the_fix_engine` grew a
-    // *Racket* fixture: they declare `[Dialect::Racket]` alone, which the
-    // Scheme fixture added for the same failure in PR #88 does not reach.
-    // This branch moves it the other way, by 1, to 105: `leftover-print-debug`
-    // drops to `Fixability::ReportOnly`. It is untagged, so the default preset
-    // admits it and both totals move together -- the same coupling
-    // `carp-deprecated-thread-macro` demonstrated upward. Note that demoting to
-    // `Pedantic` would not have been a substitute: `fix apply --rule` bypasses
-    // presets entirely, so the deletion would have survived the tag.
-    //
-    // And by 1 again, to 104: `leftover-inspect-call` follows its sibling to
-    // `ReportOnly`, also untagged, so again both totals move together. It is
-    // the worse of the two -- 8,496,293 bytes deleted over 6,078 files, 818 of
-    // them cut below half, and an adjudicated sample of 172 that was 172 false
-    // positives.
-    //
-    // Correcting the sentence above, which was measured wrong: `fix apply
-    // --rule` does *not* bypass presets, it **intersects** with them. `--preset
-    // minimal` leaves the file untouched. The conclusion still holds for a
-    // different reason -- `pedantic` and `all` both still delete, so a tag only
-    // hides the deletion behind flags users routinely pass, and only
-    // `ReportOnly` withholds it at every preset.
-    // And by 4, to 100: `leftover-step-call`, `leftover-time-benchmark-call`,
-    // `leftover-trace-call` and `leftover-format-debug-marker` follow their two
-    // siblings to `ReportOnly`. All four are untagged, so once again both
-    // totals move together. `leftover-break-call` is the one member of the
-    // family deliberately kept `Fixable`, at a measured 40% rather than the
-    // 97-100% of the rest -- so this number does not move by 5.
+    // No pedantic rule is fixable, so preset filtering leaves this count
+    // unchanged from the suite-wide total.
     assert_eq!(
         fixable_count, 100,
         "the fixable rules the default preset admits"

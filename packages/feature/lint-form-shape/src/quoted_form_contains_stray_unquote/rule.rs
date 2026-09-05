@@ -1,9 +1,5 @@
 //! `quoted-form-contains-stray-unquote`: a `,`/`,@` inside a quoted form with no backquote above it.
 //!
-//! The analysis lives in
-//! [`crate::quoted_form_contains_stray_unquote::domain`], which also backs the
-//! standalone `inspect quoted-form-contains-stray-unquote` command; this module
-//! only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -1,8 +1,5 @@
 //! `redundant-the`: a (the t form) type declaration, which is vacuous and is just form (t matches every object).
 //!
-//! The analysis lives in [`crate::redundant_the::domain`], which also backs the
-//! standalone `inspect redundant-the` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -25,11 +25,9 @@
 //! numerator is smallest — which is the case the assertion was about. It passed
 //! locally and failed in CI. The same objection applies to a doubling ratio.
 //!
-//! So the timing probes are still here, and they still print the numbers that
-//! found a 97x, a 5.5x, a 5.3x and a 5.1x cost bug in this batch — but they are
-//! `#[ignore]`d benchmarks, run on purpose, not gates that fail a pull request
-//! at 3am because a runner was busy. Do not "fix" a future flake by loosening a
-//! budget; a wall-clock budget fails eventually at any threshold.
+//! The timing probes remain as `#[ignore]`d benchmarks to run deliberately,
+//! rather than gates whose result depends on runner load. Wall-clock budgets
+//! are diagnostic measurements, not stable correctness checks.
 
 #[cfg(test)]
 mod tests {

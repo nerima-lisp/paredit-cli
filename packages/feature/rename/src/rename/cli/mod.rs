@@ -15,8 +15,6 @@ mod types;
 pub mod unwrap_function_calls;
 pub mod wrap_function_calls;
 
-// Hoisted for the composition root (section 4.2): the argument type and
-// run function of each subcommand this slice owns.
 pub use args::{
     RenameAtArgs, RenameBindingArgs, RenameFunctionArgs, RenameInFormArgs, RenameLocalFunctionArgs,
     RenameMacroletArgs, RenameSymbolArgs, RenameSymbolMacroArgs, RenameSymbolsArgs,

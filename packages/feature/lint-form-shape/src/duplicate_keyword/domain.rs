@@ -12,8 +12,6 @@
 //! at even offsets; a name repeated across those offsets is flagged. A malformed
 //! (odd-length) plist or a non-keyword in a name slot leaves the form alone.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -93,8 +91,6 @@ impl Finding for DuplicateKeywordItem {
         ]
     }
 
-    /// The same sentence the `duplicate-keyword` lint rule writes, so a SARIF
-    /// or JUnit consumer reading both sees one defect described one way.
     fn message(&self) -> String {
         format!(
             "keyword {} is passed more than once; the leftmost value wins",
@@ -103,8 +99,6 @@ impl Finding for DuplicateKeywordItem {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
     call_form_count: &mut usize,
@@ -155,10 +149,7 @@ pub fn examine(
 /// in one file, with the number of such calls scanned as the denominator beside
 /// them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no repeated keyword here" for Common
-/// Lisp and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_duplicate_keyword_report(
     path: &Path,
     dialect: Dialect,
@@ -204,7 +195,6 @@ mod tests {
             .expect("build duplicate keyword report")
     }
 
-    /// The `(call_form_count, violations)` pair the report is built from.
     fn calls(input: &str) -> (u64, Vec<DuplicateKeywordItem>) {
         let report = report(input);
         let count = report
@@ -264,8 +254,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(make-instance 'c :x 1 :x 2)", Dialect::Clojure)

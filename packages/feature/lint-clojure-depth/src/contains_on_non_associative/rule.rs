@@ -1,11 +1,6 @@
 //! `contains-on-non-associative`: a membership test whose answer is fixed
 //! before it runs.
 //!
-//! The analysis lives in
-//! [`crate::contains_on_non_associative::domain`], which also backs the
-//! standalone `inspect contains-on-non-associative` command; this module only
-//! registers it with the lint suite and phrases its findings.
-
 use paredit_core_lint_engine::LintResult;
 
 use crate::contains_on_non_associative::domain::examine_contains;

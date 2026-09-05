@@ -1,9 +1,6 @@
 //! `scheme-memq-assq-literal-key`: `memq`/`assq` searching for a number or
 //! character literal, which R7RS 6.4 leaves unspecified.
 //!
-//! The analysis lives in [`crate::memq_assq_literal_key::domain`], which also
-//! backs the standalone `inspect scheme-memq-assq-literal-key` command; this
-//! module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

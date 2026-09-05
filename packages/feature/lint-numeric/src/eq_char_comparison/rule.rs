@@ -1,8 +1,5 @@
 //! `eq-char-comparison`: an eq compared against a character literal (eq on characters is unreliable; use eql/char=).
 //!
-//! The analysis lives in [`crate::eq_char_comparison::domain`], which also backs the
-//! standalone `inspect eq-char-comparison` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -1,8 +1,5 @@
 //! `redundant-count-nil`: a remove/delete/substitute call with an explicit :count nil, the default ((remove x seq :count nil) is (remove x seq)).
 //!
-//! The analysis lives in [`crate::redundant_count_nil::domain`], which also backs the
-//! standalone `inspect redundant-count-nil` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -87,9 +87,6 @@ impl Finding for DolistResultVariableItem {
         ]
     }
 
-    /// The same sentence the `dolist-result-form-references-loop-variable`
-    /// lint rule writes, so a SARIF or JUnit consumer reading both sees one
-    /// finding described one way.
     fn message(&self) -> String {
         format!(
             "dolist result form {} reads `{}`, which the standard binds to nil once the \
@@ -99,8 +96,6 @@ impl Finding for DolistResultVariableItem {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_dolist_result(
     view: &ExpressionView,
     dolist_form_count: &mut usize,
@@ -147,10 +142,7 @@ pub fn examine_dolist_result(
 /// file, with the number of `dolist` forms scanned as the denominator beside
 /// them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no result form reads the variable" for
-/// Common Lisp and "nothing was looked for" for Clojure, and the two read
-/// identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_dolist_result_report(
     path: &Path,
     dialect: Dialect,

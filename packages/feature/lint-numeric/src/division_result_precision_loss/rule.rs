@@ -1,10 +1,6 @@
 //! `division-result-precision-loss`: an Emacs Lisp integer division whose
 //! quotient truncates to zero.
 //!
-//! The analysis lives in [`crate::division_result_precision_loss::domain`],
-//! which also backs the standalone `inspect division-result-precision-loss`
-//! command; this module only registers it with the lint suite and phrases its
-//! findings.
 
 use paredit_core_lint_engine::LintResult;
 

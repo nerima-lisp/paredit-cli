@@ -1,8 +1,5 @@
 //! `redundant-quote`: a self-evaluating literal (number/string/char/keyword) quoted redundantly.
 //!
-//! The analysis lives in [`crate::redundant_quote::domain`], which also backs the
-//! standalone `inspect redundant-quote` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

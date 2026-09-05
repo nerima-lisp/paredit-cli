@@ -170,8 +170,6 @@ fn declares_a_combination(view: &ExpressionView) -> bool {
     false
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_method_qualifier_typo(
     tree: &SyntaxTree,
     view: &ExpressionView,
@@ -219,9 +217,7 @@ pub fn examine_method_qualifier_typo(
 /// Collects every unrecognized method qualifier in one file, with the number of
 /// qualifiers scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: the closed qualifier set is Common Lisp's standard method
-/// combination, not a general Lisp idea.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_method_qualifier_typo_report(
     path: &Path,
     dialect: Dialect,

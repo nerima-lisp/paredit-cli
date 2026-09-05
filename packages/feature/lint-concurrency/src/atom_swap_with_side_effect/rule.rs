@@ -1,9 +1,6 @@
 //! `atom-swap-with-side-effect`: a retried update function that does more than
 //! compute a value.
 //!
-//! The analysis lives in [`crate::atom_swap_with_side_effect::domain`], which
-//! also backs the standalone `inspect atom-swap-with-side-effect` command; this
-//! module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

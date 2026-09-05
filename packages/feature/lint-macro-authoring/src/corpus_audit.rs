@@ -19,10 +19,9 @@
 //! reassuring `findings=0`.
 //!
 //! **The self-test.** [`ignored_audit_harness_detects_a_known_dirty_file`] runs
-//! the same harness over a file that *must* produce findings. A previous batch
-//! in this repository shipped an audit whose command line was subtly wrong;
-//! every file errored out, every file reported zero findings, and the sweep read
-//! as a clean success. That test is the guard, and it runs first.
+//! the same harness over a file that *must* produce findings. This prevents
+//! command-line or parsing failures from turning every file into a misleading
+//! zero-finding result. The self-test runs first.
 
 #![cfg(test)]
 

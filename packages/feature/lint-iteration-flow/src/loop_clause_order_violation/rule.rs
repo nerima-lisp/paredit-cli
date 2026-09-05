@@ -1,9 +1,6 @@
 //! `loop-clause-order-violation`: a `loop` variable clause after a main
 //! clause, or a `named` clause that is not first.
 //!
-//! The analysis lives in [`crate::loop_clause_order_violation::domain`], which
-//! also backs the standalone `inspect loop-clause-order-violation` command;
-//! this module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

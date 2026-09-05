@@ -81,8 +81,6 @@ fn cli_lint_fix_rewrites_to_cons() {
     assert_eq!(fixed, "(cons (car a) (cdr b))\n");
 }
 
-/// An empty finding list is ambiguous, so a dialect this rule does not model
-/// must be labelled rather than silently reported as clean.
 #[test]
 fn cli_labels_a_dialect_the_rule_does_not_model_append_list_to_cons() {
     let dir = fresh_temp_dir("append-list-to-cons-report-unmodelled");
@@ -98,9 +96,6 @@ fn cli_labels_a_dialect_the_rule_does_not_model_append_list_to_cons() {
         .stdout(predicate::str::contains("\"finding_count\": 0"));
 }
 
-/// The envelope's interchange formats, which this report reached by moving onto
-/// it. Asserted here only far enough to prove the command accepts them; their
-/// content is covered once in `report_interop`.
 #[test]
 fn cli_append_list_to_cons_emits_sarif() {
     let dir = fresh_temp_dir("append-list-to-cons-report-sarif");

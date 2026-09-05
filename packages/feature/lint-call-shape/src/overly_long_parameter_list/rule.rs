@@ -1,9 +1,6 @@
 //! `overly-long-parameter-list`: a definition with more required parameters
 //! than a threshold.
 //!
-//! The analysis lives in [`crate::overly_long_parameter_list::domain`], which
-//! also backs the standalone `inspect overly-long-parameter-list` command; this
-//! module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};

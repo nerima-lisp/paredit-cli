@@ -1,8 +1,5 @@
 //! `append-nil`: a two-argument append with a nil tail, a fresh copy ((append x nil) is (copy-list x)).
 //!
-//! The analysis lives in [`crate::append_nil::domain`], which also backs the
-//! standalone `inspect append-nil` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

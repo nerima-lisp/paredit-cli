@@ -8,8 +8,6 @@ pub mod sort_definitions;
 pub mod split_file;
 mod types;
 
-// Hoisted for the composition root (section 4.2): the argument type and
-// run function of each subcommand this slice owns.
 pub use args::{
     InsertTopLevelArgs, MoveDefinitionArgs, MoveFormArgs, SortDefinitionsArgs, SplitFileArgs,
 };

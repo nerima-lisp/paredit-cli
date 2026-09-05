@@ -1,8 +1,5 @@
 //! `redundant-progn`: a progn that is empty or wraps a single form (progn X is just X).
 //!
-//! The analysis lives in [`crate::redundant_progn::domain`], which also backs the
-//! standalone `inspect redundant-progn` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

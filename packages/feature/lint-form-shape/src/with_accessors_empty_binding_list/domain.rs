@@ -91,8 +91,6 @@ impl Finding for WithAccessorsEmptyBindingListItem {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 ///
 /// Cheapest predicate first: the head comparison rejects every node the head
 /// index let through for another rule before anything else is read.
@@ -134,10 +132,7 @@ pub fn examine(
 /// is empty, with the number of such forms scanned as the denominator beside
 /// them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no empty binding list here" for Common
-/// Lisp and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_with_accessors_empty_binding_list_report(
     path: &Path,
     dialect: Dialect,

@@ -167,8 +167,8 @@ fn every_rule_fires_through_the_real_dispatch() {
 }
 
 /// Both heads have to be in `HEADS` independently. Deleting either one from
-/// the array leaves the other's test green, which is exactly how a sibling
-/// batch shipped a rule with a missing head.
+/// the array leaves the other's test green, so each spelling needs its own
+/// dispatch assertion.
 #[test]
 fn each_head_is_indexed_separately() {
     assert_eq!(fired("(=> a b)", Dialect::Carp).len(), 1);

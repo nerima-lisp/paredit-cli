@@ -1,9 +1,6 @@
 //! `single-key-nested-path`: a nested-path accessor that reaches through
 //! nothing.
 //!
-//! The analysis lives in [`crate::single_key_nested_path::domain`], which also
-//! backs the standalone `inspect single-key-nested-path` command; this module
-//! only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

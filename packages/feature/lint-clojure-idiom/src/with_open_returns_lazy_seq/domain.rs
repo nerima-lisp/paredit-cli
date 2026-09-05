@@ -233,8 +233,6 @@ fn tail_forms<'a>(
     });
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_with_open(
     view: &ExpressionView,
     scope_count: &mut usize,

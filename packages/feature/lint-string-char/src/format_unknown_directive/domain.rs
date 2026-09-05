@@ -113,8 +113,6 @@ impl Finding for FormatUnknownDirectiveItem {
         vec![("unknown", json!(self.unknown))]
     }
 
-    /// The same sentence the `format-unknown-directive` lint rule writes, so a
-    /// SARIF or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!(
             "format control string has no such directive: {}",
@@ -123,8 +121,6 @@ impl Finding for FormatUnknownDirectiveItem {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 ///
 /// One finding per control string rather than one per directive: a string with
 /// three unknown directives is one mistake in one string, and three findings on
@@ -161,10 +157,7 @@ pub fn examine(
 /// with the number of literal control strings scanned as the denominator beside
 /// them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "every directive here is standard" for
-/// Common Lisp and "nothing was looked for" for Clojure, and the two read
-/// identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_format_unknown_directive_report(
     path: &Path,
     dialect: Dialect,
@@ -207,7 +200,6 @@ mod tests {
             .expect("build format unknown directive report")
     }
 
-    /// The `(control_string_count, violations)` pair the report is built from.
     fn scanned(input: &str) -> (u64, Vec<FormatUnknownDirectiveItem>) {
         let report = report(input);
         let count = report

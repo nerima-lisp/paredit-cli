@@ -1,8 +1,5 @@
 //! `redundant-apply`: an apply of a sharp-quoted symbol to a literal list ((apply #'foo (list a b)) is (foo a b)).
 //!
-//! The analysis lives in [`crate::redundant_apply::domain`], which also backs the
-//! standalone `inspect redundant-apply` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

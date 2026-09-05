@@ -1,10 +1,6 @@
 //! `duplicate-defmethod-signature`: two `defmethod`s with the same name,
 //! qualifiers and specializers.
 //!
-//! The analysis lives in [`crate::duplicate_defmethod_signature::domain`],
-//! which also backs the standalone `inspect duplicate-defmethod-signature`
-//! command; this module only registers it with the lint suite and phrases its
-//! findings.
 
 use paredit_core_lint_engine::LintResult;
 

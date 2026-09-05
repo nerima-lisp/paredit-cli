@@ -240,14 +240,6 @@ fn cli_restarts_reports_a_restart_nothing_invokes() {
         .stdout(predicate::str::contains("\"name\": \"RETRY\""));
 }
 
-/// An empty finding list is ambiguous, so a dialect outside a report's reach
-/// must be labelled rather than silently reported as clean.
-///
-/// Scheme rather than Clojure: `read-time-eval` models Clojure's `#=` now
-/// (see `cli_read_time_eval_models_a_clojure_read_eval_dispatch_too` below),
-/// so a Clojure fixture would no longer be unmodelled for every command in
-/// `COMMANDS`. Scheme has no construct any of these thirteen reports know
-/// about, so it stays a fixture all thirteen agree is out of reach.
 #[test]
 fn cli_every_lisp_analysis_report_labels_a_dialect_it_does_not_model() {
     // Scheme rather than Clojure: `inspect macro-hygiene` now models Clojure's

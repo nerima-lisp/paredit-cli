@@ -522,7 +522,7 @@ const INTROSPECTION_COMMANDS: [&str; 344] = [
     // catalogue and no source file.
     "migrate list",
     "migrate explain",
-    // Section D (2026-08-01 batch): leftover REPL-debugging artifacts.
+    // Leftover REPL-debugging artifacts.
     "inspect leftover-print-debug",
     "inspect leftover-trace-call",
     "inspect leftover-break-call",
@@ -977,21 +977,20 @@ const SEMANTIC_OPERATIONS: [SemanticOperation; 3] = [
 /// three dialects (`def-test`/`deftest`/`define-test`, `ert-deftest`, and
 /// `clojure.test`'s `deftest`), while two of `lint-concurrency`'s seven encode
 /// Clojure's `atom` and `future`/`promise` semantics, which have no Common
-/// Lisp counterpart at all. Four more arrived with the `lint-call-shape` and
-/// `lint-introspection` batch: `lambda` nesting and `string=` dispatch read the
+/// Lisp counterpart at all. In `lint-call-shape` and `lint-introspection`,
+/// `lambda` nesting and `string=` dispatch read the
 /// same in Emacs Lisp, `symbol-function`/`fset` name both dialects' function
-/// cells, and `boundp`/`fboundp`-style probes are spelled in Clojure too. Three
-/// more arrived with the `lint-sequence`/`lint-numeric` batch, and all three are
-/// scoped *away* from Common Lisp: `get-in` and `into` are Clojure's, and
+/// cells, and `boundp`/`fboundp`-style probes are spelled in Clojure too.
+/// The relevant `lint-sequence` and `lint-numeric` rules are scoped away from
+/// Common Lisp: `get-in` and `into` are Clojure's, and
 /// integer `/` truncating towards zero is Emacs Lisp's — in Common Lisp the same
-/// form is an exact ratio and nothing is lost. Eight more arrived with the
-/// `lint-clojure-idiom`/`lint-scheme-idiom` batch, and none of them runs on
-/// Common Lisp: `with-open`, an inline `def`, `get-in`/`assoc-in`/`update-in`
+/// form is an exact ratio and nothing is lost. The `lint-clojure-idiom` and
+/// `lint-scheme-idiom` rules do not run on Common Lisp: `with-open`, an inline
+/// `def`, `get-in`/`assoc-in`/`update-in`
 /// and a spread `[…]` literal are Clojure's, while `begin`, `let*` shadowing
 /// rules, `memq`/`assq` and the named `let` are Scheme's. Three of the four
-/// Scheme rules name Racket alongside Scheme, which is the first scope here to
-/// name more than one dialect. Four more arrived with `lint-clojure-depth`, all
-/// `CLOJURE_ONLY` and all core.async or reference-type vocabulary — the only
+/// Scheme rules name Racket alongside Scheme. The `lint-clojure-depth` rules
+/// are `CLOJURE_ONLY` and use core.async or reference-type vocabulary — the only
 /// commands in this table whose heads (`let`, `loop`, `binding`, `go`) are
 /// ordinary Common Lisp operators as well, so the scope is doing more work here
 /// than anywhere else in the list. Each answer is read from the rule's own
@@ -1115,7 +1114,7 @@ pub(super) fn support_status(command_path: &str, dialect: &str) -> SupportStatus
         "refactor inline-function" => Some(supports_inline_function_dialect(dialect)),
         "refactor inline-let" => Some(supports_inline_let_dialect(dialect)),
         "inspect elisp-file" => Some(supports_emacs_lisp_file_report_dialect(dialect)),
-        // The only two of this batch's eight rules whose scope is not plain
+        // The only two rules in this catalogue whose scope is not plain
         // `CommonLispSemantics`. `leftover-print-debug` reuses its own
         // `heads_for` directly, so this matrix cannot drift from what the
         // rule actually recognizes; `leftover-trace-call`'s CL+Elisp scope

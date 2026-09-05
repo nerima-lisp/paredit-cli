@@ -238,10 +238,7 @@ pub fn examine_file(source: &str, root: &ExpressionView) -> Option<DefpackageWit
 /// Collects the file's finding, if any, with the number of package
 /// declarations scanned as the denominator beside it.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "this file enters its package" for Common
-/// Lisp and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_defpackage_without_in_package_report(
     path: &Path,
     dialect: Dialect,

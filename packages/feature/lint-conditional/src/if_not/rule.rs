@@ -1,8 +1,5 @@
 //! `if-not`: a three-argument if with then=nil and else=t ((if test nil t) is (not test)).
 //!
-//! The analysis lives in [`crate::if_not::domain`], which also backs the
-//! standalone `inspect if-not` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

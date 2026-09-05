@@ -1,8 +1,5 @@
 //! `format-nested-directive-unbalanced`: an unbalanced ~[ ~{ ~< ~( bracketing construct in a literal format control string.
 //!
-//! The analysis lives in [`crate::format_nested_directive_unbalanced::domain`], which also backs the
-//! standalone `inspect format-nested-directive-unbalanced` command; this module only registers it
-//! with the lint suite and phrases its findings.
 //!
 //! `HeadFilter::Heads`, never `AllNodes`: the five `format`-family operators are
 //! the only nodes whose control string this rule can read, and the

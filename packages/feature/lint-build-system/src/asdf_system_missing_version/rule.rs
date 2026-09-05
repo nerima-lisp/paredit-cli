@@ -1,8 +1,5 @@
 //! `asdf-system-missing-version`: a primary ASDF system with no `:version`.
 //!
-//! The analysis lives in [`crate::asdf_system_missing_version::domain`], which
-//! also backs the standalone `inspect asdf-system-missing-version` command;
-//! this module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -1,10 +1,6 @@
 //! `package-circular-in-package-chain`: a top-level `in-package` that re-enters
 //! a package the file had already left.
 //!
-//! The analysis lives in
-//! [`crate::package_circular_in_package_chain::domain`], which also backs the
-//! standalone `inspect package-circular-in-package-chain` command; this module
-//! only registers it with the lint suite and phrases its findings.
 //!
 //! # Why this is `Heads` and not `WholeTree`
 //!

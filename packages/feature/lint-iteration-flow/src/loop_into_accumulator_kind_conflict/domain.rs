@@ -84,9 +84,6 @@ impl Finding for LoopAccumulatorConflictItem {
         ]
     }
 
-    /// The same sentence the `loop-into-accumulator-kind-conflict` lint rule
-    /// writes, so a SARIF or JUnit consumer reading both sees one finding
-    /// described one way.
     fn message(&self) -> String {
         format!(
             "loop accumulates into `{}` as a {} with `{}` and as a {} with `{}`; \
@@ -103,8 +100,6 @@ struct Claim {
     verb: String,
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_loop_accumulator_conflict(
     view: &ExpressionView,
     scan: &mut LoopScan,
@@ -162,10 +157,7 @@ pub fn examine_loop_accumulator_conflict(
 /// Collects every conflicting `into` accumulator in one file, with the number
 /// of `loop` forms scanned and the number actually modelled beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "every accumulator agrees here" for
-/// Common Lisp and "nothing was looked for" for Clojure, and the two read
-/// identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_loop_accumulator_conflict_report(
     path: &Path,
     dialect: Dialect,

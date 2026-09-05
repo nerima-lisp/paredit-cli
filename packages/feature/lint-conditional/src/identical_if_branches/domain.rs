@@ -53,15 +53,11 @@ impl Finding for IdenticalIfBranchItem {
         vec![("branch", json!(self.branch))]
     }
 
-    /// The same sentence the `identical-if-branches` lint rule writes, so a
-    /// SARIF or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!("if branches are identical: {}", self.branch)
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_if(
     view: &ExpressionView,
     if_form_count: &mut usize,
@@ -89,10 +85,7 @@ pub fn examine_if(
 /// file, with the number of two-armed `if` forms scanned as the denominator
 /// beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no `if` here repeats itself" for Common
-/// Lisp and "nothing was looked for" for Fennel, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_identical_if_branch_report(
     path: &Path,
     dialect: Dialect,
@@ -138,7 +131,6 @@ mod tests {
             .expect("build identical if branch report")
     }
 
-    /// The `(if_form_count, identical)` pair the report is built from.
     fn branches(input: &str) -> (u64, Vec<IdenticalIfBranchItem>) {
         let report = report(input);
         let count = report
@@ -185,8 +177,6 @@ mod tests {
         assert_eq!(identical.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse("(if test a a)").expect("parse input");

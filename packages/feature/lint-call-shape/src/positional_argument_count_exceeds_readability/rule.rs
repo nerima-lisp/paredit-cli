@@ -1,11 +1,6 @@
 //! `positional-argument-count-exceeds-readability`: a call inside a definition
 //! body passing a long run of unlabelled literal arguments.
 //!
-//! The analysis lives in
-//! [`crate::positional_argument_count_exceeds_readability::domain`], which also
-//! backs the standalone `inspect positional-argument-count-exceeds-readability`
-//! command; this module only registers it with the lint suite and phrases its
-//! findings.
 
 use paredit_core_lint_engine::LintResult;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};

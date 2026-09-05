@@ -1,8 +1,5 @@
 //! `double-reverse`: a (reverse (reverse x)), a wasteful obfuscated copy ((reverse (reverse x)) is (copy-seq x)).
 //!
-//! The analysis lives in [`crate::double_reverse::domain`], which also backs the
-//! standalone `inspect double-reverse` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

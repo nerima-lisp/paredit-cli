@@ -1,8 +1,5 @@
 //! `literal-place`: an incf/decf/push/pop/pushnew/setf/psetf whose place is a self-evaluating literal (cannot be modified).
 //!
-//! The analysis lives in [`crate::literal_place::domain`], which also backs the
-//! standalone `inspect literal-place` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

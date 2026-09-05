@@ -16,8 +16,6 @@
 //! The fix rewrites `(OUTER (INNER s))` as `(OUTER s)` (keeping the outer head),
 //! copying `s`'s source, so the rule is auto-fixable.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -81,8 +79,6 @@ impl Finding for NestedStringCaseItem {
         ]
     }
 
-    /// The same sentence the `nested-string-case` lint rule writes, so a SARIF
-    /// or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         "the outer string case op dominates; the inner one is dead work".to_owned()
     }
@@ -92,8 +88,6 @@ fn span_json(span: ByteSpan) -> Value {
     json!({ "start": span.start().get(), "end": span.end().get() })
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
     string_case_form_count: &mut usize,
@@ -140,10 +134,7 @@ pub fn examine(
 /// Collects every nested `(OUTER (INNER s))` case-op pair in one file, with the
 /// number of case-op forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no nested case-op pair here" for Common
-/// Lisp and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_nested_string_case_report(
     path: &Path,
     dialect: Dialect,
@@ -252,8 +243,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =

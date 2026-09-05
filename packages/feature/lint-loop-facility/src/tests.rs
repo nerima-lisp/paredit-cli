@@ -8,9 +8,8 @@
 //!
 //! Every test dispatches through [`collect_lint_outcomes`], never through a
 //! rule's `check`. Calling `check` directly bypasses the head index, which is
-//! where a wrong `HeadFilter` or a forgotten `dialect_scope` shows up — a
-//! sibling batch found that deleting a head from a rule's `Heads` left its
-//! entire suite green for exactly this reason.
+//! where a wrong `HeadFilter` or a forgotten `dialect_scope` shows up. Tests
+//! that call `check` directly cannot detect a missing `Heads` entry.
 
 use paredit_core_lint_engine::engine::{build_head_index, collect_lint_outcomes};
 use paredit_core_lint_engine::model::LintOutcome;

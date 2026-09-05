@@ -1,10 +1,6 @@
 //! `thread-spawned-without-error-handler`: a thread body that inlines work with
 //! no handler, so its errors never reach anyone.
 //!
-//! The analysis lives in
-//! [`crate::thread_spawned_without_error_handler::domain`], which also backs
-//! the standalone `inspect thread-spawned-without-error-handler` command; this
-//! module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

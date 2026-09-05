@@ -33,7 +33,7 @@ use crate::redundant_full_sequence_traversal_fusable_maps as fusable_maps;
 use crate::repeated_hash_table_lookup_same_key as repeated_lookup;
 use crate::unnecessary_sort_before_extremum_extraction as sorted_extremum;
 
-/// The three rules this batch added, run as one catalogue.
+/// The three rules under test, run as one catalogue.
 ///
 /// The shipped registry lives in the root crate and this package must not name
 /// it, so the sweep builds its own — which is also what makes the sweep report
@@ -463,7 +463,7 @@ mod tests {
     /// **Linearity.** Doubling the definition count should roughly double the
     /// cost. A rule that rescans the file per match shows ~3.7 per doubling,
     /// which is the shape two shipped rules had, and which this table found in
-    /// four rules in this batch.
+    /// four rules in this crate.
     ///
     /// **The byte-scan gate.** A definition that never spells `gethash` must not
     /// pay for the body walk; `loop-invariant-allocation` in the same pass is

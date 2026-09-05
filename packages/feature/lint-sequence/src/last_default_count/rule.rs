@@ -1,8 +1,5 @@
 //! `last-default-count`: a last call with an explicit count of 1, the default ((last x 1) is (last x)).
 //!
-//! The analysis lives in [`crate::last_default_count::domain`], which also backs the
-//! standalone `inspect last-default-count` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

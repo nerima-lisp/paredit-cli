@@ -1,8 +1,5 @@
 //! `unwind-protect-no-cleanup`: an unwind-protect with no cleanup forms, which is just its body ((unwind-protect x) is x).
 //!
-//! The analysis lives in [`crate::unwind_protect_no_cleanup::domain`], which also backs the
-//! standalone `inspect unwind-protect-no-cleanup` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -173,8 +173,6 @@ fn inherited_slots(
     inherited
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_defclass_slot_shadowing(
     tree: &SyntaxTree,
     view: &ExpressionView,
@@ -226,10 +224,7 @@ pub fn examine_defclass_slot_shadowing(
 /// Collects every shadowed slot in one file, with the number of `defclass`
 /// forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no shadowed slot here" for Common Lisp
-/// and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_defclass_slot_shadowing_report(
     path: &Path,
     dialect: Dialect,

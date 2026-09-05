@@ -1,10 +1,6 @@
 //! `return-outside-implicit-nil-block`: a `(return …)` no enclosing form
 //! establishes the implicit `nil` block for.
 //!
-//! The analysis lives in [`crate::return_outside_implicit_nil_block::domain`],
-//! which also backs the standalone `inspect
-//! return-outside-implicit-nil-block` command; this module only registers it
-//! with the lint suite and phrases its findings.
 //!
 //! `ReportOnly`: the repair is to wrap the intended form in a block or to
 //! rewrite the exit, and either changes what the program returns.

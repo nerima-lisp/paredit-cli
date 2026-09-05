@@ -215,10 +215,7 @@ fn collect(tree: &SyntaxTree) -> (Vec<EvalWhenExecuteOnlyItem>, usize) {
 /// Collects the file's findings with the number of `eval-when` forms scanned as
 /// the denominator beside it.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "every eval-when here reaches the
-/// compiler" for Common Lisp and "nothing was looked for" for Clojure, and the
-/// two read identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_eval_when_execute_only_report(
     path: &Path,
     dialect: Dialect,

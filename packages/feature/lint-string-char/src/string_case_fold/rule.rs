@@ -1,8 +1,5 @@
 //! `string-case-fold`: a string= of two same-case-folded operands ((string= (string-downcase a) (string-downcase b)) is (string-equal a b)).
 //!
-//! The analysis lives in [`crate::string_case_fold::domain`], which also backs the
-//! standalone `inspect string-case-fold` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

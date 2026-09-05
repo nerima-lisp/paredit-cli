@@ -227,8 +227,6 @@ fn is_unordered_producer(view: &ExpressionView) -> bool {
     symbol_in(head, &["loop"]) && is_hash_iteration_loop(view) && !imposes_an_order(view)
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 ///
 /// # Cost
 ///
@@ -272,10 +270,7 @@ pub fn examine(
 /// Collects every positional read of a hash table's iteration in one file, with
 /// the number of accessor forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no order assumptions here" for Common
-/// Lisp and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn collect_hash_order_assumptions(
     path: &Path,
     dialect: Dialect,

@@ -151,8 +151,6 @@ fn parking_twin(blocking: &str) -> Option<&'static str> {
         .map(|(_, parking)| *parking)
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_go_block(
     view: &ExpressionView,
     go_block_count: &mut usize,

@@ -1,8 +1,5 @@
 //! `clojure-pre-post-vacuous`: a `:pre`/`:post` vector that asserts nothing.
 //!
-//! The analysis lives in [`crate::clojure_pre_post_vacuous::domain`], which
-//! also backs the standalone report; this module only registers it with the
-//! lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -1,8 +1,5 @@
 //! `zero-divisor`: a division-family form with a literal 0 divisor, a guaranteed division-by-zero ((/ x 0)).
 //!
-//! The analysis lives in [`crate::zero_divisor::domain`], which also backs the
-//! standalone `inspect zero-divisor` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

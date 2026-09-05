@@ -1,11 +1,6 @@
 //! `defstruct-boa-aux-uninitialized-slot`: a BOA constructor binding a slot as
 //! a bare `&aux` variable, leaving it uninitialized.
 //!
-//! The analysis lives in
-//! [`crate::defstruct_boa_aux_uninitialized_slot::domain`], which documents the
-//! neighbouring premise it replaces — that *omitting* a slot skips its
-//! `:initform` — and why that one is false. This module only registers the rule
-//! and phrases its findings.
 
 use paredit_core_cli::report::Finding;
 use paredit_core_lint_engine::LintResult;

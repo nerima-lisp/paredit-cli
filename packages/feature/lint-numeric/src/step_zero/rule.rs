@@ -1,8 +1,5 @@
 //! `step-zero`: an incf/decf with an explicit step of 0, a no-op ((incf x 0)).
 //!
-//! The analysis lives in [`crate::step_zero::domain`], which also backs the
-//! standalone `inspect step-zero` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

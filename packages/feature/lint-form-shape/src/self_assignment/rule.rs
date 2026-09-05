@@ -1,8 +1,5 @@
 //! `self-assignment`: a setq/setf/psetq/psetf that assigns a place to itself.
 //!
-//! The analysis lives in [`crate::self_assignment::domain`], which also backs the
-//! standalone `inspect self-assignment` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

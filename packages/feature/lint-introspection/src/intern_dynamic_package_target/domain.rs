@@ -194,10 +194,7 @@ pub fn examine(tree: &SyntaxTree, view: &ExpressionView) -> Option<InternDynamic
 /// Collects every `intern` with a computed package target in one file, with the
 /// number of evaluated `intern` forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no computed package target here" for
-/// Common Lisp and "nothing was looked for" for Emacs Lisp, and the two read
-/// identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_intern_dynamic_package_target_report(
     path: &Path,
     dialect: Dialect,

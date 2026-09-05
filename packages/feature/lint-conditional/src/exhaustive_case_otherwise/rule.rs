@@ -1,8 +1,5 @@
 //! `exhaustive-case-otherwise`: an ecase/ccase/etypecase/ctypecase with a forbidden t/otherwise clause.
 //!
-//! The analysis lives in [`crate::exhaustive_case_otherwise::domain`], which also backs the
-//! standalone `inspect exhaustive-case-otherwise` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

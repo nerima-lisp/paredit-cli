@@ -13,9 +13,8 @@ is the one place that asks a real implementation:
   has to a type checker, and its warnings cover exactly the class of mistake a
   syntactic refactor can introduce: an undefined variable a rename missed, an
   arity a signature change broke, a `defmethod` with no matching generic.
-- **Comparing two runs.** A diagnostic that was already there is not evidence
-  against a refactor. What matters is the set that appeared, which is why a
-  baseline is a first-class input rather than something the caller diffs.
+- **Comparing two runs.** A baseline distinguishes diagnostics introduced by a
+  refactor from diagnostics that were already present.
 - **Locating a diagnostic in the tree.** The implementation reports `in: DEFUN
   BAR`; this package maps that back to the definition's span, so a finding is
   navigable like every other finding in this tool.

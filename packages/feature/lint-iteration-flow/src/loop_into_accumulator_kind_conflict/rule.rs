@@ -1,10 +1,6 @@
 //! `loop-into-accumulator-kind-conflict`: two `loop` accumulation clauses
 //! building incompatible kinds into the same `into` variable.
 //!
-//! The analysis lives in
-//! [`crate::loop_into_accumulator_kind_conflict::domain`], which also backs
-//! the standalone `inspect loop-into-accumulator-kind-conflict` command; this
-//! module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

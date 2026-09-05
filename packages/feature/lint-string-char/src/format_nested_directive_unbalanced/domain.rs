@@ -166,9 +166,6 @@ impl Finding for FormatNestedDirectiveUnbalancedItem {
         ]
     }
 
-    /// The same sentence the `format-nested-directive-unbalanced` lint rule
-    /// writes, so a SARIF or JUnit consumer reading both sees one finding
-    /// described one way.
     fn message(&self) -> String {
         match self.imbalance {
             Imbalance::Unclosed => format!(
@@ -214,8 +211,6 @@ fn first_imbalance(control: &str) -> Option<(Imbalance, char)> {
     open.pop().map(|opener| (Imbalance::Unclosed, opener))
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
     control_string_count: &mut usize,
@@ -250,10 +245,7 @@ pub fn examine(
 /// nest, with the number of literal control strings scanned as the denominator
 /// beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "every construct here nests" for Common
-/// Lisp and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_format_nested_directive_unbalanced_report(
     path: &Path,
     dialect: Dialect,
@@ -300,7 +292,6 @@ mod tests {
         .expect("build format nested directive unbalanced report")
     }
 
-    /// The `(control_string_count, violations)` pair the report is built from.
     fn scanned(input: &str) -> (u64, Vec<FormatNestedDirectiveUnbalancedItem>) {
         let report = report(input);
         let count = report

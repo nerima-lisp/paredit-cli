@@ -1,8 +1,5 @@
 //! `single-clause-cond`: a cond with one non-t clause that has a body ((cond (test a b)) is (when test a b)).
 //!
-//! The analysis lives in [`crate::single_clause_cond::domain`], which also backs the
-//! standalone `inspect single-clause-cond` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

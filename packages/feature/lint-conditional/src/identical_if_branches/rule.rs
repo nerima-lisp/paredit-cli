@@ -1,8 +1,5 @@
 //! `identical-if-branches`: an if whose then and else branches are structurally identical.
 //!
-//! The analysis lives in [`crate::identical_if_branches::domain`], which also backs the
-//! standalone `inspect identical-if-branches` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

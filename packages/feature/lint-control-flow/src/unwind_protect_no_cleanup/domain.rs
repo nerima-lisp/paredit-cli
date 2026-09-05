@@ -11,8 +11,6 @@
 //! The fix replaces the whole form with the protected form's source, so the rule
 //! is auto-fixable.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -67,15 +65,11 @@ impl Finding for UnwindProtectNoCleanupItem {
         )]
     }
 
-    /// The same sentence the `unwind-protect-no-cleanup` lint rule writes, so a
-    /// SARIF or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         "an unwind-protect with no cleanup is just its body; (unwind-protect x) is x".to_owned()
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
     unwind_protect_form_count: &mut usize,
@@ -107,10 +101,7 @@ pub fn examine(
 /// Collects every cleanupless `(unwind-protect x)` in one file, with the number
 /// of `unwind-protect` forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no cleanupless unwind-protect here" for
-/// Common Lisp and "nothing was looked for" for Clojure, and the two read
-/// identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_unwind_protect_no_cleanup_report(
     path: &Path,
     dialect: Dialect,
@@ -202,8 +193,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =

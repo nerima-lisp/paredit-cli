@@ -1,8 +1,5 @@
 //! `leftover-print-debug`: a bare debug-print call left in committed source.
 //!
-//! The analysis lives in [`crate::leftover_print_debug::domain`], which also backs the
-//! standalone `inspect leftover-print-debug` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -1,8 +1,5 @@
 //! `test-without-assertion`: a test definition whose body never asserts.
 //!
-//! The analysis lives in [`crate::test_without_assertion::domain`], which also
-//! backs the standalone `inspect test-without-assertion` command; this module
-//! only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -1,8 +1,5 @@
 //! `negated-comparison`: a not/null of a two-argument numeric comparison ((not (= a b)) is (/= a b)).
 //!
-//! The analysis lives in [`crate::negated_comparison::domain`], which also backs the
-//! standalone `inspect negated-comparison` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

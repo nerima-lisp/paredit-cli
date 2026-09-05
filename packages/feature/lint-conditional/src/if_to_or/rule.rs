@@ -1,8 +1,5 @@
 //! `if-to-or`: an if whose test and then are the same atom ((if x x y) is (or x y)).
 //!
-//! The analysis lives in [`crate::if_to_or::domain`], which also backs the
-//! standalone `inspect if-to-or` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

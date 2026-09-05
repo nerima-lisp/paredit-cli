@@ -16,8 +16,6 @@
 //! `(let ((x form)) body…)`, copying the variable, form, and body from their
 //! exact source, so the rule is auto-fixable.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -52,8 +50,6 @@ pub struct SingleValueBindItem {
     pub span: ByteSpan,
     /// The span of the single bound variable `x`.
     ///
-    /// The rewrite's input, not the report's: the lint rule reads it to build
-    /// the `let` binding, and the command never printed it.
     pub var_span: ByteSpan,
     /// The span of the value form.
     ///
@@ -89,15 +85,11 @@ impl Finding for SingleValueBindItem {
         Vec::new()
     }
 
-    /// The same sentence the `single-value-bind` lint rule writes, so a SARIF
-    /// or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         "multiple-value-bind of one variable is just let; (multiple-value-bind (x) f body) is (let ((x f)) body)".to_owned()
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_bind(
     view: &ExpressionView,
     bind_form_count: &mut usize,
@@ -158,10 +150,7 @@ pub fn examine_bind(
 /// number of `multiple-value-bind` forms scanned as the denominator beside
 /// them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "every bind here captures more than one
-/// value" for Common Lisp and "nothing was looked for" for Clojure, and the two
-/// read identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_single_value_bind_report(
     path: &Path,
     dialect: Dialect,
@@ -207,7 +196,6 @@ mod tests {
             .expect("build single-value bind report")
     }
 
-    /// The `(bind_form_count, violations)` pair the report is built from.
     fn binds(input: &str) -> (u64, Vec<SingleValueBindItem>) {
         let report = report(input);
         let count = report
@@ -282,8 +270,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =

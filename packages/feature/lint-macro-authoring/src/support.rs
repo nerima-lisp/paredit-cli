@@ -48,10 +48,8 @@ use paredit_core_syntax::view_query::{
 /// `-lint-data-structure`'s. This package needs it more than any of them: a
 /// macro body is mostly template, so a rule that gets this wrong does not
 /// misfire occasionally, it misfires on every macro in the file. A single
-/// depth counter has shipped as a false-positive source in this repository
-/// twice, most recently producing 41 findings on SBCL's sources of which every
-/// one was false, because it bailed on *any* reader prefix and so never
-/// entered the `,@` escapes inside a template.
+/// depth counter cannot represent both states; treating every reader prefix as
+/// unevaluated also misses `,@` escapes inside templates.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct QuoteState {
     hard: bool,

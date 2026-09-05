@@ -1,8 +1,5 @@
 //! `duplicate-setf-places`: a setf/setq/psetf/psetq that assigns the same variable more than once ((setf a 1 a 2)).
 //!
-//! The analysis lives in [`crate::duplicate_setf_places::domain`], which also backs the
-//! standalone `inspect duplicate-setf-places` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

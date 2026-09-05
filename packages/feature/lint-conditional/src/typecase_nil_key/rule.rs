@@ -1,8 +1,5 @@
 //! `typecase-nil-key`: a typecase/etypecase/ctypecase clause with a bare nil type, which is the empty type and never matches (use null).
 //!
-//! The analysis lives in [`crate::typecase_nil_key::domain`], which also backs the
-//! standalone `inspect typecase-nil-key` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

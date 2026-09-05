@@ -5,8 +5,7 @@
 //! evaluated **once, at definition time**, and the resulting object is stored
 //! on the function. This is the single most-cited Python defect, and it is
 //! *not* a Common Lisp defect: `(defun f (&optional (acc (list)))` evaluates
-//! its default on entry to each call, which is why the same rule was correctly
-//! refuted for Common Lisp in an earlier batch. Hy is the contrast case.
+//! its default on entry to each call. Hy is the contrast case.
 //!
 //! Measured against Hy 1.3.1 (CPython 3.14.6):
 //!

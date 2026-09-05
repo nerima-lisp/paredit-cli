@@ -26,11 +26,10 @@
 //!
 //! # Why the quote model cannot count down for Hy
 //!
-//! [`QuoteState`] is the two-counter model from
-//! `packages/feature/lint-condition-system/src/support.rs` — `hard: bool` plus
-//! `quasi: u32`. A single `i32` depth counter is wrong and has shipped in this
-//! workspace as a false-positive source twice. A consolidation of the several
-//! copies is in flight; this one should move when it lands.
+//! [`QuoteState`] uses the same two-counter model as
+//! `packages/feature/lint-condition-system/src/support.rs`: `hard: bool` plus
+//! `quasi: u32`. A single `i32` depth counter cannot represent both states and
+//! produces false positives.
 //!
 //! For Hy the model is **deliberately asymmetric**, and this is a reader
 //! limitation rather than a choice made here. Hy spells quasiquote `` ` `` and

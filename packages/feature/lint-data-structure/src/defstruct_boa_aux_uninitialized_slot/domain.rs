@@ -190,8 +190,6 @@ fn bare_aux_variables(lambda_list: &ExpressionView) -> Vec<&ExpressionView> {
     bare
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 ///
 /// Everything up to and including the `&aux` scan is local to this one
 /// `defstruct` form — the constructor option and the slot list are operands of

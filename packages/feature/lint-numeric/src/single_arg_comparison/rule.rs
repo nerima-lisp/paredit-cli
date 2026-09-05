@@ -1,8 +1,5 @@
 //! `single-arg-comparison`: a numeric comparison (< > <= >= = /=) with one argument (always true; missing an operand?).
 //!
-//! The analysis lives in [`crate::single_arg_comparison::domain`], which also backs the
-//! standalone `inspect single-arg-comparison` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

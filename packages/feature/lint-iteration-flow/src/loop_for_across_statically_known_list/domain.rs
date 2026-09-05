@@ -126,9 +126,6 @@ impl Finding for LoopForAcrossListItem {
         ]
     }
 
-    /// The same sentence the `loop-for-across-statically-known-list` lint rule
-    /// writes, so a SARIF or JUnit consumer reading both sees one finding
-    /// described one way.
     fn message(&self) -> String {
         format!(
             "loop `across` needs a vector, but {} is {}; use `in` to walk a list",
@@ -155,8 +152,6 @@ fn list_evidence(view: &ExpressionView) -> Option<ListEvidence> {
         .then_some(ListEvidence::ListConstructor)
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_loop_for_across(
     view: &ExpressionView,
     scan: &mut LoopScan,
@@ -231,10 +226,7 @@ pub fn examine_loop_for_across(
 /// Collects every `across` over a provable list in one file, with the number
 /// of `loop` forms scanned and the number actually modelled beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "every `across` has a vector" for Common
-/// Lisp and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_loop_for_across_report(
     path: &Path,
     dialect: Dialect,

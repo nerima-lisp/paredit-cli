@@ -118,9 +118,6 @@ impl Finding for MixedFloatPrecisionItem {
         ]
     }
 
-    /// The same sentence the `mixed-float-precision-arithmetic` lint rule
-    /// writes, so a SARIF or JUnit consumer reading both sees one finding
-    /// described one way.
     fn message(&self) -> String {
         format!(
             "the single-float literal {} is widened into a double-float result alongside {}, \
@@ -130,8 +127,6 @@ impl Finding for MixedFloatPrecisionItem {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 ///
 /// The predicate order is load-bearing, not stylistic. On the shape the
 /// `clean/forms/*` benchmarks are built from — `(defun clean-fn-N (a b) "doc"
@@ -214,10 +209,7 @@ pub fn examine(
 /// Collects every mixed-precision arithmetic form in one file, with the number
 /// of arithmetic forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no mixed precision here" for Common Lisp
-/// and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_mixed_float_precision_arithmetic_report(
     path: &Path,
     dialect: Dialect,
@@ -267,7 +259,6 @@ mod tests {
         .expect("build report")
     }
 
-    /// The `(arithmetic_form_count, violations)` pair the report is built from.
     fn mixed(input: &str) -> (u64, Vec<MixedFloatPrecisionItem>) {
         let report = report(input);
         let count = report

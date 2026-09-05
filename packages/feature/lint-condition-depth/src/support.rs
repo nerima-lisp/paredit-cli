@@ -4,17 +4,15 @@
 //!
 //! # Copied, deliberately
 //!
-//! The [`QuoteState`] quote model and [`is_unevaluated_at`] are copied from
-//! `paredit-feature-lint-condition-system::support`, which is what the other
-//! lint packages do with it. A consolidation of that helper into
-//! `packages/core` is in flight; when it lands this module should be deleted
-//! and the shared one used.
+//! The [`QuoteState`] quote model and [`is_unevaluated_at`] follow
+//! `paredit-feature-lint-condition-system::support`, as the other lint packages
+//! do.
 //!
 //! The model is **two counters, not a depth**. `'` and `` ` `` are not the same
 //! thing: a comma inside `'(…)` is a comma character in a literal list, so
 //! `hard` never clears, while a comma inside `` `(…) `` escapes back to code, so
-//! `quasi` counts up and down. A single `i32` depth counter is wrong and has
-//! shipped as a false-positive source twice.
+//! `quasi` counts up and down. A single `i32` depth counter cannot represent
+//! both states and produces false positives.
 //!
 //! Nothing here is called per visited node. The `clean/forms/*` benchmarks lint
 //! files with zero findings, so the per-file cost of a rule that matches nothing

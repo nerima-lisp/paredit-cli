@@ -1,10 +1,6 @@
 //! `deeply-nested-anonymous-lambda`: three or more anonymous lambdas nested
 //! with no name in between.
 //!
-//! The analysis lives in [`crate::deeply_nested_anonymous_lambda::domain`],
-//! which also backs the standalone
-//! `inspect deeply-nested-anonymous-lambda` command; this module only registers
-//! it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};

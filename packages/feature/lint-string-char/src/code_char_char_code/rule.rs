@@ -1,8 +1,5 @@
 //! `code-char-char-code`: a code-char of a char-code, a round-trip that is just the character ((code-char (char-code c)) is c).
 //!
-//! The analysis lives in [`crate::code_char_char_code::domain`], which also backs the
-//! standalone `inspect code-char-char-code` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

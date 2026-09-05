@@ -1,9 +1,5 @@
 //! `destructuring-bind-unused-whole`: a destructuring-bind whose &whole variable is never referenced.
 //!
-//! The analysis lives in [`crate::destructuring_bind_unused_whole::domain`],
-//! which also backs the standalone `inspect destructuring-bind-unused-whole`
-//! command; this module only registers it with the lint suite and phrases its
-//! findings.
 
 use paredit_core_lint_engine::LintResult;
 

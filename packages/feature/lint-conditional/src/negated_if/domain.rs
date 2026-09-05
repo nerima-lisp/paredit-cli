@@ -12,8 +12,6 @@
 //! The fix rewrites `(if (not X) A B)` as `(if X B A)`, copying `X`, `A`, and `B`
 //! from their exact source, so the rule is auto-fixable.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -87,16 +85,11 @@ impl Finding for NegatedIfItem {
         Vec::new()
     }
 
-    /// The same sentence the `negated-if` lint rule writes, so a SARIF or JUnit
-    /// consumer reading both sees one finding described one way. Load-bearing
-    /// here, since this finding has no text columns of its own.
     fn message(&self) -> String {
         "if test is negated; (if (not c) a b) is (if c b a)".to_owned()
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_if(
     view: &ExpressionView,
     if_form_count: &mut usize,
@@ -135,10 +128,7 @@ pub fn examine_if(
 /// Collects every negated three-argument `if` in one file, with the number of
 /// `if` forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no negated `if` here" for Common Lisp
-/// and "nothing was looked for" for Fennel, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_negated_if_report(
     path: &Path,
     dialect: Dialect,
@@ -184,7 +174,6 @@ mod tests {
             .expect("build negated if report")
     }
 
-    /// The `(if_form_count, violations)` pair the report is built from.
     fn ifs(input: &str) -> (u64, Vec<NegatedIfItem>) {
         let report = report(input);
         let count = report
@@ -258,8 +247,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =

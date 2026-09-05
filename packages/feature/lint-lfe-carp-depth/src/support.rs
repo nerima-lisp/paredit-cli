@@ -5,8 +5,8 @@
 //! Nothing here materializes the document. Both rules in this package work
 //! entirely within the subtree the dispatcher handed them — a `when` guard or
 //! a single clause list — so neither ever calls [`SyntaxTree::root_view`].
-//! That is deliberate: an earlier batch in this workspace measured
-//! 450843 ns/call against 28 ns/call purely from a rule reaching `root_view`
+//! That is deliberate: the cost probe measured 450843 ns/call against 28
+//! ns/call purely from a rule reaching `root_view`
 //! before its cheap head check, and the cheapest way not to make that mistake
 //! is to have no reason to call it at all.
 
@@ -292,8 +292,8 @@ impl NodeContext {
 /// [`SyntaxTree::root_view`] materializes the whole document into owned views,
 /// so this costs the *file's size* rather than the node's depth. A rule that
 /// asked this before its cheap head check would charge every visited node for
-/// a walk that almost always answers "no"; an earlier batch in this workspace
-/// measured 450843 ns/call against 28 ns/call from exactly that ordering
+/// a walk that almost always answers "no"; the cost probe measured 450843
+/// ns/call against 28 ns/call from exactly that ordering
 /// mistake. Both callers here ask only once a finding is otherwise ready to
 /// report, which makes the cost proportional to the number of findings rather
 /// than the number of nodes — and findings are rare.

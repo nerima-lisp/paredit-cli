@@ -1,9 +1,5 @@
 //! `loop-collect-into-immediately-returned`: a loop that collects into an accumulator only to return it from finally.
 //!
-//! The analysis lives in
-//! [`crate::loop_collect_into_immediately_returned::domain`], which also backs
-//! the standalone `inspect loop-collect-into-immediately-returned` command;
-//! this module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

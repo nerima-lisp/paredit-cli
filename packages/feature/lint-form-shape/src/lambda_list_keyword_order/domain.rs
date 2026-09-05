@@ -83,8 +83,6 @@ impl Finding for LambdaListKeywordOrderItem {
         ]
     }
 
-    /// The same sentence the `lambda-list-keyword-order` lint rule writes, so a
-    /// SARIF or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!(
             "{} lists lambda-list keyword {} after {}",
@@ -97,10 +95,7 @@ impl Finding for LambdaListKeywordOrderItem {
 /// are out of order, with the number of callable definitions scanned as the
 /// denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no misordered lambda list here" for
-/// Common Lisp and "nothing was looked for" for Clojure, and the two read
-/// identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_lambda_list_keyword_order_report(
     path: &Path,
     dialect: Dialect,
@@ -213,7 +208,6 @@ mod tests {
             .expect("build lambda list keyword order report")
     }
 
-    /// The `(definition_count, violations)` pair the report is built from.
     fn violations(input: &str) -> (u64, Vec<LambdaListKeywordOrderItem>) {
         let report = report(input);
         let count = report
@@ -289,8 +283,6 @@ mod tests {
         assert!(items.is_empty());
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =

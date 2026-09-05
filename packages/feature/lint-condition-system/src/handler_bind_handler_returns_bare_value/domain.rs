@@ -132,8 +132,6 @@ fn handler_body_tail(lambda: &ExpressionView) -> Option<&ExpressionView> {
     lambda.children.get(2..).and_then(<[_]>::last)
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_handler_bind(
     view: &ExpressionView,
     handler_count: &mut usize,

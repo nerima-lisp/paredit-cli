@@ -152,8 +152,6 @@ fn vacuous_shape(vector: &ExpressionView) -> Option<VacuousShape> {
         .then_some(VacuousShape::AlwaysTrue)
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 ///
 /// Counts every `defn` arity that carries a condition map as the denominator:
 /// "two vacuous contracts" means something different in a file with three
@@ -195,11 +193,7 @@ pub fn examine_defn(
 /// Collects every vacuous `:pre`/`:post` vector in one file, with the number of
 /// condition maps scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no vacuous contract here" for Clojure
-/// and "nothing was looked for" for Common Lisp, and the two read identically
-/// without the flag. The flag is derived from [`SCOPE`], the same constant the
-/// engine consults, so the two cannot disagree.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_clojure_pre_post_vacuous_report(
     path: &Path,
     dialect: Dialect,

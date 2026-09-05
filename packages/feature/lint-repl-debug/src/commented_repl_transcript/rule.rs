@@ -1,8 +1,5 @@
 //! `commented-repl-transcript`: a comment block shaped like a pasted REPL session.
 //!
-//! The analysis lives in [`crate::commented_repl_transcript::domain`], which also backs the
-//! standalone `inspect commented-repl-transcript` command; this module only registers it with
-//! the lint suite and phrases its findings.
 //!
 //! Deliberately `Fixability::ReportOnly` — see the fuller rationale in
 //! [`crate::commented_repl_transcript::domain`]'s module doc: this project's

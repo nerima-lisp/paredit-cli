@@ -1,8 +1,5 @@
 //! `nil-comparison`: an eq/eql/equal/equalp comparison against nil ((eq x nil) is just (null x)).
 //!
-//! The analysis lives in [`crate::nil_comparison::domain`], which also backs the
-//! standalone `inspect nil-comparison` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

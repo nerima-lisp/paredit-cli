@@ -12,8 +12,6 @@
 //! The fix rewrites `(subseq seq 0)` as `(copy-seq seq)`, copying the sequence
 //! operand from its exact source, so the rule is auto-fixable.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -76,16 +74,12 @@ impl Finding for SubseqZeroItem {
         )]
     }
 
-    /// The same sentence the `subseq-zero` lint rule writes, so a SARIF or
-    /// JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         "a subseq from index 0 copies the whole sequence; (subseq seq 0) is (copy-seq seq)"
             .to_owned()
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
     subseq_form_count: &mut usize,
@@ -121,10 +115,7 @@ pub fn examine(
 /// Collects every `(subseq seq 0)` in one file, with the number of `subseq`
 /// forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "every `subseq` here is a real slice" for
-/// Common Lisp and "nothing was looked for" for Clojure, and the two read
-/// identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_subseq_zero_report(
     path: &Path,
     dialect: Dialect,
@@ -170,7 +161,6 @@ mod tests {
             .expect("build subseq zero report")
     }
 
-    /// The `(subseq_form_count, violations)` pair the report is built from.
     fn subseqs(input: &str) -> (u64, Vec<SubseqZeroItem>) {
         let report = report(input);
         let count = report
@@ -238,8 +228,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(subseq x 0)", Dialect::Clojure).expect("parse");

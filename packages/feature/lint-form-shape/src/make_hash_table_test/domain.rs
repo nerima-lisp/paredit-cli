@@ -14,8 +14,6 @@
 //! `redundant-eql-test` (which covers the sequence/list
 //! operators whose `:test` defaults to `eql`).
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -96,15 +94,11 @@ impl Finding for MakeHashTableTestItem {
         )]
     }
 
-    /// The same sentence the `make-hash-table-test` lint rule writes, so a SARIF
-    /// or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         "the make-hash-table :test defaults to eql; drop the explicit :test 'eql".to_owned()
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
     make_hash_table_form_count: &mut usize,
@@ -140,10 +134,7 @@ pub fn examine(
 /// Collects every `(make-hash-table … :test 'eql …)` in one file, with the
 /// number of `make-hash-table` forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no redundant `:test`" for Common Lisp and
-/// "nothing was looked for" for Clojure, and the two read identically without
-/// the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_make_hash_table_test_report(
     path: &Path,
     dialect: Dialect,
@@ -256,8 +247,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(make-hash-table :test 'eql)", Dialect::Clojure)

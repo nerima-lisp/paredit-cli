@@ -1,10 +1,6 @@
 //! `introspection-probe-unchecked`: a probe whose not-found answer is `nil`,
 //! applied directly by `funcall`/`apply`.
 //!
-//! The analysis lives in [`crate::introspection_probe_unchecked::domain`],
-//! which also backs the standalone `inspect introspection-probe-unchecked`
-//! command; this module only registers it with the lint suite and phrases its
-//! findings.
 
 use paredit_core_lint_engine::LintResult;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};

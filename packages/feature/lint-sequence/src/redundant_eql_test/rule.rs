@@ -1,8 +1,5 @@
 //! `redundant-eql-test`: an eql-defaulting call with an explicit :test #'eql, the default ((find x l :test #'eql) is (find x l)).
 //!
-//! The analysis lives in [`crate::redundant_eql_test::domain`], which also backs the
-//! standalone `inspect redundant-eql-test` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

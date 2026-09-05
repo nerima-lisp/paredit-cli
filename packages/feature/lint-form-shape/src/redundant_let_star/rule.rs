@@ -1,8 +1,5 @@
 //! `redundant-let-star`: a let* with zero or one binding, which is just let (no sequential scope in play).
 //!
-//! The analysis lives in [`crate::redundant_let_star::domain`], which also backs the
-//! standalone `inspect redundant-let-star` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -1,8 +1,5 @@
 //! `modify-macro-arity`: an incf/decf/push/pop call with the wrong number of arguments.
 //!
-//! The analysis lives in [`crate::modify_macro_arity::domain`], which also backs the
-//! standalone `inspect modify-macro-arity` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

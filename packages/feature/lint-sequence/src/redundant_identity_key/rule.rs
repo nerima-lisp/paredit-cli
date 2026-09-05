@@ -1,8 +1,5 @@
 //! `redundant-identity-key`: a :key-taking call with an explicit :key #'identity/nil, the default ((sort xs #'< :key #'identity) is (sort xs #'<)).
 //!
-//! The analysis lives in [`crate::redundant_identity_key::domain`], which also backs the
-//! standalone `inspect redundant-identity-key` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

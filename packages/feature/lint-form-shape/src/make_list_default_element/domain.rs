@@ -12,8 +12,6 @@
 //! end of the preceding argument through the `nil`), leaving the rest
 //! byte-identical, so the rule is auto-fixable.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -76,15 +74,11 @@ impl Finding for MakeListDefaultElementItem {
         )]
     }
 
-    /// The same sentence the `make-list-default-element` lint rule writes, so a
-    /// SARIF or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         "explicit :initial-element nil restates make-list's default; drop it".to_owned()
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
     call_form_count: &mut usize,
@@ -120,10 +114,7 @@ pub fn examine(
 /// Collects every `(make-list n :initial-element nil)` in one file, with the
 /// number of `make-list` calls scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no restated default" for Common Lisp and
-/// "nothing was looked for" for Clojure, and the two read identically without
-/// the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_make_list_default_element_report(
     path: &Path,
     dialect: Dialect,
@@ -169,7 +160,6 @@ mod tests {
             .expect("build make-list default element report")
     }
 
-    /// The `(call_form_count, violations)` pair the report is built from.
     fn calls(input: &str) -> (u64, Vec<MakeListDefaultElementItem>) {
         let report = report(input);
         let count = report
@@ -222,8 +212,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =

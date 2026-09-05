@@ -1,8 +1,5 @@
 //! `dead-boolean-operand`: an and/or whose non-final constant operand makes later operands dead.
 //!
-//! The analysis lives in [`crate::dead_boolean_operand::domain`], which also backs the
-//! standalone `inspect dead-boolean-operand` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

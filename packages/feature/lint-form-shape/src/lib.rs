@@ -58,7 +58,7 @@ pub mod with_open_file_redundant_direction_default;
 // The root's REGISTRY names each rule's META and RULE across this crate
 // boundary (section 4.2), and each slice's cli owns its own subcommand.
 
-/// The eight rules added in this batch, driven through the *engine* rather
+/// The crate's eight rules, driven through the *engine* rather
 /// than through their own `build_*_report`.
 ///
 /// The two entry points do not share their quote handling, and neither covers

@@ -67,9 +67,8 @@ an `eval-when`'s situations list and a `macrolet`'s bindings list are inside the
 form but are not body, and a candidate found in one of them is not a top level
 form.
 
-Both halves matter. Getting the operator list wrong produces false positives on
-`(locally …)` and `(macrolet () …)`, which is a failure an earlier batch in this
-repository shipped. Getting the body index wrong is subtler: it only shows up
+Both halves matter. An incomplete operator list produces false positives on
+`(locally …)` and `(macrolet () …)`. A wrong body index is subtler: it only shows up
 when a non-body position happens to contain a list whose head is itself one of
 the five, and mutation testing caught that the obvious test cases never reach
 it.

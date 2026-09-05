@@ -35,10 +35,8 @@ pub struct SplitFilePlan {
 
 /// What was already on disk where the split is writing.
 ///
-/// Phase 7: this was `to_file_existed: bool` beside `to_parent_existed: bool`,
-/// and one of the four combinations is impossible — a file cannot exist inside
-/// a directory that does not. Three states say the same thing and cannot
-/// express the fourth.
+/// The three states exclude the impossible combination of an existing file in
+/// a missing directory.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SplitFileDestination {
     /// Neither the file nor its directory exists.

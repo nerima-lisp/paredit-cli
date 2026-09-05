@@ -1,8 +1,5 @@
 //! `char-op-string`: a character function (char=/char-code/alpha-char-p/...) applied to a string literal (type error).
 //!
-//! The analysis lives in [`crate::char_op_string::domain`], which also backs the
-//! standalone `inspect char-op-string` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -1,8 +1,5 @@
 //! `single-operand-boolean`: a single-operand and/or ((and X) and (or X) are just X).
 //!
-//! The analysis lives in [`crate::single_operand_boolean::domain`], which also backs the
-//! standalone `inspect single-operand-boolean` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 
@@ -140,7 +137,7 @@ mod tests {
         );
     }
 
-    // ----- the corruption this rule shipped with ---------------------------
+    // ----- quoted-input regression -----------------------------------------
 
     /// The measured defect: the fix replaced `view.span`, which begins at the
     /// backquote, so `` `(or ,x) `` became `,x` — a comma outside any

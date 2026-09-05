@@ -1,8 +1,5 @@
 //! `identity-arithmetic`: an arithmetic form with a redundant identity operand ((+ x 0), (* x 1), (- x 0), (/ x 1)).
 //!
-//! The analysis lives in [`crate::identity_arithmetic::domain`], which also backs the
-//! standalone `inspect identity-arithmetic` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

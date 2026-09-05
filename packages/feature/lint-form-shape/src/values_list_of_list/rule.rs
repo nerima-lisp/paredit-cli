@@ -1,8 +1,5 @@
 //! `values-list-of-list`: a values-list of a list constructor ((values-list (list a b)) is (values a b)).
 //!
-//! The analysis lives in [`crate::values_list_of_list::domain`], which also backs the
-//! standalone `inspect values-list-of-list` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

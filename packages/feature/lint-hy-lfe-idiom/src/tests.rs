@@ -12,9 +12,8 @@
 //!
 //! Every test dispatches through [`collect_lint_outcomes`], never through a
 //! rule's `check`. Calling `check` directly bypasses the head index, which is
-//! where a wrong `HeadFilter` or a forgotten `dialect_scope` shows up — a
-//! sibling batch found that deleting a head from a rule's `Heads` left its
-//! entire suite green for exactly this reason.
+//! where a wrong `HeadFilter` or a forgotten `dialect_scope` shows up. Tests
+//! that call `check` directly cannot detect a missing `Heads` entry.
 
 use paredit_core_lint_engine::engine::{build_head_index, collect_lint_outcomes};
 use paredit_core_lint_engine::model::LintOutcome;
@@ -739,9 +738,7 @@ fn every_rule_in_this_crate_is_head_filtered() {
 #[test]
 fn every_rules_declared_heads_match_its_domain_head_names() {
     // The `Heads` array and the domain's `HEAD_NAMES` are two spellings of one
-    // fact. A sibling batch found that deleting a head from a rule's `Heads`
-    // left its entire suite green, because every test went through a head that
-    // was still listed; this is the assertion that would have caught it.
+    // fact. This assertion keeps them synchronized.
     use paredit_core_lint_engine::model::HeadFilter;
     let declared = |entry: &RuleEntry| -> Vec<&'static str> {
         match entry.rule().head_filter() {

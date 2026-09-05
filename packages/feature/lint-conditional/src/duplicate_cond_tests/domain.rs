@@ -61,8 +61,6 @@ impl Finding for DuplicateCondTestItem {
         ]
     }
 
-    /// The same sentence the `duplicate-cond-tests` lint rule writes, so a SARIF
-    /// or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!(
             "cond repeats test {} ({}×)",
@@ -71,8 +69,6 @@ impl Finding for DuplicateCondTestItem {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_cond(
     view: &ExpressionView,
     cond_form_count: &mut usize,
@@ -122,10 +118,7 @@ pub fn examine_cond(
 /// Collects every duplicated `cond` test in one file, with the number of `cond`
 /// forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no repeated test here" for Common Lisp
-/// and "nothing was looked for" for Fennel, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_duplicate_cond_test_report(
     path: &Path,
     dialect: Dialect,
@@ -171,7 +164,6 @@ mod tests {
             .expect("build duplicate cond test report")
     }
 
-    /// The `(cond_form_count, duplicates)` pair the report is built from.
     fn duplicates(input: &str) -> (u64, Vec<DuplicateCondTestItem>) {
         let report = report(input);
         let count = report
@@ -219,8 +211,6 @@ mod tests {
         assert_eq!(duplicates.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse("(cond ((foo) 1) ((foo) 2))").expect("parse input");

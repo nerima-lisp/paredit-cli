@@ -1,9 +1,6 @@
 //! `lock-acquired-not-released`: a lock taken by hand with no cleanup to give
 //! it back.
 //!
-//! The analysis lives in [`crate::lock_acquired_not_released::domain`], which
-//! also backs the standalone `inspect lock-acquired-not-released` command; this
-//! module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -13,8 +13,6 @@
 //! Deeper nestings collapse one layer per pass under `--fix`'s fixpoint, so
 //! `(car (cdr (cdr x)))` converges to `(caddr x)`.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -50,9 +48,6 @@ pub struct NestedCxrItem {
     pub combined: String,
     /// The span of the innermost argument `x` (for reconstructing the fix).
     ///
-    /// The rewrite's input, not the report's: the lint rule reads it to splice
-    /// the argument into the combined accessor, and the command never printed
-    /// it.
     pub arg_span: ByteSpan,
 }
 
@@ -76,8 +71,6 @@ impl Finding for NestedCxrItem {
         vec![("combined", json!(self.combined))]
     }
 
-    /// The same sentence the `nested-cxr` lint rule writes, so a SARIF or JUnit
-    /// consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!(
             "nested car/cdr accessors combine into ({} …)",
@@ -86,8 +79,6 @@ impl Finding for NestedCxrItem {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_accessor(
     view: &ExpressionView,
     accessor_form_count: &mut usize,
@@ -133,10 +124,7 @@ pub fn examine_accessor(
 /// Collects every combinable nested `cXr` accessor in one file, with the number
 /// of `cXr` accessor forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no combinable accessor here" for Common
-/// Lisp and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_nested_cxr_report(
     path: &Path,
     dialect: Dialect,
@@ -182,7 +170,6 @@ mod tests {
             .expect("build nested cxr report")
     }
 
-    /// The `(accessor_form_count, violations)` pair the report is built from.
     fn cxrs(input: &str) -> (u64, Vec<NestedCxrItem>) {
         let report = report(input);
         let count = report
@@ -282,8 +269,6 @@ mod tests {
         assert_eq!(violations[0].combined, "cadr");
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =

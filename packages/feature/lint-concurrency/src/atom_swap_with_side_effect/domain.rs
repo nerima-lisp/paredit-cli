@@ -214,8 +214,6 @@ fn inline_function_body(update: &ExpressionView) -> Option<&[ExpressionView]> {
     update.children.get(start..)
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_swap(
     view: &ExpressionView,
     swap_count: &mut usize,

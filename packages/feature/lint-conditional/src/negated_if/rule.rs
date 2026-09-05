@@ -1,8 +1,5 @@
 //! `negated-if`: a three-argument if with a negated test ((if (not c) a b) is (if c b a)).
 //!
-//! The analysis lives in [`crate::negated_if::domain`], which also backs the
-//! standalone `inspect negated-if` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

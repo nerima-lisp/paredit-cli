@@ -19,8 +19,6 @@
 //! The fix rewrites `(cond (test body…))` as `(when test body…)` by wrapping
 //! the clause interior verbatim, so the rule is auto-fixable.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -58,8 +56,6 @@ pub struct SingleClauseCondItem {
     /// The span of the clause interior (`test body…`, parens excluded), which
     /// the fix wraps as `(when …)`.
     ///
-    /// The rewrite's input, not the report's: the lint rule slices it to build
-    /// the replacement, and neither the old renderer nor this one prints it.
     pub clause_inner_span: ByteSpan,
 }
 
@@ -85,16 +81,12 @@ impl Finding for SingleClauseCondItem {
         Vec::new()
     }
 
-    /// The same sentence the `single-clause-cond` lint rule writes, so a SARIF
-    /// or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         "single-clause cond with a body is just when; (cond (test a b)) is (when test a b)"
             .to_owned()
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_cond(
     view: &ExpressionView,
     cond_form_count: &mut usize,
@@ -146,10 +138,7 @@ pub fn examine_cond(
 /// Collects every single-clause `cond` in one file, with the number of `cond`
 /// forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no single-clause cond here" for Common
-/// Lisp and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_single_clause_cond_report(
     path: &Path,
     dialect: Dialect,
@@ -195,7 +184,6 @@ mod tests {
             .expect("build single-clause cond report")
     }
 
-    /// The `(cond_form_count, violations)` pair the report is built from.
     fn conds(input: &str) -> (u64, Vec<SingleClauseCondItem>) {
         let report = report(input);
         let count = report
@@ -295,8 +283,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =

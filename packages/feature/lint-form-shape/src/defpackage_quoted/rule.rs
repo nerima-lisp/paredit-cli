@@ -1,8 +1,5 @@
 //! `defpackage-quoted`: a quoted designator in a defpackage clause, which defpackage does not evaluate ((:export 'foo)).
 //!
-//! The analysis lives in [`crate::defpackage_quoted::domain`], which also backs the
-//! standalone `inspect defpackage-quoted` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

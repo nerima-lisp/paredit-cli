@@ -1,8 +1,5 @@
 //! `single-operand-list-op`: a single-argument append/nconc/list*, which returns its argument unchanged ((append x) is x).
 //!
-//! The analysis lives in [`crate::single_operand_list_op::domain`], which also backs the
-//! standalone `inspect single-operand-list-op` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

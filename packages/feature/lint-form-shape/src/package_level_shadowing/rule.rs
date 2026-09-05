@@ -3,9 +3,6 @@
 //! top-level `defun`/`defvar`/`defparameter`/`defconstant`/`defmacro` in the
 //! same file.
 //!
-//! The analysis lives in [`crate::package_level_shadowing::domain`], which
-//! also backs the standalone `inspect package-level-shadowing` command; this
-//! module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

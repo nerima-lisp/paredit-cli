@@ -1,10 +1,6 @@
 //! `apply-with-literal-collection`: an argument list written out and then
 //! spread.
 //!
-//! The analysis lives in [`crate::apply_with_literal_collection::domain`],
-//! which also backs the standalone `inspect apply-with-literal-collection`
-//! command; this module only registers it with the lint suite and phrases its
-//! findings.
 
 use paredit_core_lint_engine::LintResult;
 

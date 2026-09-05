@@ -16,8 +16,6 @@
 //! The fix rewrites `(floor x 1)` as `(floor x)`, copying the operator and
 //! number operand from their exact source, so the rule is auto-fixable.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -63,8 +61,6 @@ pub struct RedundantDivisorItem {
     pub operator: &'static str,
     /// The span of the operator token (preserves the source casing).
     ///
-    /// The rewrite's input, not the report's: the lint rule copies the operator
-    /// as written into the shortened form, and the command never prints it.
     pub operator_span: ByteSpan,
     /// The span of the number operand (for reconstructing the fix).
     pub number_span: ByteSpan,
@@ -103,8 +99,6 @@ impl Finding for RedundantDivisorItem {
         ]
     }
 
-    /// The same sentence the `redundant-divisor` lint rule writes, so a SARIF
-    /// or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!(
             "the divisor defaults to 1; ({} x 1) is ({} x)",
@@ -158,10 +152,7 @@ pub fn examine(
 /// Collects every `(op x 1)` quotient form in one file, with the number of
 /// quotient forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no unit divisor here" for Common Lisp
-/// and "nothing was looked for" for Fennel, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_redundant_divisor_report(
     path: &Path,
     dialect: Dialect,
@@ -207,7 +198,6 @@ mod tests {
             .expect("build redundant divisor report")
     }
 
-    /// The `(quotient_form_count, violations)` pair the report is built from.
     fn quotients(input: &str) -> (u64, Vec<RedundantDivisorItem>) {
         let report = report(input);
         let count = report
@@ -291,8 +281,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(floor x 1)", Dialect::Clojure).expect("parse");

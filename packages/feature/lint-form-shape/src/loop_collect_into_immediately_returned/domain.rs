@@ -256,8 +256,6 @@ fn read_collect_into_shape(view: &ExpressionView) -> Option<CollectIntoShape> {
     })
 }
 
-/// Examines one node. Shared with the lint suite's rule.
-///
 /// Cheapest predicate first: head comparison, then one linear pass over the
 /// loop's own top-level children (never its operands' subtrees) to place the
 /// clause keywords. The whole-form occurrence count runs last, only for a loop

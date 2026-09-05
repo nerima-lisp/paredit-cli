@@ -1,8 +1,5 @@
 //! `typep-predicate`: a typep against a type with a dedicated predicate ((typep x 'string) is (stringp x)).
 //!
-//! The analysis lives in [`crate::typep_predicate::domain`], which also backs the
-//! standalone `inspect typep-predicate` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

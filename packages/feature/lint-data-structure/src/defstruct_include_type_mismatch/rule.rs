@@ -1,10 +1,6 @@
 //! `defstruct-include-type-mismatch`: a `defstruct` whose `:include` names a
 //! same-file structure with a different `:type`.
 //!
-//! The analysis lives in [`crate::defstruct_include_type_mismatch::domain`],
-//! which documents the premise it replaces — that `:type list` with `:include`
-//! is itself constrained — and why that one is false. This module only
-//! registers the rule and phrases its findings.
 
 use paredit_core_cli::report::Finding;
 use paredit_core_lint_engine::LintResult;

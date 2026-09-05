@@ -1,8 +1,5 @@
 //! `malformed-iteration-spec`: a dolist/dotimes spec that is not a `(var form [result])` list.
 //!
-//! The analysis lives in [`crate::malformed_iteration_spec::domain`], which also backs the
-//! standalone `inspect malformed-iteration-spec` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

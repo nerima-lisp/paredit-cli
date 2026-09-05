@@ -23,8 +23,6 @@
 //!   - Only the bare symbol `t` counts; a quoted `'t` (which carries a reader
 //!     prefix) is left alone.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -94,8 +92,6 @@ impl Finding for TComparisonItem {
         vec![("operator", json!(self.operator))]
     }
 
-    /// The same sentence the `t-comparison` lint rule writes, so a SARIF or
-    /// JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!(
             "{} against t matches only the symbol T, not any true value",
@@ -141,10 +137,7 @@ pub fn examine_comparison(
 /// Collects every t comparison in one file, with the number of
 /// eq/eql/equal/equalp forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no comparison against `t` here" for
-/// Common Lisp and "nothing was looked for" for Clojure, and the two read
-/// identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_t_comparison_report(
     path: &Path,
     dialect: Dialect,
@@ -190,7 +183,6 @@ mod tests {
             .expect("build t comparison report")
     }
 
-    /// The `(comparison_form_count, violations)` pair the report is built from.
     fn comparisons(input: &str) -> (u64, Vec<TComparisonItem>) {
         let report = report(input);
         let count = report
@@ -276,8 +268,6 @@ mod tests {
         assert_eq!(violations[0].operator, "eq");
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(eq x t)", Dialect::Clojure).expect("parse");

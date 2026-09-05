@@ -1,9 +1,6 @@
 //! `test-asserts-constant`: a test assertion whose truth is settled by the
 //! source.
 //!
-//! The analysis lives in [`crate::test_asserts_constant::domain`], which also
-//! backs the standalone `inspect test-asserts-constant` command; this module
-//! only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

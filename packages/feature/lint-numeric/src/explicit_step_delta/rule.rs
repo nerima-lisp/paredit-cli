@@ -1,8 +1,5 @@
 //! `explicit-step-delta`: an incf/decf with an explicit delta of 1, the default ((incf x 1) is (incf x)).
 //!
-//! The analysis lives in [`crate::explicit_step_delta::domain`], which also backs the
-//! standalone `inspect explicit-step-delta` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

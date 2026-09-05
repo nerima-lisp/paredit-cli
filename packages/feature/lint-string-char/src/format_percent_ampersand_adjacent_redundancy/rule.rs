@@ -1,8 +1,5 @@
 //! `format-percent-ampersand-adjacent-redundancy`: a ~%~& in a literal format control string, where the ~& is already at the start of a line.
 //!
-//! The analysis lives in [`crate::format_percent_ampersand_adjacent_redundancy::domain`], which also backs the
-//! standalone `inspect format-percent-ampersand-adjacent-redundancy` command; this module only registers it
-//! with the lint suite and phrases its findings.
 //!
 //! `HeadFilter::Heads`, never `AllNodes`: the five `format`-family operators are
 //! the only nodes whose control string this rule can read, and the

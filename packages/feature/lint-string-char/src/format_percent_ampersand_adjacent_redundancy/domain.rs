@@ -109,17 +109,12 @@ impl Finding for FormatPercentAmpersandAdjacentRedundancyItem {
         vec![("occurrences", json!(self.occurrences))]
     }
 
-    /// The same sentence the `format-percent-ampersand-adjacent-redundancy`
-    /// lint rule writes, so a SARIF or JUnit consumer reading both sees one
-    /// finding described one way.
     fn message(&self) -> String {
         "~& directly after ~% is already at the start of a line; drop it, or write ~%~% for a blank line"
             .to_owned()
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
     control_string_count: &mut usize,
@@ -168,10 +163,7 @@ pub fn examine(
 /// `~%~&` in one file, with the number of literal control strings scanned as
 /// the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no redundant fresh-line here" for Common
-/// Lisp and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_format_percent_ampersand_adjacent_redundancy_report(
     path: &Path,
     dialect: Dialect,
@@ -218,7 +210,6 @@ mod tests {
         .expect("build format percent ampersand adjacent redundancy report")
     }
 
-    /// The `(control_string_count, violations)` pair the report is built from.
     fn scanned(input: &str) -> (u64, Vec<FormatPercentAmpersandAdjacentRedundancyItem>) {
         let report = report(input);
         let count = report

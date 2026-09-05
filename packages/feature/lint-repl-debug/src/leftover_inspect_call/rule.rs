@@ -1,8 +1,5 @@
 //! `leftover-inspect-call`: a Common Lisp (inspect x) or (describe x) left in committed source.
 //!
-//! The analysis lives in [`crate::leftover_inspect_call::domain`], which also backs the
-//! standalone `inspect leftover-inspect-call` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

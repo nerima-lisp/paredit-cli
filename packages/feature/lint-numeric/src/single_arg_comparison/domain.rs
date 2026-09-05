@@ -12,8 +12,6 @@
 //! error rather than a vacuous truth. A lone reader conditional (`#+`/`#-`) as
 //! the sole argument is exempt: it may expand to zero or more arguments.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -74,8 +72,6 @@ impl Finding for SingleArgComparisonItem {
         vec![("operator", json!(self.operator))]
     }
 
-    /// The same sentence the `single-arg-comparison` lint rule writes, so a
-    /// SARIF or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!(
             "{} has a single argument; the comparison is always true (missing an operand?)",
@@ -110,10 +106,7 @@ pub fn examine_comparison(
 /// Collects every single-argument numeric comparison in one file, with the
 /// number of comparison forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "every comparison here has its operands"
-/// for Common Lisp and "nothing was looked for" for Clojure, and the two read
-/// identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_single_arg_comparison_report(
     path: &Path,
     dialect: Dialect,
@@ -159,7 +152,6 @@ mod tests {
             .expect("build single-arg comparison report")
     }
 
-    /// The `(comparison_form_count, violations)` pair the report is built from.
     fn comparisons(input: &str) -> (u64, Vec<SingleArgComparisonItem>) {
         let report = report(input);
         let count = report
@@ -236,8 +228,6 @@ mod tests {
         assert_eq!(violations[0].operator, ">");
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(< x)", Dialect::Clojure).expect("parse");

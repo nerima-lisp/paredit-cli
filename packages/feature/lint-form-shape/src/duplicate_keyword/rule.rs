@@ -1,8 +1,5 @@
 //! `duplicate-keyword`: a make-* call passing the same keyword argument twice ((make-instance 'c :x 1 :x 2)).
 //!
-//! The analysis lives in [`crate::duplicate_keyword::domain`], which also backs the
-//! standalone `inspect duplicate-keyword` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

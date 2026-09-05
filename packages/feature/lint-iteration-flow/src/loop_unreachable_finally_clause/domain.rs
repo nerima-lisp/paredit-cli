@@ -78,9 +78,6 @@ impl Finding for LoopUnreachableFinallyItem {
         vec![("form", json!(self.form)), ("after", json!(self.after))]
     }
 
-    /// The same sentence the `loop-unreachable-finally-clause` lint rule
-    /// writes, so a SARIF or JUnit consumer reading both sees one finding
-    /// described one way.
     fn message(&self) -> String {
         format!(
             "loop epilogue form {} can never run: an earlier finally clause already \
@@ -101,8 +98,6 @@ fn unconditional_exit(view: &ExpressionView) -> Option<String> {
     (head == "return" || head == "return-from").then_some(head)
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_loop_unreachable_finally(
     view: &ExpressionView,
     scan: &mut LoopScan,
@@ -141,10 +136,7 @@ pub fn examine_loop_unreachable_finally(
 /// Collects every dead `loop` epilogue form in one file, with the number of
 /// `loop` forms scanned and the number actually modelled beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "every epilogue form can run" for Common
-/// Lisp and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_loop_unreachable_finally_report(
     path: &Path,
     dialect: Dialect,

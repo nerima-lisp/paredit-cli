@@ -1,8 +1,5 @@
 //! `case-key-eql-pitfall`: a case clause keyed on a string or float literal.
 //!
-//! The analysis lives in [`crate::case_key_eql_pitfall::domain`], which also
-//! backs the standalone `inspect case-key-eql-pitfall` command; this module
-//! only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

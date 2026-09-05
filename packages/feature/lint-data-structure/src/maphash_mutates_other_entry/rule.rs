@@ -1,10 +1,6 @@
 //! `maphash-mutates-other-entry`: a `maphash` body that adds or removes an
 //! entry other than the one being processed.
 //!
-//! The analysis lives in [`crate::maphash_mutates_other_entry::domain`], which
-//! documents which two modifications CLHS 18.2 permits and why the naive form
-//! of this rule fires on correct code. This module only registers it with the
-//! lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

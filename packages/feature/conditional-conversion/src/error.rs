@@ -1,13 +1,11 @@
 //! Why a conditional conversion refuses to run.
 //!
-//! Section 9.2. The interesting part of this package's conversion is how
-//! little of it is new: six of its eleven refusals are already
+//! Six of this package's eleven refusals are already
 //! [`paredit_core_edit::EditRefusal`] variants — the dialect check, the
 //! input/output parse checks, the comment check, the two shape checks — with
 //! `operation` set to `"conditional conversion"`.
 //!
-//! That is the measurement from core/edit's README repeating one package out:
-//! the refusal vocabulary is shared, and only the reasons that are genuinely
+//! The refusal vocabulary is shared; only reasons that are genuinely
 //! about *this* conversion need types of their own. Those are the five below,
 //! each about the arity or shape of a specific `if`/`when`/`unless` form.
 

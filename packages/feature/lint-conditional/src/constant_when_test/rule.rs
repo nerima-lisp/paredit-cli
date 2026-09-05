@@ -1,8 +1,5 @@
 //! `constant-when-test`: a when/unless with a literal t/nil test ((when t b) is (progn b); (when nil b) is nil).
 //!
-//! The analysis lives in [`crate::constant_when_test::domain`], which also backs the
-//! standalone `inspect constant-when-test` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 
@@ -158,8 +155,7 @@ mod tests {
 
     /// A hard-quoted `(when t (a))` is a three-element list, not a `when`
     /// form. Rewriting it to `(progn (a))` changes what `*p*` *holds* — the
-    /// old behaviour, which this rule shipped with and which the guard now
-    /// refuses outright rather than merely spelling differently.
+    /// an invalid transformation, so the guard refuses the finding outright.
     #[test]
     fn a_hard_quoted_always_true_when_is_not_a_finding_at_all() {
         assert_eq!(count("(defparameter *p* '(when t (a)))\n"), 0);

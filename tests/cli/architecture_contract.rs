@@ -1,6 +1,6 @@
 //! The architecture rules the package split exists to enforce.
 //!
-//! Section 6 Phase 6-4 makes these mandatory. Each one guards a property that
+//! Each test guards a property that
 //! is invisible until it is already broken: a package with no README, a core
 //! package that has grown a dependency on a feature, `clap` leaking out of a
 //! `cli` module, or a member that silently opted out of `unsafe_code = "deny"`.
@@ -49,8 +49,7 @@ fn rust_sources(root: &Path) -> Vec<PathBuf> {
     found
 }
 
-/// Section 3.3: a package that does not say what its boundary means has only
-/// declared one mechanically.
+/// Every package documents its boundary.
 #[test]
 fn every_workspace_package_documents_itself() {
     let members = workspace_members();
@@ -98,7 +97,7 @@ fn every_workspace_package_documents_itself() {
     }
 }
 
-/// Section 6 Phase 6-4: core must not depend on a feature.
+/// Core packages must not depend on feature packages.
 ///
 /// This is the direction that cannot be recovered from once it is allowed. A
 /// core package that names a feature stops being reusable by the others, and

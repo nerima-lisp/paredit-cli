@@ -1,10 +1,6 @@
 //! `make-array-conflicting-initializers`: a `make-array` supplying both
 //! `:initial-element` and `:initial-contents`.
 //!
-//! The analysis lives in
-//! [`crate::make_array_conflicting_initializers::domain`]; this module only
-//! registers it with the lint suite and phrases its findings.
-
 use paredit_core_cli::report::Finding;
 use paredit_core_lint_engine::LintResult;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};

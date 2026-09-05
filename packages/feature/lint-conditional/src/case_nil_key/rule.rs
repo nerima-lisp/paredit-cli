@@ -1,8 +1,5 @@
 //! `case-nil-key`: a case/ecase/ccase clause with a bare nil key, which is the empty key list and never matches (use ((nil) …)).
 //!
-//! The analysis lives in [`crate::case_nil_key::domain`], which also backs the
-//! standalone `inspect case-nil-key` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

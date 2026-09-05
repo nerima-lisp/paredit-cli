@@ -19,8 +19,6 @@
 //! call), and any clause guarded by a `#+`/`#-` reader conditional or spliced
 //! in from a template (`,@`).
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -96,8 +94,6 @@ impl Finding for MalformedCaseClauseItem {
         vec![("head", json!(self.head)), ("clause", json!(self.clause))]
     }
 
-    /// The same sentence the `malformed-case-clause` lint rule writes, so a
-    /// SARIF or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!(
             "{} clause {} is not a non-empty list",
@@ -106,8 +102,6 @@ impl Finding for MalformedCaseClauseItem {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_case(
     view: &ExpressionView,
     case_form_count: &mut usize,
@@ -146,10 +140,7 @@ pub fn examine_case(
 /// Collects every malformed `case`-family clause in one file, with the number
 /// of `case`-family forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "every clause is well formed" for Common
-/// Lisp and "nothing was looked for" for Fennel, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_malformed_case_clause_report(
     path: &Path,
     dialect: Dialect,
@@ -197,7 +188,6 @@ mod tests {
             .expect("build malformed case clause report")
     }
 
-    /// The `(case_form_count, violations)` pair the report is built from.
     fn clauses(input: &str) -> (u64, Vec<MalformedCaseClauseItem>) {
         let report = report(input);
         let count = report
@@ -282,8 +272,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(case x (1 :one) foo)", Dialect::Clojure)

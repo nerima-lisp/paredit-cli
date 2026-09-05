@@ -1,8 +1,5 @@
 //! `one-armed-if`: a two-argument if with no else branch ((if test then) is (when test then)).
 //!
-//! The analysis lives in [`crate::one_armed_if::domain`], which also backs the
-//! standalone `inspect one-armed-if` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -33,11 +33,8 @@
 //! - **A form reached only as quoted data.**
 //!
 //! Report only, unlike the four sibling rules, which do attach a deletion fix.
-//! Dropping ` :direction :input` is mechanically safe, but this batch is
-//! uniformly `ReportOnly` by instruction, and the surrounding
-//! `:if-does-not-exist` default *is* derived from `:direction`, so a reader
-//! checking the rewrite has more to think about here than with
-//! `:adjustable nil`.
+//! The surrounding `:if-does-not-exist` default is derived from `:direction`,
+//! so the rule does not offer an automatic rewrite.
 //!
 //! Scope: Common Lisp only.
 
@@ -116,8 +113,6 @@ fn option_carrier<'a>(view: &'a ExpressionView, head: &str) -> Option<&'a Expres
     is_paren_list(binding).then_some(binding)
 }
 
-/// Examines one node. Shared with the lint suite's rule.
-///
 /// Cheapest predicate first: the head comparison, then the option list's
 /// existence, then a stride-2 walk of the keyword slots. Nothing allocates
 /// until a finding is produced.

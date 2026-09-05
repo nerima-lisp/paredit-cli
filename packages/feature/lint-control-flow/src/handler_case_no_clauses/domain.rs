@@ -10,8 +10,6 @@
 //! The fix replaces the whole form with the protected form's source, so the rule
 //! is auto-fixable.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -68,15 +66,11 @@ impl Finding for HandlerCaseNoClausesItem {
         )]
     }
 
-    /// The same sentence the `handler-case-no-clauses` lint rule writes, so a
-    /// SARIF or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         "a handler-case with no clauses is just its body; (handler-case x) is x".to_owned()
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
     handler_case_form_count: &mut usize,
@@ -108,10 +102,7 @@ pub fn examine(
 /// Collects every clauseless `(handler-case expr)` in one file, with the number
 /// of `handler-case` forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "every handler-case has clauses here" for
-/// Common Lisp and "nothing was looked for" for Clojure, and the two read
-/// identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_handler_case_no_clauses_report(
     path: &Path,
     dialect: Dialect,
@@ -204,8 +195,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =

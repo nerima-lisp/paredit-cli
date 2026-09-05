@@ -1,8 +1,5 @@
 //! `duplicate-lambda-list-keyword`: a lambda list that repeats a lambda-list keyword (&optional, &key, ...).
 //!
-//! The analysis lives in [`crate::duplicate_lambda_list_keyword::domain`], which also backs the
-//! standalone `inspect duplicate-lambda-list-keyword` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

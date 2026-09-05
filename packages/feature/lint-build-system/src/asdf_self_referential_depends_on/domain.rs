@@ -157,8 +157,6 @@ fn dependency_entries(value: &ExpressionView) -> &[ExpressionView] {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 ///
 /// `dependency_count` counts every entry read across the three options — the
 /// denominator a rate of "dependencies that name their own system" is taken
@@ -196,10 +194,7 @@ pub fn examine_defsystem(
 /// Collects every self-referential dependency in one file, with the number of
 /// dependency entries scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no system here names itself" for Common
-/// Lisp and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_asdf_self_referential_depends_on_report(
     path: &Path,
     dialect: Dialect,

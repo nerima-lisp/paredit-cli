@@ -34,10 +34,9 @@
 //! `eval-when` an ordinary nested form, where only `:execute` is ever
 //! considered and naming it is correct rather than suspect.
 //!
-//! A previous batch in this repository shipped rules that got this wrong and
-//! produced false positives on exactly the `locally`/`macrolet`/
-//! `symbol-macrolet` shapes, which is why [`is_top_level_form`] enumerates them
-//! rather than testing a depth.
+//! [`is_top_level_form`] therefore enumerates the `locally`/`macrolet`/
+//! `symbol-macrolet` shapes rather than testing a depth; treating depth zero as
+//! top level produces false positives for each of them.
 //!
 //! # Cost
 //!

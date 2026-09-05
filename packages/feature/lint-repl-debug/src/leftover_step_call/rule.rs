@@ -1,8 +1,5 @@
 //! `leftover-step-call`: a Common Lisp (step form) wrapper left in committed source.
 //!
-//! The analysis lives in [`crate::leftover_step_call::domain`], which also backs the
-//! standalone `inspect leftover-step-call` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

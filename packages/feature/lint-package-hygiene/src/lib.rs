@@ -374,9 +374,7 @@ mod corpus_sweep_tests {
             assert_eq!(findings, 0, "false positive on `{label}`");
             candidates += candidate_count(source);
         }
-        // Without this the assertion above would pass on a corpus containing no
-        // `in-package` at all, which is exactly how a previous sweep proved
-        // nothing.
+        // Reject a vacuous pass on a corpus containing no `in-package` forms.
         assert!(
             candidates >= 12,
             "the corpus only contains {candidates} top-level in-package switches, \

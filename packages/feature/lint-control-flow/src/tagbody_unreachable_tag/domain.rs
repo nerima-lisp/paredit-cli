@@ -101,8 +101,6 @@ fn definition_spans(view: &ExpressionView) -> Vec<ByteSpan> {
     spans
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 ///
 /// Reads only the matched form's own subtree, so a file of T tagbodies costs
 /// the file once and not T times.

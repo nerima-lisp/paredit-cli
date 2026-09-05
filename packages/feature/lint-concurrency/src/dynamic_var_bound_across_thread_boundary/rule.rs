@@ -1,11 +1,6 @@
 //! `dynamic-var-bound-across-thread-boundary`: a `let`-rebound special read on
 //! a thread the binding does not reach.
 //!
-//! The analysis lives in
-//! [`crate::dynamic_var_bound_across_thread_boundary::domain`], which also
-//! backs the standalone `inspect dynamic-var-bound-across-thread-boundary`
-//! command; this module only registers it with the lint suite and phrases its
-//! findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -8,9 +8,8 @@ live in how two clauses relate, not in the shape of any one form. That is the
 premise of this crate, and it is why these rules could not be written as
 ordinary shape checks.
 
-Every premise below was settled by running SBCL 2.6.0, not by reasoning about
-the standard. Several plausible rules died that way; see "Rules that were
-proposed and dropped".
+Every premise below was checked by running SBCL 2.6.0 in addition to reading
+the standard. Checks excluded by those results are documented below.
 
 | rule | category | severity | fix | heads |
 | --- | --- | --- | --- | --- |
@@ -86,11 +85,9 @@ clauses that name no `into` (CLHS 6.1.1.3). A `finally (return …)` pre-empts i
 
 The list is fully consed on the way there and read by nothing.
 
-## Rules that were proposed and dropped
+## Excluded checks
 
-Seven rules were proposed for this batch. Four were dropped on evidence, and
-the reasons are recorded because each is a trap a later batch could walk into
-again.
+Four candidates are not implemented for the following reasons.
 
 - **`loop-with-clause-after-for`** — refuted twice over. SBCL compiles and runs
   `(loop for x in '(1 2 3) with total = 0 collect (+ x total))` clean, with no
@@ -110,10 +107,9 @@ again.
   decidable from the clause grammar.
 - **`loop-conditional-clause-without-else-accumulation`** — a `when p collect x`
   with no `else` is ordinary, correct Common Lisp and usually exactly what the
-  author meant. There was no defect to detect, only a shape. Dropped without
-  implementation rather than shipped as `pedantic` on plausibility.
+  author meant. There is no defect to detect, only a shape.
 
-Two more were reshaped rather than dropped:
+Two related candidates were narrowed:
 
 - **`loop-finally-return-shadowed-by-accumulation`** narrowed into
   `loop-accumulation-discarded-by-finally-return`. As originally stated it
@@ -124,8 +120,7 @@ Two more were reshaped rather than dropped:
   '((1 2 3) (4 5 6)) …)` silently drops the third element, and `(loop for
   (a b c) in '((1 2) …) …)` silently yields `NIL`) but is decidable only when
   both the pattern and the list are literal. The corpus sweep found no such
-  occurrence, so shipping it would have meant a rule with a zero denominator —
-  a guaranteed false clean. Recorded here rather than implemented.
+  occurrence, so it would have a zero denominator — a guaranteed false clean.
 
 ## Third-party corpus audit
 
@@ -147,9 +142,8 @@ Candidates and findings over the larger sweep:
 | `loop-into-accumulator-never-read` | 772 `into` clauses | 0 |
 | `loop-accumulation-discarded-by-finally-return` | 5627 implicit accumulations | 0 |
 
-**The audit changed the code.** Before it,
-`loop-into-accumulator-never-read` reported **41 findings over SBCL's own
-sources, every one of them a false positive** — all the same shape:
+An earlier occurrence counter produced **41 false positives over SBCL's own
+sources**, all with the same shape:
 
 ```lisp
 (loop for i in funs collect `(define-alien-routine ,i void) into defines
@@ -193,8 +187,7 @@ all three rules and re-measuring:
 
 A 250-500x per-call regression, and the doubling ratio goes from linear to
 **quadratic** — the per-call cost is itself linear in file size, and there are
-linearly many calls. This is the same inversion a sibling batch measured at
-450843 ns/call against 28.
+linearly many calls.
 
 ## Relationship to `lint-iteration-flow`
 
@@ -204,29 +197,27 @@ keywords, operand positions are never keywords, an unmodelled sub-grammar
 aborts the whole form. Those were arrived at by corpus measurement and are not
 reinvented lightly.
 
-The duplication is deliberate for two reasons. A feature-to-feature dependency
-needs an entry in `tests/cli/feature_dependency_contract.rs`, which this batch
-was not permitted to edit. More importantly the existing reader could not
-answer this crate's question anyway: it documents compound `and` clauses as
+The duplication is deliberate. A feature-to-feature dependency requires an
+entry in `tests/cli/feature_dependency_contract.rs`, and the existing reader
+cannot answer this crate's question: it documents compound `and` clauses as
 "tokenized but never interpreted", and lists `and` among its `NAME_INTRODUCERS`
 specifically so that it over-collects and *loses* findings. Parallel-group
 structure is exactly what `loop-parallel-binding-reads-sibling` needs.
 
-**The merge is worth doing and belongs in its own pass.** `loop_grammar.rs`'s
-tokenizer is a superset of `loop_syntax.rs`'s: it adds `ParallelGroup`,
+`loop_grammar.rs`'s tokenizer is a superset of `loop_syntax.rs`'s: it adds
+`ParallelGroup`,
 init-versus-step operand roles, and `of-type` skipping, and it drops the
 `LoopScan`/`FileFindings` plumbing the standalone `inspect` commands need. The
-right home for the merged reader is `packages/core/`, which this batch was also
-not permitted to modify — so it is reported as a gap rather than attempted.
+right home for the merged reader is `packages/core/`, outside this crate.
 
-## Gaps found and not fixed
+## Known gaps
 
 - **`lisp-analysis`'s `loop_report` mishandles `into` for extremum verbs.** Its
   `EXTREMUM_ACCUMULATORS` path steps `index += 2` with no `into` handling, so
   `(loop for x in xs collect x maximize x into m)` is reported as a
   `conflicting-accumulation` even though `into m` separates the two. That is a
-  false positive in the existing implicit-case implementation, in a package
-  this batch did not touch.
+  false positive in the existing implicit-case implementation, in a separate
+  package.
 - **`loop_report`'s `unterminated` finding is inspect-only.** A `loop` whose
   only `for` clauses are the non-terminating `= form [then form]` kind, with no
   `while`/`until`/`repeat`/`return`, cannot terminate — SBCL macroexpands

@@ -36,17 +36,8 @@ decided silently.
 ### Why `inline_literal_constant` is not in this package
 
 It calls `collect_define_symbol_macro_reference_renames`, which belongs to
-`domain::rename` — a feature package that does not exist yet. Rather than drag
-the whole of `rename` (18,895 lines) forward out of §6's order, that slice
-stays in the root crate and joins this package when `feature/rename` is
-extracted. At that point this package gains a `paredit-feature-rename`
-dependency, which is a legitimate feature-to-feature edge (§2.2 measured 89 of
-them across the tree).
-
-Worth noting how it was found: the reference is written `use super::rename::…`,
-not `crate::domain::rename::…`, so a closure check that only looks for `crate::`
-paths reports the feature as closed and the breakage surfaces later, at compile
-time. `scripts/move-feature-package.py` now follows `super::` siblings too.
+`domain::rename`. The slice stays in the root crate until that dependency can
+be represented without pulling the rename implementation into this package.
 
 ## Dependencies
 
@@ -64,38 +55,28 @@ time. `scripts/move-feature-package.py` now follows `super::` siblings too.
 
 ## Public API
 
-Two names per slice, per §4.2 — the `clap` argument type and the function that
-runs it. Five slices, so ten names, and `command.rs`/`dispatch.rs` see nothing
-else.
-
-`#[non_exhaustive]` is deliberately absent (§9.4).
+Each slice exposes its `clap` argument type and the function that runs it;
+`command.rs` and `dispatch.rs` do not depend on its internals.
 
 ### Why `InlineFunctionRequest` takes `InlineCallSelection`
 
-It used to carry `call_paths: Vec<Path>` beside `all_calls: bool`, and one of
-those combinations is rejected outright — `--all-calls` together with
-`--call-path` answers "accepts either --all-calls or repeated --call-path, not
-both". A rule enforced at runtime over a state the type permits is a rule that
-can be forgotten. `InlineCallSelection::{AllCalls, Paths}` has no way to write
-the rejected state down, so the check now lives once, at the argument
-boundary, where it is an argument problem.
+`InlineCallSelection::{AllCalls, Paths}` makes `--all-calls` and repeated
+`--call-path` mutually exclusive in the type. The argument boundary constructs
+the selection, so downstream code cannot represent the rejected combination.
 
 `all_calls` is still reported: it is derived from the selection rather than
 stored beside it.
 
 ### Errors
 
-`InlineError` divides the 221 refusal sites by what a caller can do. The one
-worth knowing about is `UnsupportedLambdaList`: seventy-four of the messages
-are the lambda-list and destructuring reader saying some version of "this
-parameter list is more complex than inlining handles", and they mean one thing
-to a caller. The construct that was too complex is the payload; the kind is
-the type. `InlineSafetyError` is the opposite — inlining that would *change
-meaning*, and the only family a caller can deliberately override.
+`InlineError` groups refusals by what a caller can do.
+`UnsupportedLambdaList` represents lambda lists that are too complex to inline;
+the rejected construct is its payload. `InlineSafetyError` instead represents
+inlining that would change meaning and can be deliberately overridden.
 
 ## Layout
 
-Slice-first, per §3.1:
+The package is organized by command slice:
 
 ```text
 src/

@@ -12,8 +12,6 @@
 //! Complements `malformed-let-binding`, which checks a
 //! binding's *shape*; this rule checks the *validity of the bound variable*.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -86,15 +84,11 @@ impl Finding for BindsConstantItem {
         ]
     }
 
-    /// The same sentence the `binds-constant` lint rule writes, so a SARIF or
-    /// JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!("{} cannot bind the constant {}", self.head, self.variable)
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_binding_form(
     view: &ExpressionView,
     binding_form_count: &mut usize,
@@ -139,10 +133,7 @@ pub fn examine_binding_form(
 /// file, with the number of binding forms scanned as the denominator beside
 /// them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no constant binding here" for Common
-/// Lisp and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_binds_constant_report(
     path: &Path,
     dialect: Dialect,
@@ -188,7 +179,6 @@ mod tests {
             .expect("build binds constant report")
     }
 
-    /// The `(binding_form_count, violations)` pair the report is built from.
     fn violations(input: &str) -> (u64, Vec<BindsConstantItem>) {
         let report = report(input);
         let count = report
@@ -276,8 +266,6 @@ mod tests {
         assert_eq!(items.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =

@@ -16,8 +16,6 @@
 //! The fix rewrites the form as `(list X …)`, copying the element and the tail
 //! list's elements from source, so the rule is auto-fixable.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -53,8 +51,6 @@ pub struct ConsToListItem {
     pub span: ByteSpan,
     /// The span of the prepended element `X`.
     ///
-    /// The rewrite's input, not the report's: the lint rule reads it to build
-    /// the `list` call, and the command has never printed it.
     pub element_span: ByteSpan,
     /// The span of the tail list's elements (`b c` in `(list b c)`), or `None`
     /// for a `nil`/empty-list tail.
@@ -87,15 +83,11 @@ impl Finding for ConsToListItem {
         Vec::new()
     }
 
-    /// The same sentence the `cons-to-list` lint rule writes, so a SARIF or
-    /// JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         "cons onto nil/a list is a list constructor; use list".to_owned()
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_cons(
     view: &ExpressionView,
     cons_form_count: &mut usize,
@@ -147,10 +139,7 @@ pub fn examine_cons(
 /// Collects every collapsible `cons` in one file, with the number of `cons`
 /// forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "every cons here is a genuine cons" for
-/// Common Lisp and "nothing was looked for" for Clojure, and the two read
-/// identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn collect_cons_to_lists(
     path: &Path,
     dialect: Dialect,
@@ -196,7 +185,6 @@ mod tests {
             .expect("collect cons to lists")
     }
 
-    /// The `(cons_form_count, violations)` pair the report is built from.
     fn conses(input: &str) -> (u64, Vec<ConsToListItem>) {
         let report = report(input);
         let count = report
@@ -275,8 +263,6 @@ mod tests {
         assert_eq!(parts("(cons a (cons b nil))", &violations[0]), ("b", None));
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(cons a nil)", Dialect::Clojure).expect("parse");

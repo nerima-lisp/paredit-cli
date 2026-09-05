@@ -139,8 +139,6 @@ fn implicit_nil_head(argument: &ExpressionView) -> Option<String> {
     symbol_in(head, &IMPLICIT_NIL_HEADS).then(|| normalized_symbol(head))
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_arithmetic(
     view: &ExpressionView,
     arithmetic_form_count: &mut usize,

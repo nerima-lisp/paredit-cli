@@ -188,8 +188,7 @@ pub struct NamestringRoundTrip {
 pub fn examine(view: &ExpressionView) -> Option<NamestringRoundTrip> {
     // The qualifier is stripped once and the table compared against the result.
     // `symbol_is` per entry would re-split the same head eleven times, and this
-    // rule's heads include `with-open-file`, which is dense in ordinary code —
-    // measured at 0.16µs/invocation before this change and 0.03µs after.
+    // rule's heads include `with-open-file`, which is dense in ordinary code.
     let head = unqualified(list_head(view)?);
     let (name, position) = FILE_OPERATORS
         .iter()

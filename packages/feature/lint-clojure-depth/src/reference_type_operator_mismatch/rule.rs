@@ -1,10 +1,6 @@
 //! `reference-type-operator-mismatch`: an atom operator on a ref, and the
 //! other five crossings.
 //!
-//! The analysis lives in
-//! [`crate::reference_type_operator_mismatch::domain`], which also backs the
-//! standalone `inspect reference-type-operator-mismatch` command; this module
-//! only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

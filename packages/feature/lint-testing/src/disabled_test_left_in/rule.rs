@@ -1,8 +1,5 @@
 //! `disabled-test-left-in`: a committed test that can never run.
 //!
-//! The analysis lives in [`crate::disabled_test_left_in::domain`], which also
-//! backs the standalone `inspect disabled-test-left-in` command; this module
-//! only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

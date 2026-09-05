@@ -615,7 +615,7 @@ mod tests {
     /// projects to **~34 s**. The budget sits ~485× above the first and ~3.4×
     /// below the second, so there is a real window and it is occupied.
     ///
-    /// That is what distinguishes this from the *ratio* assertions this batch
+    /// That is what distinguishes this from the *ratio* assertions these rules
     /// removed elsewhere (see `cost_probe.rs`). A ratio of two short durations
     /// has no safe threshold — its variance under load is unbounded and the
     /// value being bounded sits right next to the bound. An absolute budget

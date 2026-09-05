@@ -15,8 +15,6 @@
 //! (`,@`) argument — e.g. `(eq x #+sbcl y #-sbcl z)` is a valid feature-portable
 //! comparison whose written three-token shape is not a real arity error.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -94,8 +92,6 @@ impl Finding for EqualityArityItem {
         ]
     }
 
-    /// The same sentence the `equality-arity` lint rule writes, so a SARIF or
-    /// JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!(
             "{} takes exactly {EXPECTED_ARGUMENTS} arguments but has {}",
@@ -141,10 +137,7 @@ pub fn examine_call(
 /// Collects every misarity equality-predicate call in one file, with the number
 /// of such calls scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "every call is binary" for Common Lisp
-/// and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_equality_arity_report(
     path: &Path,
     dialect: Dialect,
@@ -190,7 +183,6 @@ mod tests {
             .expect("build equality arity report")
     }
 
-    /// The `(call_count, violations)` pair the report is built from.
     fn violations(input: &str) -> (u64, Vec<EqualityArityItem>) {
         let report = report(input);
         let count = report
@@ -262,8 +254,6 @@ mod tests {
         assert_eq!(items.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(eq x)", Dialect::Clojure).expect("parse input");

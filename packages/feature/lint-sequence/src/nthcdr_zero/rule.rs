@@ -1,8 +1,5 @@
 //! `nthcdr-zero`: an nthcdr with a zero count, which returns the list unchanged ((nthcdr 0 x) is x).
 //!
-//! The analysis lives in [`crate::nthcdr_zero::domain`], which also backs the
-//! standalone `inspect nthcdr-zero` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

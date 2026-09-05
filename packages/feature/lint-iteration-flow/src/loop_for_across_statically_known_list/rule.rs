@@ -1,10 +1,6 @@
 //! `loop-for-across-statically-known-list`: a `loop for … across` clause over
 //! a value that is provably a list rather than a vector.
 //!
-//! The analysis lives in
-//! [`crate::loop_for_across_statically_known_list::domain`], which also backs
-//! the standalone `inspect loop-for-across-statically-known-list` command;
-//! this module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

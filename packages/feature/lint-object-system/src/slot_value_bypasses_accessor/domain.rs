@@ -137,8 +137,6 @@ fn defines_the_accessor(tree: &SyntaxTree, index: usize, accessor: &str) -> bool
     name == accessor || name == format!("(setf {accessor})")
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_slot_value_bypasses_accessor(
     tree: &SyntaxTree,
     view: &ExpressionView,
@@ -186,8 +184,7 @@ pub fn examine_slot_value_bypasses_accessor(
 /// Collects every accessor-bypassing `slot-value` read in one file, with the
 /// number of `slot-value` forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: `slot-value` and CLOS accessors are Common Lisp's.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_slot_value_bypasses_accessor_report(
     path: &Path,
     dialect: Dialect,

@@ -121,8 +121,6 @@ fn render_signature(signature: &MethodSignature) -> String {
     parts.join(" ")
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_duplicate_defmethod_signature(
     tree: &SyntaxTree,
     view: &ExpressionView,
@@ -164,8 +162,7 @@ pub fn examine_duplicate_defmethod_signature(
 /// Collects every replaced `defmethod` in one file, with the number of
 /// `defmethod` forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: method replacement by signature is CLOS's rule, not a general one.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_duplicate_defmethod_signature_report(
     path: &Path,
     dialect: Dialect,

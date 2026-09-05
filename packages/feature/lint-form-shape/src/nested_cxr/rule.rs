@@ -1,8 +1,5 @@
 //! `nested-cxr`: nested car/cdr accessors that combine into one ((car (cdr x)) is (cadr x)).
 //!
-//! The analysis lives in [`crate::nested_cxr::domain`], which also backs the
-//! standalone `inspect nested-cxr` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -218,9 +218,7 @@ Four rounds were needed:
 
 ## Note on `support.rs`
 
-`support.rs` copies the two-counter `QuoteState` quote model from
-`paredit-feature-lint-condition-system::support`, as the other lint packages do.
-A consolidation into `packages/core` is in flight; when it lands, this module's
-quote half should be deleted and the shared one used. A single `i32` depth
-counter is **not** an acceptable substitute — it is wrong for `` ` ``/`,` and has
-shipped as a false-positive source twice.
+`support.rs` follows the two-counter `QuoteState` quote model in
+`paredit-feature-lint-condition-system::support`. A single `i32` depth counter
+is **not** an acceptable substitute because it cannot distinguish hard quotes
+from nested quasiquotes.

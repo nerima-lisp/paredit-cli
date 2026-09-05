@@ -12,8 +12,6 @@
 //! The fix replaces the whole form with the argument's exact source, so the rule
 //! is auto-fixable.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -33,8 +31,6 @@ pub struct RedundantIdentityItem {
     pub span: ByteSpan,
     /// The span of the argument `X` (lets a fix substitute its source).
     ///
-    /// The rewrite's input, not the report's: the lint rule reads it to splice
-    /// the argument in, and the command never printed it.
     pub inner_span: ByteSpan,
 }
 
@@ -61,15 +57,11 @@ impl Finding for RedundantIdentityItem {
         Vec::new()
     }
 
-    /// The same sentence the `redundant-identity` lint rule writes, so a SARIF
-    /// or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         "identity returns its argument unchanged; (identity x) is x".to_owned()
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_identity(
     view: &ExpressionView,
     identity_form_count: &mut usize,
@@ -97,10 +89,7 @@ pub fn examine_identity(
 /// Collects every redundant `(identity X)` call in one file, with the number of
 /// `identity` forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no identity call here" for Common Lisp
-/// and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_redundant_identity_report(
     path: &Path,
     dialect: Dialect,
@@ -146,7 +135,6 @@ mod tests {
             .expect("build redundant identity report")
     }
 
-    /// The `(identity_form_count, violations)` pair the report is built from.
     fn identities(input: &str) -> (u64, Vec<RedundantIdentityItem>) {
         let report = report(input);
         let count = report
@@ -205,8 +193,6 @@ mod tests {
         assert_eq!(slice("(list (identity y))", violations[0].inner_span), "y");
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(identity x)", Dialect::Clojure).expect("parse");

@@ -1,8 +1,5 @@
 //! `the-arity`: a the special form without exactly two arguments (a type and a form).
 //!
-//! The analysis lives in [`crate::the_arity::domain`], which also backs the
-//! standalone `inspect the-arity` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

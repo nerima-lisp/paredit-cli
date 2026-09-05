@@ -225,14 +225,12 @@ proportional to it: a file with four hundred call sites is not the size of one
 with twenty-five, and holding it fixed would measure a shape no real invocation
 has.
 
-The loop parses once per match. It is worth stating as a number, because it was
-twice per match until the parse `Edit::normalize_changed_line_trivia` makes —
-of the rewrite it is handed, to tell trailing whitespace apart from the inside
-of a string — was lent back to the caller instead of dropped. Those two parses
-were about 95% of the loop, and removing one of them roughly halved it at every
-arm. Nothing about *what* is parsed changed: there is no incremental parsing
-here, and a parse is only carried forward when it still describes the document
-byte for byte, which `edit_target_with` asserts on every pass in a debug build.
+The loop parses once per match. `Edit::normalize_changed_line_trivia` returns
+the rewrite's normalized parse to the caller, avoiding a second parse when it
+still describes the document byte for byte. `edit_target_with` asserts this in
+debug builds. There is no incremental parsing here; rewrites that leave
+trailing whitespace invalidate the parse and cause the next pass to parse
+again.
 
 Once per match is the ordinary case rather than a guarantee: a pass whose
 rewrite left trailing whitespace behind has its parse invalidated by the

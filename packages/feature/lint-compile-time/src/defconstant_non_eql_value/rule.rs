@@ -1,8 +1,5 @@
 //! `defconstant-non-eql-value`: a constant whose initform allocates.
 //!
-//! The analysis lives in [`crate::defconstant_non_eql_value::domain`]; this
-//! module only registers it with the lint suite.
-//!
 //! # Cost
 //!
 //! `HeadFilter::Heads(&["defconstant"])`. `clean/forms/*` contains no

@@ -137,8 +137,6 @@ fn included_structure<'a>(form: &'a DefstructForm<'a>) -> Option<(&'a str, ByteS
     Some((name, option.span))
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 ///
 /// The `:include` option is read off this form's own header, and only a
 /// `defstruct` that *has* one pays for the top-level scan that looks for its

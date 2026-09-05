@@ -38,9 +38,6 @@ fn cli_does_not_flag_import_from_as_widening() {
         .stdout(predicate::str::contains("\"finding_count\": 0"));
 }
 
-/// An empty finding list is ambiguous, so a dialect this rule does not model
-/// (`:use` widening is Common Lisp's package system, not Emacs Lisp's) must
-/// be labelled rather than silently reported as clean.
 #[test]
 fn cli_use_widening_labels_a_dialect_the_rule_does_not_model() {
     let dir = fresh_temp_dir("use-widening-report-unmodelled");

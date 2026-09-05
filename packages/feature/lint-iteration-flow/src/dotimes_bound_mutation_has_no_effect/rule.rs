@@ -1,10 +1,6 @@
 //! `dotimes-bound-mutation-has-no-effect`: assigning the `dotimes` count
 //! variable from inside the body.
 //!
-//! The analysis lives in
-//! [`crate::dotimes_bound_mutation_has_no_effect::domain`], which also backs
-//! the standalone `inspect dotimes-bound-mutation-has-no-effect` command; this
-//! module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

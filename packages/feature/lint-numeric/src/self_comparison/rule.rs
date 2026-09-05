@@ -1,8 +1,5 @@
 //! `self-comparison`: a comparison whose two operands are structurally identical.
 //!
-//! The analysis lives in [`crate::self_comparison::domain`], which also backs the
-//! standalone `inspect self-comparison` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

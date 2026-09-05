@@ -96,7 +96,7 @@ impl LintRule for Rule {
         // descent. It materializes the whole document, so asking before
         // `collect_in_guard` would charge every visited `when` for a walk that
         // almost always answers "no" — the ordering mistake that measured
-        // 450843 ns/call against 28 ns/call in an earlier batch.
+        // 450843 ns/call against 28 ns/call in the reference measurement.
         //
         // A `(when …)` inside a quoted list, a `` ` `` template or a
         // `defsyntax` rule is not a guard the compiler will ever check; see

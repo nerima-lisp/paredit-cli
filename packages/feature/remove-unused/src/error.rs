@@ -1,16 +1,10 @@
 //! Why removing something unused refuses to run.
 //!
-//! Section 9.2, and the largest feature package: 87 refusals, 78 of them
-//! distinct. They divide into four questions a caller asks separately.
-//!
-//! The 24-message [`BindingListError`] group is worth naming explicitly: this
-//! is the **third** place in the tree that reads a Common Lisp binding list
-//! and complains about its shape, after
+//! [`BindingListError`] reads Common Lisp binding lists and reports their
+//! unsupported shapes. It remains separate from
 //! `paredit_core_semantics::BindingFormError` and
-//! `paredit_feature_binding::BindingFormShapeError`. The three read different
-//! form families with different wordings, so they are not the same type — but
-//! before §9.2 the duplication was three unrelated sets of strings, and now it
-//! is three types a reader can put side by side.
+//! `paredit_feature_binding::BindingFormShapeError` because the passes cover
+//! different form families and diagnostics.
 
 use thiserror::Error;
 

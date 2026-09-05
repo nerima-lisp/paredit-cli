@@ -1,8 +1,5 @@
 //! `nested-progn`: a multi-form progn nested directly inside another progn (its forms splice in).
 //!
-//! The analysis lives in [`crate::nested_progn::domain`], which also backs the
-//! standalone `inspect nested-progn` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

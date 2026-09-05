@@ -189,8 +189,6 @@ fn read_by<'a>(methods: &'a [(String, ExpressionView)], slot: &SlotSpec<'_>) -> 
         .map(|(name, _)| name.as_str())
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_defclass_required_slot_no_initform_or_initarg(
     tree: &SyntaxTree,
     view: &ExpressionView,
@@ -241,8 +239,7 @@ pub fn examine_defclass_required_slot_no_initform_or_initarg(
 /// Collects every unbound-on-read slot in one file, with the number of slots
 /// scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: `:initform`, `:initarg` and `unbound-slot` are CLOS's.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_defclass_required_slot_no_initform_or_initarg_report(
     path: &Path,
     dialect: Dialect,

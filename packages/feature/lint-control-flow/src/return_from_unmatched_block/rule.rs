@@ -1,9 +1,6 @@
 //! `return-from-unmatched-block`: a `return-from` naming a block that does not
 //! lexically enclose it.
 //!
-//! The analysis lives in [`crate::return_from_unmatched_block::domain`], which
-//! also backs the standalone `inspect return-from-unmatched-block` command;
-//! this module only registers it with the lint suite and phrases its findings.
 //!
 //! `ReportOnly`, and not because a fix is hard to write: every repair —
 //! renaming the block, moving the exit, deleting it — changes which form the

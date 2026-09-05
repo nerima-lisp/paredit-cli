@@ -207,8 +207,6 @@ fn read_and_rebound(thunk: &ExpressionView) -> (Vec<String>, Vec<String>) {
     (read, rebound)
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 ///
 /// Needs the tree because the enclosing `let` is what makes this a defect, and
 /// [`paredit_core_lint_engine::engine::RuleContext`] carries no parent pointer.

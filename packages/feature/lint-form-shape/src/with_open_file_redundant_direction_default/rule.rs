@@ -1,10 +1,5 @@
 //! `with-open-file-redundant-direction-default`: an explicit :direction :input, which is already open's default.
 //!
-//! The analysis lives in
-//! [`crate::with_open_file_redundant_direction_default::domain`], which also
-//! backs the standalone `inspect with-open-file-redundant-direction-default`
-//! command; this module only registers it with the lint suite and phrases its
-//! findings.
 
 use paredit_core_lint_engine::LintResult;
 

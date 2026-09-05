@@ -6,8 +6,6 @@ pub mod render;
 pub mod reorder;
 pub mod swap;
 
-// Hoisted for the composition root (section 4.2): the argument type and
-// run function of each subcommand this slice owns.
 pub use add::add_function_parameter;
 pub use args::{
     AddFunctionParameterArgs, MoveFunctionParameterArgs, RemoveFunctionParameterArgs,

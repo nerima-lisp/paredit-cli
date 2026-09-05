@@ -1,8 +1,5 @@
 //! `eval-when-situation`: an eval-when with an invalid situation (not :compile-toplevel/:load-toplevel/:execute).
 //!
-//! The analysis lives in [`crate::eval_when_situation::domain`], which also backs the
-//! standalone `inspect eval-when-situation` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

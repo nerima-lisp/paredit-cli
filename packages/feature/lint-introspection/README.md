@@ -17,8 +17,8 @@ Every rule is `Fixability::ReportOnly`. The remedy in each case is a design
 decision — a literal designator, a dispatch table, a checked branch — and none
 of the three is a rewrite a tool may choose.
 
-Every rule declares `HeadFilter::Heads`. Two anchor on the operator that does
-the interesting thing (`intern`; `fset`/`defalias`/`setf`), and the third
+Every rule declares `HeadFilter::Heads`. Two anchor on the mutating operator
+(`intern`; `fset`/`defalias`/`setf`), and the third
 anchors on the *consumer* (`funcall`/`apply`) rather than on the probe, because
 "was this value checked?" is a question about where the value goes, and a rule
 anchored on the probe would have to look upward at context a per-node predicate

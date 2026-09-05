@@ -1,8 +1,5 @@
 //! `redundant-start-zero`: a bounded-sequence call with an explicit :start 0, the default ((find x seq :start 0) is (find x seq)).
 //!
-//! The analysis lives in [`crate::redundant_start_zero::domain`], which also backs the
-//! standalone `inspect redundant-start-zero` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

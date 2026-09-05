@@ -15,8 +15,7 @@
 //!   unit test on `examine`, which takes the dialect as an argument, still
 //!   passes.
 //!
-//! A sibling batch shipped a rule with a head missing from its `Heads` array
-//! and its whole suite stayed green, for exactly this reason.
+//! Direct rule tests cannot detect a head missing from a rule's `Heads` array.
 
 use std::path::Path;
 

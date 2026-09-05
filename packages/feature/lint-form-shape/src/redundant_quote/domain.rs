@@ -13,8 +13,6 @@
 //! never reaches the atom-gated check. Both the reader-sugar form (`'5`) and
 //! the explicit `(quote 5)` form are recognized.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -141,15 +139,11 @@ impl Finding for RedundantQuoteItem {
         vec![("literal", json!(self.literal))]
     }
 
-    /// The same sentence the `redundant-quote` lint rule writes, so a SARIF or
-    /// JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!("quoting {} {} is redundant", self.kind, self.literal)
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_quote(
     view: &ExpressionView,
     quoted_form_count: &mut usize,
@@ -181,10 +175,7 @@ pub fn examine_quote(
 /// Collects every redundant quote of a self-evaluating literal in one file,
 /// with the number of quoted forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no redundant quote here" for Common Lisp
-/// and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_redundant_quote_report(
     path: &Path,
     dialect: Dialect,
@@ -230,7 +221,6 @@ mod tests {
             .expect("build redundant quote report")
     }
 
-    /// The `(quoted_form_count, violations)` pair the report is built from.
     fn quotes(input: &str) -> (u64, Vec<RedundantQuoteItem>) {
         let report = report(input);
         let count = report
@@ -312,8 +302,6 @@ mod tests {
         assert!(violations.is_empty());
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse("(list '5)").expect("parse input");

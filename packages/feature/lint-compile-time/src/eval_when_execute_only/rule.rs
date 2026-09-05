@@ -1,10 +1,6 @@
 //! `eval-when-execute-only`: a top-level `eval-when` whose body `compile-file`
 //! discards.
 //!
-//! The analysis lives in [`crate::eval_when_execute_only::domain`], which also
-//! backs the standalone `inspect eval-when-execute-only` command; this module
-//! only registers it with the lint suite.
-//!
 //! # Cost
 //!
 //! `HeadFilter::Heads(&["eval-when"])`, so the rule is never dispatched on a

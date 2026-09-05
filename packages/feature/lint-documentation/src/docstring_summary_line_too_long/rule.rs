@@ -1,8 +1,6 @@
 //! `docstring-summary-line-too-long`: a docstring whose first line is too wide
 //! to serve as the summary every doc generator shows on its own.
 //!
-//! The analysis lives in [`crate::docstring_summary_line_too_long::domain`];
-//! this module declares the rule's metadata, its head filter, and its knob.
 
 use paredit_core_lint_engine::LintResult;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};

@@ -322,9 +322,6 @@ fn parameter_span(
         .map(|parameter| parameter.span)
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// `flet`, `labels` and `defun` through the single dispatch pass instead of
-/// walking the tree again.
 pub fn examine_nested_definition(
     tree: &SyntaxTree,
     view: &ExpressionView,

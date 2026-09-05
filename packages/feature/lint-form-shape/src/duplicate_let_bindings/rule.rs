@@ -1,8 +1,5 @@
 //! `duplicate-let-bindings`: a parallel let that binds the same variable more than once.
 //!
-//! The analysis lives in [`crate::duplicate_let_bindings::domain`], which also backs the
-//! standalone `inspect duplicate-let-bindings` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

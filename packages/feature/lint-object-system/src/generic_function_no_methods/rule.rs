@@ -1,9 +1,6 @@
 //! `generic-function-no-methods`: a `defgeneric` no `defmethod` in the file
 //! ever specializes.
 //!
-//! The analysis lives in [`crate::generic_function_no_methods::domain`], which
-//! also backs the standalone `inspect generic-function-no-methods` command;
-//! this module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

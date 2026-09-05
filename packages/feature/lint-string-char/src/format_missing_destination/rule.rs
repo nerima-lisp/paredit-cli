@@ -1,8 +1,5 @@
 //! `format-missing-destination`: a format call whose first argument is a string literal (nil/t/stream destination is missing).
 //!
-//! The analysis lives in [`crate::format_missing_destination::domain`], which also backs the
-//! standalone `inspect format-missing-destination` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

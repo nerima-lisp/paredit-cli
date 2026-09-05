@@ -61,14 +61,12 @@ mod tests {
     }
 
     #[test]
-    fn now_flags_a_declared_non_character() {
+    fn flags_a_declared_non_character() {
         assert_eq!(findings("(char-code (the integer x))").len(), 1);
     }
 
     #[test]
-    fn now_flags_a_string_that_is_not_written_as_a_literal() {
-        // The case the spelling test was always reaching for, finally stated
-        // as the type it is.
+    fn flags_a_nonliteral_string_expression() {
         assert_eq!(findings("(char-upcase (symbol-name s))").len(), 1);
     }
 

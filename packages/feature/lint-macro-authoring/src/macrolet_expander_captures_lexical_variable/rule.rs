@@ -1,10 +1,6 @@
 //! `macrolet-expander-captures-lexical-variable`: a `macrolet` expander that
 //! evaluates a name an enclosing form binds lexically.
 //!
-//! The analysis lives in
-//! [`crate::macrolet_expander_captures_lexical_variable::domain`], which quotes
-//! CLHS and the SBCL runs — including the one where the answer is silently the
-//! global value. This module only registers the rule and phrases its findings.
 
 use paredit_core_cli::report::Finding;
 use paredit_core_lint_engine::LintResult;

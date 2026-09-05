@@ -161,8 +161,6 @@ fn has_complete_arity(operator: &str, children: usize) -> bool {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_nested_path(
     view: &ExpressionView,
     nested_path_count: &mut usize,

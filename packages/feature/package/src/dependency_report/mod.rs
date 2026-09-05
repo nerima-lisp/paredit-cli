@@ -1,4 +1,3 @@
-//! One slice, one directory; the layers are names, not directories.
 //!
 //! No `cli` layer here: dependency_report's command needs
 //! definition_report, which belongs to the project-analysis feature and has

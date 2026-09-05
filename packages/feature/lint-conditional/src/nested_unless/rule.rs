@@ -1,8 +1,5 @@
 //! `nested-unless`: an unless whose only body is an unless, mergeable by or ((unless a (unless b c)) is (unless (or a b) c)).
 //!
-//! The analysis lives in [`crate::nested_unless::domain`], which also backs the
-//! standalone `inspect nested-unless` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

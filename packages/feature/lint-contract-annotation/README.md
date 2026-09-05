@@ -12,16 +12,9 @@ intended — and both are `HeadFilter::Heads`.
 | `typed-racket-arity-mismatch` | `Arity` | `Warning` | `define` | Racket |
 | `clojure-pre-post-vacuous` | `Suspicious` | `Warning` | `defn`, `defn-` | Clojure |
 
-## Four rules that were proposed and dropped
+## Rejected rule candidates
 
-Each was dropped because the language premise behind it turned out to be false.
-They are recorded here so nobody re-proposes them.
-
-Two of the four — `check-type-redundant-with-declare` and
-`clojure-pre-referencing-percent` — were **written, reviewed and pushed** before
-the refutation landed, and were removed from the branch before merge. If you are
-reading this because you found one of them in the git history and wondered where
-it went, the answer is below.
+Each is omitted because its language premise is false.
 
 **`typed-racket-missing-return-type`** — "a `(: name …)` annotation whose `->`
 type has fewer than 2 elements, i.e. no explicit return type".
@@ -41,7 +34,7 @@ The corollary is load-bearing for `typed-racket-arity-mismatch` and is pinned by
 **`racket-contract-out-stale-name`** — "a `(provide (contract-out …))` entry
 naming a symbol that no `define` in the module provides".
 
-Dropped for two independent reasons, either of which is sufficient.
+It is rejected for two independent reasons, either of which is sufficient.
 
 1. Racket already rejects it. `contract-out` provides each identifier "from the
    enclosing module", and an identifier that is not bound there is an
@@ -161,9 +154,9 @@ in `src/lib.rs` asserts the zero directly.
 
 Both rules are `Heads`, and both call into `support` only *after* the head has
 matched — the `clean/forms/*` benchmarks lint zero-finding files, so the
-per-file cost of a rule that matches nothing is exactly what they measure. Both
-are moreover skipped before the walk begins for any Common Lisp file, because
-the dispatcher resolves the dialect scope first.
+per-file cost of a rule that matches nothing is exactly what they measure. The
+dispatcher also skips both rules before walking a Common Lisp file by resolving
+the dialect scope first.
 
 `src/cost_tests.rs` drives the real dispatcher with `PassOptions { measure:
 true }` and pins the shape rather than the constant: microseconds and invocation

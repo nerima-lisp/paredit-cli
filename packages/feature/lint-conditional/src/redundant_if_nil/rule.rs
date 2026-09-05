@@ -1,8 +1,5 @@
 //! `redundant-if-nil`: a three-argument if whose else branch is a redundant literal nil ((if c x nil) is (if c x)).
 //!
-//! The analysis lives in [`crate::redundant_if_nil::domain`], which also backs the
-//! standalone `inspect redundant-if-nil` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -1,8 +1,5 @@
 //! `redundant-prog1`: a prog1 wrapping a single form, which is just that form ((prog1 x) is x).
 //!
-//! The analysis lives in [`crate::redundant_prog1::domain`], which also backs the
-//! standalone `inspect redundant-prog1` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

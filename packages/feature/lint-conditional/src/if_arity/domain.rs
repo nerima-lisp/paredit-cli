@@ -17,8 +17,6 @@
 //! conditional (`#+`/`#-` expand to zero or one form) or a splicing unquote
 //! (`,@` splices an unknown number of forms).
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 
 use std::path::Path;
 
@@ -82,15 +80,11 @@ impl Finding for IfArityItem {
         vec![("argument_count", json!(self.argument_count))]
     }
 
-    /// The same sentence the `if-arity` lint rule writes, so a SARIF or JUnit
-    /// consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!("if takes 2 or 3 arguments but has {}", self.argument_count)
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_if(
     view: &ExpressionView,
     if_form_count: &mut usize,
@@ -123,10 +117,7 @@ pub fn examine_if(
 /// Collects every misarity `if` form in one file, with the number of `if` forms
 /// scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "every `if` here takes 2 or 3 arguments"
-/// for Common Lisp and "nothing was looked for" for Emacs Lisp — whose `if` has
-/// an implicit-progn else — and the two read identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_if_arity_report(
     path: &Path,
     dialect: Dialect,
@@ -174,7 +165,6 @@ mod tests {
             .expect("build if arity report")
     }
 
-    /// The `(if_form_count, violations)` pair the report is built from.
     fn violations(input: &str) -> (u64, Vec<IfArityItem>) {
         let report = report(input);
         let count = report
@@ -238,8 +228,6 @@ mod tests {
         assert_eq!(items[0].argument_count, 4);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         // Emacs Lisp `if` has an implicit-progn else, so this is valid there.

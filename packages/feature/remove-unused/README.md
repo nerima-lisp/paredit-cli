@@ -20,10 +20,9 @@ references what:
 - **`definition_movement`** — moves a definition to another file, and drives
   `sort_definitions` and `split_file`.
 
-The export policy is the interesting part. "Unused" is only meaningful relative
-to a boundary: a function unused inside its file may be the package's entire
-purpose, so removal consults `package_report` for what is exported before
-deciding anything.
+"Unused" is meaningful only relative to an export boundary: a function unused
+inside its file may be the package's entire purpose, so removal consults
+`package_report` for what is exported before deciding anything.
 
 ### What this package does not own
 

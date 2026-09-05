@@ -1,8 +1,5 @@
 //! `cons-to-list`: a cons onto nil or a list literal ((cons a nil) is (list a); (cons a (list b)) is (list a b)).
 //!
-//! The analysis lives in [`crate::cons_to_list::domain`], which also backs the
-//! standalone `inspect cons-to-list` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

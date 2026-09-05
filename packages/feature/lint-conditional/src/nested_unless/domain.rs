@@ -21,8 +21,6 @@
 //! [`crate::nested_when::domain`], which combines nested `when` tests
 //! with `and`.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -53,9 +51,6 @@ pub struct NestedUnlessItem {
     pub span: ByteSpan,
     /// The span of the outer test `a`.
     ///
-    /// The rewrite's input, not the report's: the lint rule slices it to build
-    /// the merged `(or a b)`, and neither the old renderer nor this one prints
-    /// it.
     pub outer_test_span: ByteSpan,
     /// The span of the inner test `b`. Unreported, for the same reason as
     /// `outer_test_span`.
@@ -87,15 +82,11 @@ impl Finding for NestedUnlessItem {
         Vec::new()
     }
 
-    /// The same sentence the `nested-unless` lint rule writes, so a SARIF or
-    /// JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         "unless whose only body is an unless merges by or; (unless a (unless b c)) is (unless (or a b) c)".to_owned()
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_unless(
     view: &ExpressionView,
     unless_form_count: &mut usize,
@@ -146,10 +137,7 @@ pub fn examine_unless(
 /// Collects every `unless` whose sole body form is an `unless` in one file, with
 /// the number of `unless` forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no nested unless here" for Common Lisp
-/// and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_nested_unless_report(
     path: &Path,
     dialect: Dialect,
@@ -195,7 +183,6 @@ mod tests {
             .expect("build nested unless report")
     }
 
-    /// The `(unless_form_count, violations)` pair the report is built from.
     fn nested(input: &str) -> (u64, Vec<NestedUnlessItem>) {
         let report = report(input);
         let count = report
@@ -271,8 +258,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(unless a (unless b c))", Dialect::Clojure)

@@ -1,8 +1,5 @@
 //! `parse-integer-default-radix`: a parse-integer call with an explicit :radix 10, the default ((parse-integer s :radix 10) is (parse-integer s)).
 //!
-//! The analysis lives in [`crate::parse_integer_default_radix::domain`], which also backs the
-//! standalone `inspect parse-integer-default-radix` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

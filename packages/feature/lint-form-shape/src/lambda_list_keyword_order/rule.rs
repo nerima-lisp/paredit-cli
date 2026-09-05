@@ -1,8 +1,5 @@
 //! `lambda-list-keyword-order`: lambda-list keywords out of the canonical &optional/&rest/&key/&aux order.
 //!
-//! The analysis lives in [`crate::lambda_list_keyword_order::domain`], which also backs the
-//! standalone `inspect lambda-list-keyword-order` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

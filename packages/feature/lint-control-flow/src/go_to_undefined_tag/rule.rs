@@ -1,9 +1,6 @@
 //! `go-to-undefined-tag`: a `go` naming a tag no enclosing tagbody
 //! establishes.
 //!
-//! The analysis lives in [`crate::go_to_undefined_tag::domain`], which also
-//! backs the standalone `inspect go-to-undefined-tag` command; this module
-//! only registers it with the lint suite and phrases its findings.
 //!
 //! `ReportOnly`: there is no mechanical repair — the tag is either missing or
 //! misspelled, and only the author knows which.

@@ -1,8 +1,5 @@
 //! `one-step-arithmetic`: a +/- of a literal 1 with a shorthand ((+ x 1) is (1+ x); (- x 1) is (1- x)).
 //!
-//! The analysis lives in [`crate::one_step_arithmetic::domain`], which also backs the
-//! standalone `inspect one-step-arithmetic` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

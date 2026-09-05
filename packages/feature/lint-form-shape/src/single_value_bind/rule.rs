@@ -1,8 +1,5 @@
 //! `single-value-bind`: a multiple-value-bind of one variable ((multiple-value-bind (x) f body) is (let ((x f)) body)).
 //!
-//! The analysis lives in [`crate::single_value_bind::domain`], which also backs the
-//! standalone `inspect single-value-bind` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

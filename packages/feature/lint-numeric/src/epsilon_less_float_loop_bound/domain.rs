@@ -113,9 +113,6 @@ impl Finding for EpsilonLessLoopItem {
         ]
     }
 
-    /// The same sentence the `epsilon-less-float-loop-bound` lint rule writes,
-    /// so a SARIF or JUnit consumer reading both sees one finding described one
-    /// way.
     fn message(&self) -> String {
         format!(
             "{} accumulates the inexact float {} each iteration, so the end test ({} {} …) may \
@@ -165,8 +162,6 @@ fn inexact_step_literal(step: &ExpressionView) -> Option<String> {
     })
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 ///
 /// Work is bounded to the matched `do` form's own binding list and end test —
 /// never a subtree walk, and never the whole file.
@@ -251,10 +246,7 @@ pub fn examine(
 /// Collects every equality-terminated inexact float loop in one file, with the
 /// number of `do`/`do*` forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no drifting loop here" for Common Lisp
-/// and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_epsilon_less_float_loop_bound_report(
     path: &Path,
     dialect: Dialect,
@@ -304,7 +296,6 @@ mod tests {
         .expect("build report")
     }
 
-    /// The `(do_form_count, violations)` pair the report is built from.
     fn loops(input: &str) -> (u64, Vec<EpsilonLessLoopItem>) {
         let report = report(input);
         let count = report

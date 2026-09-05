@@ -1,9 +1,5 @@
 //! `restart-case-clause-without-report`: a restart the debugger can only name.
 //!
-//! The analysis lives in [`crate::restart_case_clause_without_report::domain`],
-//! which also backs the standalone `inspect restart-case-clause-without-report`
-//! command; this module only registers it with the lint suite and phrases its
-//! findings.
 
 use paredit_core_lint_engine::LintResult;
 

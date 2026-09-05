@@ -1,10 +1,6 @@
 //! `when-unless-implicit-nil-misused`: a when/unless value handed to an
 //! operator that requires a number.
 //!
-//! The analysis lives in [`crate::when_unless_implicit_nil_misused::domain`],
-//! which also backs the standalone `inspect when-unless-implicit-nil-misused`
-//! command; this module only registers it with the lint suite and phrases its
-//! findings.
 //!
 //! The head filter is the *arithmetic* operators rather than `when`/`unless`.
 //! That inversion is what makes the check local to the matched node — see the

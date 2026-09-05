@@ -146,8 +146,6 @@ pub fn is_chain_link(view: &ExpressionView) -> bool {
         && !has_reader_conditional(view)
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 ///
 /// Emits a candidate for *every* chain link whose target is a chain link, which
 /// for a three-deep chain is two candidates; suppressing the inner one is the
@@ -214,10 +212,7 @@ fn only_outermost(candidates: Vec<GetChainItem>) -> Vec<GetChainItem> {
 /// Collects every nested `get` chain in one file, with the number of `get`
 /// forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no nested get chains here" for Clojure
-/// and "nothing was looked for" for Common Lisp, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn collect_get_chains(
     path: &Path,
     dialect: Dialect,

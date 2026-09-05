@@ -1,8 +1,5 @@
 //! `t-comparison`: an eq/eql/equal/equalp comparison against t (only matches the symbol T, not any true value).
 //!
-//! The analysis lives in [`crate::t_comparison::domain`], which also backs the
-//! standalone `inspect t-comparison` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

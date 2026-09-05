@@ -1,9 +1,5 @@
 //! `handler-bind-handler-returns-bare-value`: a result nothing reads.
 //!
-//! The analysis lives in
-//! [`crate::handler_bind_handler_returns_bare_value::domain`], which also backs
-//! the standalone `inspect handler-bind-handler-returns-bare-value` command;
-//! this module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

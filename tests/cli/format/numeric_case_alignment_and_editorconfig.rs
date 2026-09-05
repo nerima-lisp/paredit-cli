@@ -1,9 +1,5 @@
-//! Phase 4+5 of Section J: FR-012 (`format.numeric-literal-case` /
-//! `--numeric-literal-case`), FR-013 (`format.align-clause-values` /
-//! `--align-clause-values`), FR-014 (terminal-width auto-detection for
-//! `--max-width`'s default — only the non-terminal branch is directly
-//! testable, see below), and FR-015 (`.editorconfig` discovery), exercised
-//! through the real binary.
+//! CLI coverage for numeric-literal case, clause-value alignment, terminal
+//! width defaults, and `.editorconfig` discovery.
 
 use super::*;
 
@@ -16,15 +12,13 @@ fn repo(name: &str) -> PathBuf {
     root
 }
 
-// --- FR-012: `format.numeric-literal-case` / `--numeric-literal-case` ---
-
 #[test]
 fn cli_format_numeric_literal_case_flag_lowercases_markers() {
     let dir = fresh_temp_dir("format-numeric-literal-case-lower");
     let file = dir.join(Path::new("source.lisp"));
     fs::write(&file, "(list #X1F 1.0D0)\n").expect("write fixture");
 
-    // Off by default: byte-identical to before this phase.
+    // The default leaves the source byte-identical.
     paredit()
         .arg("edit")
         .arg("format")
@@ -128,7 +122,7 @@ fn cli_format_align_clause_values_flag_pads_values_to_a_shared_column() {
     )
     .expect("write fixture");
 
-    // Off by default: byte-identical to before this phase.
+    // Off by default: preserve the input bytes.
     paredit()
         .arg("edit")
         .arg("format")

@@ -46,8 +46,6 @@ fn cli_does_not_flag_cons_element_or_other_variable() {
         .stdout(predicate::str::contains("\"dialect_modelled\": true"));
 }
 
-/// An empty finding list is ambiguous, so a dialect this rule does not model
-/// must be labelled rather than silently reported as clean.
 #[test]
 fn cli_labels_a_dialect_the_rule_does_not_model() {
     let dir = fresh_temp_dir("manual-push-report-unmodelled");
@@ -63,9 +61,6 @@ fn cli_labels_a_dialect_the_rule_does_not_model() {
         .stdout(predicate::str::contains("\"finding_count\": 0"));
 }
 
-/// The envelope's interchange formats, which this report reached by moving onto
-/// it. Asserted here only far enough to prove the command accepts them; their
-/// content is covered once in `report_interop`.
 #[test]
 fn cli_manual_push_emits_sarif() {
     let dir = fresh_temp_dir("manual-push-report-sarif");

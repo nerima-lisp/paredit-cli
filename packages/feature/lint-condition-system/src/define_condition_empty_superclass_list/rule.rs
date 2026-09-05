@@ -1,9 +1,5 @@
 //! `define-condition-empty-superclass-list`: a condition that is not an error.
 //!
-//! The analysis lives in
-//! [`crate::define_condition_empty_superclass_list::domain`], which also backs
-//! the standalone `inspect define-condition-empty-superclass-list` command; this
-//! module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

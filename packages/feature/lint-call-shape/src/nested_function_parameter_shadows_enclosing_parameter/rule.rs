@@ -2,10 +2,6 @@
 //! local function, or a nested `defun`, whose parameter reuses an enclosing
 //! function's parameter name.
 //!
-//! The analysis lives in
-//! [`crate::nested_function_parameter_shadows_enclosing_parameter::domain`],
-//! which also backs the standalone command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};

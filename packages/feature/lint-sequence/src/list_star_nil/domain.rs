@@ -14,8 +14,6 @@
 //! The fix rewrites the head `list*` to `list` and deletes the trailing ` nil`,
 //! leaving the kept elements byte-identical, so the rule is auto-fixable.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -73,8 +71,6 @@ impl Finding for ListStarNilItem {
         ]
     }
 
-    /// The same sentence the `list-star-nil` lint rule writes, so a SARIF or
-    /// JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         "list* with a nil tail is a spelled-out list; (list* a b nil) is (list a b)".to_owned()
     }
@@ -85,8 +81,6 @@ fn span_json(span: ByteSpan) -> Value {
     json!({ "start": span.start().get(), "end": span.end().get() })
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
     call_form_count: &mut usize,
@@ -120,10 +114,7 @@ pub fn examine(
 /// Collects every `(list* a … nil)` in one file, with the number of `list*`
 /// calls scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no nil-tailed list* here" for Common
-/// Lisp and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_list_star_nil_report(
     path: &Path,
     dialect: Dialect,
@@ -169,7 +160,6 @@ mod tests {
             .expect("build list* nil report")
     }
 
-    /// The `(call_form_count, violations)` pair the report is built from.
     fn calls(input: &str) -> (u64, Vec<ListStarNilItem>) {
         let report = report(input);
         let count = report
@@ -225,8 +215,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =

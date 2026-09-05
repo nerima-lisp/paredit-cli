@@ -21,8 +21,6 @@
 //! multi-pair `setf` and any reader-conditional operand are skipped, and `P` is
 //! matched to the cons tail by exact source text.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -70,8 +68,6 @@ pub struct ManualPushItem {
     pub span: ByteSpan,
     /// The span of the assigned variable `P` (for reconstructing the fix).
     ///
-    /// The rewrite's input, not the report's: the lint rule slices it to build
-    /// `(push E P)`, and the command never printed it.
     pub place_span: ByteSpan,
     /// The span of the pushed element `E`.
     ///
@@ -100,15 +96,11 @@ impl Finding for ManualPushItem {
         Vec::new()
     }
 
-    /// The same sentence the `manual-push` lint rule writes, so a SARIF or JUnit
-    /// consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         "setf conses onto a variable; use push".to_owned()
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_assignment(
     view: &ExpressionView,
     assignment_form_count: &mut usize,
@@ -149,10 +141,7 @@ pub fn examine_assignment(
 /// Collects every manual push in one file, with the number of `setf`/`setq`
 /// forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no hand-written push" for Common Lisp and
-/// "nothing was looked for" for Clojure, and the two read identically without
-/// the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_manual_push_report(
     path: &Path,
     dialect: Dialect,
@@ -198,7 +187,6 @@ mod tests {
             .expect("build manual push report")
     }
 
-    /// The `(assignment_form_count, violations)` pair the report is built from.
     fn pushes(input: &str) -> (u64, Vec<ManualPushItem>) {
         let report = report(input);
         let count = report
@@ -280,8 +268,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(setf xs (cons item xs))", Dialect::Clojure)

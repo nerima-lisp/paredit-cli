@@ -1,8 +1,5 @@
 //! `leftover-trace-call`: `trace`/`untrace` used as a statement, left in committed source.
 //!
-//! The analysis lives in [`crate::leftover_trace_call::domain`], which also backs the
-//! standalone `inspect leftover-trace-call` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

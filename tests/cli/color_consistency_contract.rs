@@ -43,7 +43,7 @@ const MISINDENTED: &str = "(defun alpha (x)\n            x)\n";
 const PATCH_FROM: &str = "(defun alpha () 1)\n";
 const PATCH_TO: &str = "(defun alpha () 2)\n";
 
-/// The seven commands fixed in this change, then the already-correct controls.
+/// The seven report commands, followed by controls known to emit color.
 ///
 /// The controls are not decoration: they prove the harness itself — the flag,
 /// the piped capture, the ESC scan — can observe color at all, so a row

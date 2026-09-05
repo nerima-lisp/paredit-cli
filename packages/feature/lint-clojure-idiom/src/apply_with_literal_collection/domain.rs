@@ -117,8 +117,6 @@ impl Finding for ApplyWithLiteralCollectionItem {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_apply(
     view: &ExpressionView,
     apply_count: &mut usize,

@@ -99,7 +99,7 @@ impl LintRule for Rule {
         // descent. It materializes the whole document, so asking before
         // `examine` would charge every visited `defun` for a walk that almost
         // always answers "no" — the ordering mistake that measured
-        // 450843 ns/call against 28 ns/call in an earlier batch.
+        // 450843 ns/call against 28 ns/call in the reference measurement.
         // A `(case …)` inside a quoted list is data, and one inside a
         // `defsyntax` rule is a *template* whose symbols are pattern
         // variables rather than the bare variables they look like. Both were

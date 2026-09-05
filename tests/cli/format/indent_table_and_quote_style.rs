@@ -1,7 +1,5 @@
-//! Phase 3 of Section J: FR-008 (`format.indent-table` / `--indent-table`),
-//! FR-009 (`format.width-profiles` / `--width-profile`), and FR-010
-//! (`format.quote-style` / `--quote-style`), exercised through the real
-//! binary — both the flag and the `paredit.toml` key for each.
+//! CLI coverage for indentation tables, width profiles, and quote styles,
+//! including command-line flags and `paredit.toml` keys.
 
 use super::*;
 
@@ -248,7 +246,7 @@ fn cli_format_quote_style_flag_expands_a_quote_prefix() {
     let file = dir.join(Path::new("source.lisp"));
     fs::write(&file, "'(alpha beta)\n").expect("write fixture");
 
-    // Off by default: byte-identical to before this phase.
+    // The default leaves the source byte-identical.
     paredit()
         .arg("edit")
         .arg("format")

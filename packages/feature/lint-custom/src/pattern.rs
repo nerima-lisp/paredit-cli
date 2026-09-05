@@ -25,7 +25,7 @@
 //! point of `(setf ?_ ?_)` reporting `(setf x y)` as well as `(setf x x)`.
 //! Reading `?_` the way the selector reads every other `?name` would make
 //! `?_` a capture spelled `_`, and two of them would then have to agree,
-//! silently narrowing every such rule the day this module changed under it.
+//! silently narrowing every such rule during grammar unification.
 //! Keeping `?_` anonymous, and reserving bare `_` for the literal symbol
 //! `defrule` always read it as, is what the pattern languages diverging
 //! "unambiguously" (see the module's own contract test) comes down to in

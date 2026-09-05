@@ -135,8 +135,6 @@ fn leading_whole_variable(lambda_list: &ExpressionView) -> Option<(&ExpressionVi
     bindable_variable_name(variable).map(|name| (variable, name))
 }
 
-/// Examines one node. Shared with the lint suite's rule.
-///
 /// Cheapest predicate first: the head comparison, then the form's own arity,
 /// then the lambda list's first two elements. The subtree scan for references
 /// happens last and only for a form that actually opens with a nameable

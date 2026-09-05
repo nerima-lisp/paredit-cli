@@ -1,8 +1,5 @@
 //! `quoted-case-key`: a case/ecase/ccase clause with a quoted key ('a matches quote and a, not a).
 //!
-//! The analysis lives in [`crate::quoted_case_key::domain`], which also backs the
-//! standalone `inspect quoted-case-key` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -1,8 +1,5 @@
 //! `malformed-cond-clause`: a cond clause that is not a non-empty list.
 //!
-//! The analysis lives in [`crate::malformed_cond_clause::domain`], which also backs the
-//! standalone `inspect malformed-cond-clause` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

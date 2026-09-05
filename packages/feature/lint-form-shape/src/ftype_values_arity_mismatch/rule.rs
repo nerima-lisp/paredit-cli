@@ -1,8 +1,5 @@
 //! `ftype-values-arity-mismatch`: a declaimed ftype promising more values than its defun returns.
 //!
-//! The analysis lives in [`crate::ftype_values_arity_mismatch::domain`], which
-//! also backs the standalone `inspect ftype-values-arity-mismatch` command;
-//! this module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

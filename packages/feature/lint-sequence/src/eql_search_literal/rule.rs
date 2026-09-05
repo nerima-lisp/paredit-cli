@@ -1,8 +1,5 @@
 //! `eql-search-literal`: a member/assoc/find/substitute/adjoin/... searching for a string/list literal without :test (default eql won't match).
 //!
-//! The analysis lives in [`crate::eql_search_literal::domain`], which also backs the
-//! standalone `inspect eql-search-literal` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

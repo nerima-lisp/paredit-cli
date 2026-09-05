@@ -1,8 +1,6 @@
 //! `racket-match-unreachable-clause`: a `match` clause an earlier catch-all
 //! makes dead.
 //!
-//! The analysis lives in [`crate::match_unreachable_clause::domain`]; this
-//! module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

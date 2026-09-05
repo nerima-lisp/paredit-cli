@@ -1,9 +1,6 @@
 //! `with-open-returns-lazy-seq`: a resource scope whose value is realized after
 //! the resource closes.
 //!
-//! The analysis lives in [`crate::with_open_returns_lazy_seq::domain`], which
-//! also backs the standalone `inspect with-open-returns-lazy-seq` command; this
-//! module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

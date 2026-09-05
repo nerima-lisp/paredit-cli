@@ -1,8 +1,5 @@
 //! `format-unknown-directive`: a ~ directive in a literal format control string that CLHS 22.3 does not define.
 //!
-//! The analysis lives in [`crate::format_unknown_directive::domain`], which also backs the
-//! standalone `inspect format-unknown-directive` command; this module only registers it
-//! with the lint suite and phrases its findings.
 //!
 //! `HeadFilter::Heads`, never `AllNodes`: the five `format`-family operators are
 //! the only nodes whose control string this rule can read, and the

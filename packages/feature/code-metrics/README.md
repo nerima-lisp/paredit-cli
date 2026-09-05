@@ -11,8 +11,8 @@ files are long, which package is doing too many jobs, and which code changes
 often *and* is complicated, which is where a refactor pays.
 
 - **`docstrings`** — definitions with no docstring, and docstrings that name a
-  parameter the lambda list does not have. The second is the one worth having:
-  a stale docstring is worse than none, and only a mechanical check finds it.
+  parameter the lambda list does not have. A stale docstring is worse than
+  none, and only a mechanical check finds it.
 - **`todo`** — `TODO`/`FIXME`/`XXX`/`HACK` markers, with the definition each
   one sits in. Comments are kept as trivia beside the tree, so this is the only
   report that reads them.

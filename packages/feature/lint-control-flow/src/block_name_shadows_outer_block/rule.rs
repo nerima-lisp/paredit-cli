@@ -1,10 +1,6 @@
 //! `block-name-shadows-outer-block`: a nested `block` reusing an enclosing
 //! block's name, so an inner `return-from` exits the inner one.
 //!
-//! The analysis lives in [`crate::block_name_shadows_outer_block::domain`],
-//! which also backs the standalone `inspect block-name-shadows-outer-block`
-//! command; this module only registers it with the lint suite and phrases its
-//! findings.
 //!
 //! `ReportOnly`: renaming either block changes which form every
 //! `return-from` under it exits, and only the author knows which one each

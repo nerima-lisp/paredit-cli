@@ -146,8 +146,6 @@ fn distinct_symbols(elements: &[ExpressionView]) -> Option<usize> {
     Some(names.len())
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 ///
 /// `min_elements` is the caller's threshold — the rule passes what
 /// `--rule-arg set-membership-via-linear-scan.min-elements=` resolved to, and
@@ -211,10 +209,7 @@ pub fn examine(
 /// Collects every long-literal `member` in one file, with the number of
 /// `member` forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no long literal membership tests here"
-/// for Common Lisp and "nothing was looked for" for Clojure, and the two read
-/// identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn collect_linear_scans(
     path: &Path,
     dialect: Dialect,

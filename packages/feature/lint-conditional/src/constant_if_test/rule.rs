@@ -1,8 +1,5 @@
 //! `constant-if-test`: an if whose test is the literal t or nil ((if t a b) is a; (if nil a b) is b).
 //!
-//! The analysis lives in [`crate::constant_if_test::domain`], which also backs the
-//! standalone `inspect constant-if-test` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

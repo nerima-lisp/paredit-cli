@@ -1,9 +1,6 @@
 //! `stringly-typed-dispatch`: a `cond`/`if` chain dispatching on string
 //! equality against a set of identifier-shaped literals.
 //!
-//! The analysis lives in [`crate::stringly_typed_dispatch::domain`], which also
-//! backs the standalone `inspect stringly-typed-dispatch` command; this module
-//! only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};

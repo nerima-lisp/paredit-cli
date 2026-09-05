@@ -1,11 +1,6 @@
 //! `defclass-required-slot-no-initform-or-initarg`: a slot with no `:initform`
 //! and no `:initarg` that a method in the file reads.
 //!
-//! The analysis lives in
-//! [`crate::defclass_required_slot_no_initform_or_initarg::domain`], which also
-//! backs the standalone `inspect defclass-required-slot-no-initform-or-initarg`
-//! command; this module only registers it with the lint suite and phrases its
-//! findings.
 
 use paredit_core_lint_engine::LintResult;
 

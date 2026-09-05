@@ -24,9 +24,8 @@ about one form:
 
 - **No lint rules.** None of these slices has a file under
   `domain/lint/rules`, which is exactly the test that separates a report
-  invoked as a command from a rule the engine runs. Of the 157 `*_report`
-  modules that were still in the root, 127 are rule-backed and belong to
-  Phase 5; these eighteen are not.
+  invoked as a command from a rule the engine runs. The reports in this package
+  are not rule-backed.
 - **No refactoring.** It reports; it never edits.
 - **No package or definition model.** Those are `feature/package` and
   `feature/remove-unused`, which this package depends on.
@@ -36,14 +35,13 @@ about one form:
 `call_cycle_report` and `package_cycle_report` reference each other — the one
 2-cycle §1.2 found across all 206 slices. §5.2.1's prescription is to
 co-locate them, and both are here, so it resolves without any code change. It
-is worth knowing that this was the entire cyclic risk in a 209k-line codebase.
+was the only mutual cycle found across the 206 slices.
 
 ### Why `system_order` rejoins here
 
-It was moved out of `core/semantics` during Phase 2 because it depends on
-`dependency_report` and `system_cycle_report`, which made core depend on
-feature-level reports. ASDF ordering is project analysis rather than language
-semantics, and this is the package it was waiting for.
+`system_order` depends on `dependency_report` and `system_cycle_report`, so it
+cannot live in `core/semantics` without making core depend on feature-level
+reports. ASDF ordering is project analysis rather than language semantics.
 
 ## Dependencies
 
@@ -98,7 +96,7 @@ src/
 
 | You are… | and it does **not** belong here because… |
 | --- | --- |
-| adding a lint rule | if it has a `domain/lint/rules` file it is Phase 5's, not this package's |
+| adding a lint rule | rules belong in a `feature/lint-*` package, not this package |
 | changing what a package exports | that is `feature/package` |
 | removing anything a report finds | reports do not edit |
 

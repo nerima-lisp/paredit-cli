@@ -1,8 +1,5 @@
 //! `flet-single-use-inlinable`: an flet/labels whose one local function is called once, in tail position.
 //!
-//! The analysis lives in [`crate::flet_single_use_inlinable::domain`], which
-//! also backs the standalone `inspect flet-single-use-inlinable` command; this
-//! module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

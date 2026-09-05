@@ -11,8 +11,6 @@
 //! lone reader conditional (`#+`/`#-`) as the sole operand is exempt: it may
 //! expand to zero or one operand depending on the build.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -68,8 +66,6 @@ pub struct SingleOperandBooleanItem {
     pub operator: &'static str,
     /// The span of the sole operand `X` (lets a fix substitute its source).
     ///
-    /// The rewrite's input, not the report's: the lint rule slices it to build
-    /// the replacement, and the command has never printed it.
     pub inner_span: ByteSpan,
 }
 
@@ -96,8 +92,6 @@ impl Finding for SingleOperandBooleanItem {
         vec![("operator", json!(self.operator))]
     }
 
-    /// The same sentence the `single-operand-boolean` lint rule writes, so a
-    /// SARIF or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!(
             "{} has a single operand; ({} X) is just X",
@@ -106,8 +100,6 @@ impl Finding for SingleOperandBooleanItem {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_boolean(
     view: &ExpressionView,
     boolean_form_count: &mut usize,
@@ -142,10 +134,7 @@ pub fn examine_boolean(
 /// Collects every single-operand `and`/`or` in one file, with the number of
 /// `and`/`or` forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no single-operand boolean here" for
-/// Common Lisp and "nothing was looked for" for Clojure, and the two read
-/// identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_single_operand_boolean_report(
     path: &Path,
     dialect: Dialect,
@@ -191,7 +180,6 @@ mod tests {
             .expect("build single-operand boolean report")
     }
 
-    /// The `(boolean_form_count, violations)` pair the report is built from.
     fn booleans(input: &str) -> (u64, Vec<SingleOperandBooleanItem>) {
         let report = report(input);
         let count = report
@@ -269,8 +257,6 @@ mod tests {
         assert_eq!(violations[0].operator, "or");
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(and x)", Dialect::Clojure).expect("parse");

@@ -167,8 +167,7 @@ pub fn examine(
 /// Collects every unchecked probe application in one file, with the number of
 /// evaluated application forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_introspection_probe_unchecked_report(
     path: &Path,
     dialect: Dialect,

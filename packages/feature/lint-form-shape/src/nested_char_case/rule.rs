@@ -1,8 +1,5 @@
 //! `nested-char-case`: nested char case ops where the outer dominates ((char-upcase (char-downcase c)) is (char-upcase c)).
 //!
-//! The analysis lives in [`crate::nested_char_case::domain`], which also backs the
-//! standalone `inspect nested-char-case` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

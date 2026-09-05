@@ -227,9 +227,8 @@ idempotent, every path the tree reports resolves, and no line of formatted
 output starts at or left of the column of its enclosing form's opening
 delimiter.
 
-The fifth is the only one that is not a round-trip through the tool's own
-tree, which is what makes it worth having: a layout that is merely *wrong*
-satisfies the first four as long as it is wrong consistently. Columns are
+The fifth is independent of the tool's own round-trip: a layout that is merely
+*wrong* satisfies the first four as long as it is wrong consistently. Columns are
 measured as display width, so a full-width character counts as two. Lines the
 formatter reproduced verbatim — inside a multi-line token, or in a top-level
 form carrying a comment — are exempt, because their indentation was chosen by

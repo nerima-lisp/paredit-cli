@@ -1,9 +1,6 @@
 //! `eval-when-body-never-runs`: a nested `eval-when` whose situations the
 //! standard ignores, so its body never runs.
 //!
-//! The analysis lives in [`crate::eval_when_body_never_runs::domain`]; this
-//! module only registers it with the lint suite.
-//!
 //! # Cost
 //!
 //! `HeadFilter::Heads(&["eval-when"])` — the same head as

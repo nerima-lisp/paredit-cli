@@ -1,8 +1,5 @@
 //! `destructive-literal`: a destructive call (nreverse/sort/delete/nsubstitute/nconc/...) on a quoted list literal (undefined behavior).
 //!
-//! The analysis lives in [`crate::destructive_literal::domain`], which also backs the
-//! standalone `inspect destructive-literal` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

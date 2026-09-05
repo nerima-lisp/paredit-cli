@@ -1,8 +1,5 @@
 //! `manual-push`: a setf/setq that manually conses onto a variable ((setf x (cons e x)) is (push e x)).
 //!
-//! The analysis lives in [`crate::manual_push::domain`], which also backs the
-//! standalone `inspect manual-push` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -40,9 +40,7 @@ pub enum DataFormat {
     DirLocals,
     /// A Racket data file: `.rktd` by extension. `#lang` alone cannot signal
     /// this — every named language is still executable Racket — so `.rktd`
-    /// is the only unambiguous marker. Phase 1 gives it no rule of its own
-    /// beyond baseline — the value is routing these files into the report at
-    /// all.
+    /// is the only unambiguous marker. It uses the baseline checks.
     RacketData,
 }
 
@@ -221,10 +219,8 @@ fn is_edn_path(path: &Path) -> bool {
 /// Whether `root` is an Emacs Lisp file with a top-level `(custom-set-variables
 /// ...)` form.
 ///
-/// Phase 1 requires the whole file to be recognised this way rather than
-/// extracting a sub-region: `custom-set-variables` is very often one form
-/// among many others in a larger `init.el`, and narrowing the check to just
-/// that form (rather than the file) is future work, not a Phase 1 promise.
+/// The whole file is recognised this way because `custom-set-variables` is
+/// often one form among many in a larger `init.el`.
 fn is_emacs_customize(dialect: Dialect, root: &ExpressionView) -> bool {
     dialect == Dialect::EmacsLisp
         && root
@@ -471,9 +467,8 @@ fn emacs_customize_entry_issues(entry: &ExpressionView) -> Vec<DataIssue> {
 ///
 /// Not a full number-literal grammar: distinguishing a symbol from a number
 /// precisely needs the same digit/sign/exponent state machine
-/// `selector::pattern`'s `Number` constraint already has, and duplicating it
-/// here for one Phase 1 heuristic is not worth the second copy to keep in
-/// sync. A bare leading digit is rejected instead, which covers the entries
+/// `selector::pattern`'s `Number` constraint already has. A bare leading digit
+/// is rejected instead, which covers the entries
 /// this check exists for — `custom-set-variables` never binds a literal
 /// number as if it were a variable name.
 fn looks_like_symbol(view: &ExpressionView) -> bool {

@@ -1,8 +1,5 @@
 //! `car-nthcdr`: a car of an nthcdr, which is nth ((car (nthcdr n x)) is (nth n x)).
 //!
-//! The analysis lives in [`crate::car_nthcdr::domain`], which also backs the
-//! standalone `inspect car-nthcdr` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

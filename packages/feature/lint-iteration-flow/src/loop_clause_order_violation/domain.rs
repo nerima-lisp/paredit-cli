@@ -122,9 +122,6 @@ impl Finding for LoopClauseOrderItem {
         ]
     }
 
-    /// The same sentence the `loop-clause-order-violation` lint rule writes,
-    /// so a SARIF or JUnit consumer reading both sees one finding described
-    /// one way.
     fn message(&self) -> String {
         match self.problem {
             ClauseOrderProblem::VariableClauseAfterMainClause => format!(
@@ -140,8 +137,6 @@ impl Finding for LoopClauseOrderItem {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_loop_clause_order(
     view: &ExpressionView,
     scan: &mut LoopScan,
@@ -193,10 +188,7 @@ pub fn examine_loop_clause_order(
 /// Collects every misplaced `loop` clause in one file, with the number of
 /// `loop` forms scanned and the number actually modelled beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "every clause is in order here" for
-/// Common Lisp and "nothing was looked for" for Clojure, and the two read
-/// identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_loop_clause_order_report(
     path: &Path,
     dialect: Dialect,

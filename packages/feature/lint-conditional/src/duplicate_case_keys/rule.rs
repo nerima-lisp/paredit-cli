@@ -1,8 +1,5 @@
 //! `duplicate-case-keys`: a case/ecase/ccase key repeated across more than one clause.
 //!
-//! The analysis lives in [`crate::duplicate_case_keys::domain`], which also backs the
-//! standalone `inspect duplicate-case-keys` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

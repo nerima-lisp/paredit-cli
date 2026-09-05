@@ -1,8 +1,5 @@
 //! `leftover-break-call`: a Common Lisp (break ...) left in committed source.
 //!
-//! The analysis lives in [`crate::leftover_break_call::domain`], which also backs the
-//! standalone `inspect leftover-break-call` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

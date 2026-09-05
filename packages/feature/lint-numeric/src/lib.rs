@@ -1347,8 +1347,8 @@ mod equality_arity_key_and_binding_tests {
         }
     }
 
-    /// **The boundary this change creates.** A clause *body* is ordinary code,
-    /// and a real misarity call there must still be reported.
+    /// A clause body is ordinary code, so a real misarity call there must
+    /// still be reported.
     #[test]
     fn a_call_in_a_case_clause_body_is_still_reported() {
         assert!(reported("(case kind (some-key (eq x)))"));

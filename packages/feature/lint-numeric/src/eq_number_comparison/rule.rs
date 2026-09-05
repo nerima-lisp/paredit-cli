@@ -1,8 +1,5 @@
 //! `eq-number-comparison`: an eq compared against a number literal (eq on numbers is unreliable).
 //!
-//! The analysis lives in [`crate::eq_number_comparison::domain`], which also backs the
-//! standalone `inspect eq-number-comparison` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

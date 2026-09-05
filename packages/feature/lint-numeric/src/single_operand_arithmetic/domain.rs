@@ -20,8 +20,6 @@
 //! [`crate::identity_arithmetic::domain`], which would have to *delete*
 //! an operand from a multi-argument form and is therefore report-only.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -77,8 +75,6 @@ pub struct SingleOperandArithmeticItem {
     pub operator: &'static str,
     /// The span of the sole operand `X`.
     ///
-    /// The rewrite's input, not the report's: the lint rule copies `X`'s source
-    /// to replace the wrapper with it, and the command has never printed it.
     pub inner_span: ByteSpan,
 }
 
@@ -104,8 +100,6 @@ impl Finding for SingleOperandArithmeticItem {
         vec![("operator", json!(self.operator))]
     }
 
-    /// The same sentence the `single-operand-arithmetic` lint rule writes, so a
-    /// SARIF or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!(
             "{} has a single operand; ({} X) is just X",
@@ -114,8 +108,6 @@ impl Finding for SingleOperandArithmeticItem {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_arithmetic(
     view: &ExpressionView,
     arithmetic_form_count: &mut usize,
@@ -150,10 +142,7 @@ pub fn examine_arithmetic(
 /// Collects every single-operand `+`/`*` in one file, with the number of
 /// `+`/`*` forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "every `+`/`*` here does real arithmetic"
-/// for Common Lisp and "nothing was looked for" for Clojure, and the two read
-/// identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_single_operand_arithmetic_report(
     path: &Path,
     dialect: Dialect,
@@ -199,7 +188,6 @@ mod tests {
             .expect("build single-operand arithmetic report")
     }
 
-    /// The `(arithmetic_form_count, violations)` pair the report is built from.
     fn arithmetic(input: &str) -> (u64, Vec<SingleOperandArithmeticItem>) {
         let report = report(input);
         let count = report
@@ -281,8 +269,6 @@ mod tests {
         assert_eq!(violations[0].operator, "*");
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(+ x)", Dialect::Clojure).expect("parse");

@@ -1,8 +1,5 @@
 //! `duplicate-boolean-operands`: an and/or that lists the same operand more than once.
 //!
-//! The analysis lives in [`crate::duplicate_boolean_operands::domain`], which also backs the
-//! standalone `inspect duplicate-boolean-operands` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

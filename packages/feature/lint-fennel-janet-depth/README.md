@@ -62,10 +62,8 @@ the transcript.
 turn copied its `QuoteState` from
 `paredit-feature-lint-condition-system::support`. The two-counter quote model —
 a `hard` flag that never clears for `'` and a `quasi` depth that `,` decrements
-for `` ` ``/`~` — is not specific to any of the three packages, and a single
-`i32` depth counter in its place is wrong and has shipped as a false-positive
-source before. A consolidation into core is in flight; when it lands, this file
-should be deleted in favour of it.
+for `` ` ``/`~` — is not specific to any of the three packages. A single `i32`
+depth counter cannot represent both states and produces false positives.
 
 The other reason the file exists is that three of the shared one-liners in
 `paredit_core_syntax::view_query` are actively wrong for these dialects:

@@ -187,8 +187,6 @@ fn is_catch_all_clause(clause: &ExpressionView) -> bool {
         .is_some_and(|name| name == "t")
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_cond(
     view: &ExpressionView,
     cond_form_count: &mut usize,

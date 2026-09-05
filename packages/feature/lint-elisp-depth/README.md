@@ -33,7 +33,7 @@ expression that settled it.
 - **`setq` on a buffer-local variable.** `setq` on an automatically
   buffer-local variable creates a *buffer-local* binding and leaves the global
   alone, and all ten common mode variables tested are `local-variable-if-set-p`.
-  The rule was backwards — the same way a previous batch's version of it was.
+  Reporting this shape would invert Emacs Lisp's actual binding semantics.
 - **A lambda passed to `advice-add` being unremovable.** `advice-remove`
   compares with `equal`, and two separately byte-compiled identical lambdas are
   `equal`. The advice comes off. Only a lambda closing over a *different* value

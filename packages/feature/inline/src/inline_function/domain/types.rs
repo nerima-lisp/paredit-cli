@@ -3,12 +3,8 @@ use paredit_core_syntax::sexpr::{ByteSpan, Path, SymbolName};
 
 /// Which calls to inline.
 ///
-/// Phase 7: this was `call_paths: Vec<Path>` beside `all_calls: bool`, whose
-/// combinations include one the command rejects outright - the CLI answers
-/// `--all-calls` plus `--call-path` with "accepts either --all-calls or
-/// repeated --call-path, not both". A rule enforced at runtime over a state
-/// the type permits is a rule that can be forgotten; the enum has no way to
-/// write it down.
+/// The enum makes `--all-calls` and explicit `--call-path` values mutually
+/// exclusive.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InlineCallSelection {
     /// Every same-file call to the definition.

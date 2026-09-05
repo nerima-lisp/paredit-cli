@@ -1,8 +1,5 @@
 //! `malformed-let-binding`: a let/let* binding that is neither a symbol nor a (var value) pair.
 //!
-//! The analysis lives in [`crate::malformed_let_binding::domain`], which also backs the
-//! standalone `inspect malformed-let-binding` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

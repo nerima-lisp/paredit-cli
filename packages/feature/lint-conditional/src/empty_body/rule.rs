@@ -1,8 +1,5 @@
 //! `empty-body`: a when/unless/dolist/dotimes with no body (the test/spec runs, then nothing happens).
 //!
-//! The analysis lives in [`crate::empty_body::domain`], which also backs the
-//! standalone `inspect empty-body` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

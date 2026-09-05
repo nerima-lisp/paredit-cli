@@ -1,22 +1,18 @@
 //! Why a parameter-list refactor refuses to run.
 //!
-//! Section 9.2. 93 refusals across 18 files, and the shape that dominates is
-//! the **call site**:
+//! Most failures identify the **call site**:
 //!
 //! ```text
 //! {command} call to '{function}' at {start}..{end} {problem}
 //! ```
 //!
-//! Fifteen messages, five commands, one shape. Adding, removing, reordering
-//! and swapping a parameter all have to visit every call and can all give up
-//! at one — and when they do, the useful information is *which call* (the
-//! byte range) and *why*. [`CallArgumentError`] carries the location on every
-//! variant so a caller can point at the call rather than describing it.
+//! Adding, removing, reordering, and swapping parameters all visit every call.
+//! [`CallArgumentError`] carries the location on every variant so a caller can
+//! identify which call failed and why.
 //!
-//! The other recurring pair is worth naming because it is the same refusal
-//! written five times: `{command} call path {path} overlaps the selected
+//! Two recurring refusals are `{command} call path {path} overlaps the selected
 //! definition` and `{command} output is not a valid S-expression document`,
-//! once per command. Both now carry `operation`.
+//! so both carry `operation`.
 
 use thiserror::Error;
 

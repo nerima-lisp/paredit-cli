@@ -1,8 +1,5 @@
 //! `list-star-to-cons`: a two-argument list*, which is just a cons ((list* a b) is (cons a b)).
 //!
-//! The analysis lives in [`crate::list_star_to_cons::domain`], which also backs the
-//! standalone `inspect list-star-to-cons` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -1,10 +1,6 @@
 //! `loop-unreachable-finally-clause`: a `loop` epilogue form written after a
 //! `finally` clause that already returns.
 //!
-//! The analysis lives in [`crate::loop_unreachable_finally_clause::domain`],
-//! which also backs the standalone `inspect loop-unreachable-finally-clause`
-//! command; this module only registers it with the lint suite and phrases its
-//! findings.
 
 use paredit_core_lint_engine::LintResult;
 

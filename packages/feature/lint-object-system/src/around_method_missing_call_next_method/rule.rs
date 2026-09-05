@@ -1,10 +1,6 @@
 //! `around-method-missing-call-next-method`: an `:around` method whose body
 //! never calls `call-next-method`.
 //!
-//! The analysis lives in
-//! [`crate::around_method_missing_call_next_method::domain`], which also backs
-//! the standalone `inspect around-method-missing-call-next-method` command;
-//! this module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -177,10 +177,9 @@ over a connection or a socket, which this rule cannot distinguish —
 libraries. An agent is therefore only ever detected as the *target* of an atom,
 ref or volatile operator.
 
-## The candidates that were dropped
+## Rejected rule candidates
 
-Eight rules were proposed for this batch. Four shipped. The evidence against
-the other four, plus a fifth that was built and then withdrawn:
+The following candidates are not implemented for the reasons given below.
 
 ### `defrecord-implements-protocol-method-not-in-protocol` — refuted by the compiler
 
@@ -206,7 +205,7 @@ shapes — `(into [] (map inc))` with the collection forgotten, `(into [] (map
 inc xs) ys)` with an already-applied sequence call where a transducer belongs —
 are provable but are typos with no measured occurrence, and everything else
 needs to know what the function argument *is*, which is a type this dialect
-does not carry. Dropped without a corpus run because there is no shape to run.
+does not carry. There is no decidable shape to audit against a corpus.
 
 ### `reduce-without-init-on-possibly-empty` — refuted by measurement
 
@@ -229,7 +228,7 @@ narrowest version of this rule is 35 false positives — the same shape as the
 "104 occurrences of the idiom in correct Common Lisp" finding that killed an
 earlier rule.
 
-### `spec-fdef-arity-mismatch` and `protocol-method-missing-arity` — dropped on cost, structurally
+### `spec-fdef-arity-mismatch` and `protocol-method-missing-arity` — structurally too expensive
 
 Both are cross-form correlations: `s/fdef` ↔ `defn`, `defprotocol` ↔
 `defrecord`. Neither is refuted — a `defprotocol` arity the `defrecord` does
@@ -237,7 +236,7 @@ not implement is a genuine `AbstractMethodError` at run time, and the compiler
 does **not** catch it (`findMethodsWithNameAndArity` rejects methods that are
 *not* in an interface; it says nothing about ones that are missing).
 
-They are dropped because there is no non-quadratic way to build them here.
+There is no non-quadratic way to build them here.
 Correlating two top-level forms needs a per-file index, and
 `RuleContext::scratch_cache` is a single type-erased slot already owned by
 `lint-repl-debug` — a second type in it panics. Without it, each `defrecord`
@@ -248,7 +247,7 @@ corpus audit clean over 765 pairs and was still dropped at 4.37 s for 2000
 protocols — slower than the scan it was written to beat. The `s/fdef` case is
 worse besides: `s/fdef` need not name a function in the same file at all.
 
-### The rule that was built and then dropped: `dynamic-scope-returns-lazy-seq`
+### `dynamic-scope-returns-lazy-seq` — rejected after implementation
 
 Heads `binding`, `with-bindings`, `with-local-vars`, `with-redefs`. Its premise
 is *correct* and was verified: all four restore what they installed in a
@@ -418,7 +417,7 @@ Measured over the corpus, by spelling:
 
 So roughly one `go` block in six is invisible to this package. That is a
 **core-engine gap**, reported rather than fixed: the correct place for it is
-`head_key`, in `packages/core/lint-engine`, which this branch does not touch.
+`head_key`, in `packages/core/lint-engine`, outside this crate.
 Adding `a/go` and `async/go` to the `Heads` list was considered and rejected —
 an alias is arbitrary, and a head list keyed to a naming convention can only be
 tested against that convention. A missed alias-qualified `go` is a false
@@ -472,7 +471,7 @@ band the four shipped rules produce in the same runs. A per-candidate
 `tree.root_view()`, or a top-level rescan of the kind the two dropped
 cross-form rules would have needed, reads as ~4.0 and does not appear.
 
-The one number worth reading twice is `reference-type-operator-mismatch`:
+`reference-type-operator-mismatch` has the largest candidate-dependent cost:
 **2613 ns/call when the binding vector holds a reference constructor, 77 when
 it does not.** `let` is the most common head in the language, and the rule is
 affordable only because the body is never walked until a constructor has been

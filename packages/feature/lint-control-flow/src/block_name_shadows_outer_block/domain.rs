@@ -109,8 +109,6 @@ fn contains_exit_to(view: &ExpressionView, name: &str) -> bool {
     found
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 ///
 /// Reads only the matched form's own subtree.
 pub fn examine_block(

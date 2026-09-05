@@ -1,8 +1,5 @@
 //! `leftover-time-benchmark-call`: a Common Lisp (time form) wrapper left in committed source.
 //!
-//! The analysis lives in [`crate::leftover_time_benchmark_call::domain`], which also backs the
-//! standalone `inspect leftover-time-benchmark-call` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

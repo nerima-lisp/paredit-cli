@@ -1,8 +1,5 @@
 //! `equality-arity`: an eq/eql/equal/equalp call without exactly two arguments.
 //!
-//! The analysis lives in [`crate::equality_arity::domain`], which also backs the
-//! standalone `inspect equality-arity` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

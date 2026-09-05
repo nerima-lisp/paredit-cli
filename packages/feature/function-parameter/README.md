@@ -30,8 +30,8 @@ which is why this feature carries by far the most tests.
 
 - **No lambda-list linting.** `duplicate_parameter_report`,
   `unused_parameter_report`, `lambda_list_keyword_order_report` and
-  `duplicate_lambda_list_keyword_report` are rules, and go to Phase 5's
-  `feature/lint-*` packages. Section 5.2.1 groups them here; a rule that reports
+  `duplicate_lambda_list_keyword_report` are rules, and go to `feature/lint-*`
+  packages. A rule that reports
   a bad lambda list and a refactoring that rewrites one are different products.
 - **No scope analysis.** Whether a name at a call position is really this
   function is answered with `paredit-core-semantics`' binding tables.

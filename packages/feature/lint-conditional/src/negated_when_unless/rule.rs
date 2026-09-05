@@ -1,8 +1,5 @@
 //! `negated-when-unless`: a when/unless whose test is a (not X)/(null X) negation (flip the macro instead).
 //!
-//! The analysis lives in [`crate::negated_when_unless::domain`], which also backs the
-//! standalone `inspect negated-when-unless` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

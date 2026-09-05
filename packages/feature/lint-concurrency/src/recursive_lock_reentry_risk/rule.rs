@@ -1,9 +1,6 @@
 //! `recursive-lock-reentry-risk`: a non-recursive lock taken again inside its
 //! own scope.
 //!
-//! The analysis lives in [`crate::recursive_lock_reentry_risk::domain`], which
-//! also backs the standalone `inspect recursive-lock-reentry-risk` command;
-//! this module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

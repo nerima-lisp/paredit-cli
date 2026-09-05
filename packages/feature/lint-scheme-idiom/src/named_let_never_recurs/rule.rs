@@ -1,9 +1,6 @@
 //! `scheme-named-let-never-recurs`: a named `let` whose loop name is never
 //! mentioned in its body.
 //!
-//! The analysis lives in [`crate::named_let_never_recurs::domain`], which also
-//! backs the standalone `inspect scheme-named-let-never-recurs` command; this
-//! module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

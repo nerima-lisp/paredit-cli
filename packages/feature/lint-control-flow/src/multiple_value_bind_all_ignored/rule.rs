@@ -1,10 +1,6 @@
 //! `multiple-value-bind-all-ignored`: a `multiple-value-bind` whose body
 //! references none of the variables it binds.
 //!
-//! The analysis lives in
-//! [`crate::multiple_value_bind_all_ignored::domain`], which also backs the
-//! standalone `inspect multiple-value-bind-all-ignored` command; this module
-//! only registers it with the lint suite and phrases its findings.
 //!
 //! `ReportOnly`: the two repairs — unwrapping to the value form plus a
 //! `progn`, or adding `(declare (ignore …))` — mean different things, and

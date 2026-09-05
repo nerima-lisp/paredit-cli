@@ -1,8 +1,5 @@
 //! `redundant-identity`: an identity call, which returns its argument unchanged ((identity x) is just x).
 //!
-//! The analysis lives in [`crate::redundant_identity::domain`], which also backs the
-//! standalone `inspect redundant-identity` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

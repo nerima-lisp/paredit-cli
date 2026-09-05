@@ -10,8 +10,6 @@
 //! expand to zero or one form depending on the build, so the static single-form
 //! count does not reflect its evaluated arity.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -36,8 +34,6 @@ pub struct RedundantPrognItem {
     /// The span of the single body form, or `None` for an empty progn (whose
     /// meaning is `nil`). Lets a fix substitute the exact inner source text.
     ///
-    /// The rewrite's input, not the report's: the lint rule slices it to build
-    /// the replacement, and the command has never printed it.
     pub inner_span: Option<ByteSpan>,
 }
 
@@ -60,9 +56,6 @@ impl Finding for RedundantPrognItem {
         vec![("body_form_count", json!(self.body_form_count))]
     }
 
-    /// The same sentence the `redundant-progn` lint rule writes, including its
-    /// split between the empty and the single-form shape, so a SARIF or JUnit
-    /// consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         let detail = if self.body_form_count == 0 {
             "an empty progn is nil"
@@ -92,8 +85,6 @@ fn is_spliced(view: &ExpressionView) -> bool {
         .contains(&ReaderPrefix::UnquoteSplicing)
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_progn(
     view: &ExpressionView,
     progn_form_count: &mut usize,
@@ -134,10 +125,7 @@ pub fn examine_progn(
 /// Collects every redundant progn (empty, or wrapping a single form) in one
 /// file, with the number of progn forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no redundant progn here" for Common Lisp
-/// and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_redundant_progn_report(
     path: &Path,
     dialect: Dialect,
@@ -183,7 +171,6 @@ mod tests {
             .expect("build redundant progn report")
     }
 
-    /// The `(progn_form_count, violations)` pair the report is built from.
     fn progns(input: &str) -> (u64, Vec<RedundantPrognItem>) {
         let report = report(input);
         let count = report
@@ -276,8 +263,6 @@ mod tests {
         assert!(violations.is_empty());
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(progn x)", Dialect::Clojure).expect("parse");

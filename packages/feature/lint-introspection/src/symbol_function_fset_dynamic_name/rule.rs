@@ -1,10 +1,6 @@
 //! `symbol-function-fset-dynamic-name`: a function definition installed under a
 //! name built by `intern` at run time.
 //!
-//! The analysis lives in
-//! [`crate::symbol_function_fset_dynamic_name::domain`], which also backs the
-//! standalone `inspect symbol-function-fset-dynamic-name` command; this module
-//! only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};

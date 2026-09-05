@@ -18,8 +18,6 @@
 //! it. Callers that have a type context therefore pass a second test — see
 //! [`IsCharacterArgument`] — which catches `(eq (char s 0) c)` too.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -56,8 +54,6 @@ pub struct EqCharComparisonItem {
     pub span: ByteSpan,
     /// The span of the `eq` head symbol, for an `eq` -> `eql` fix.
     ///
-    /// The rewrite's input, not the report's: the lint rule reads it to swap
-    /// `eq` for `eql`, and the command never prints it.
     pub head_span: ByteSpan,
     pub evidence: CharacterEvidence,
 }
@@ -100,8 +96,6 @@ impl Finding for EqCharComparisonItem {
         vec![("literal", json!(self.literal()))]
     }
 
-    /// The same sentence the `eq-char-comparison` lint rule writes, so a SARIF
-    /// or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         match &self.evidence {
             CharacterEvidence::Literal(literal) => {
@@ -175,10 +169,7 @@ pub fn examine_comparison(
 /// Collects every `eq` call with a character-literal argument in one file, with
 /// the number of `eq` calls scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no such comparison here" for Common Lisp
-/// and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_eq_char_comparison_report(
     path: &Path,
     dialect: Dialect,
@@ -224,7 +215,6 @@ mod tests {
             .expect("build eq char comparison report")
     }
 
-    /// The `(comparison_form_count, violations)` pair the report is built from.
     fn comparisons(input: &str) -> (u64, Vec<EqCharComparisonItem>) {
         let report = report(input);
         let count = report
@@ -291,8 +281,6 @@ mod tests {
         );
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         // Parse as Common Lisp (whose `#\a` char syntax the tree understands),

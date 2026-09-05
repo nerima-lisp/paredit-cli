@@ -418,10 +418,8 @@ impl RefactorPreviewDecisionStatus {
 
 /// Whether the caller asked for the rewrite to be persisted.
 ///
-/// Phase 7: this was the first of three adjacent `bool` parameters to
-/// [`decide_refactor_preview`], which decides a user-visible status and the
-/// process exit code. Transposing any two of the three compiled and changed
-/// the verdict silently; as three distinct two-value enums it cannot.
+/// A distinct type prevents this value from being transposed with the other
+/// binary inputs to [`decide_refactor_preview`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PreviewWriteRequest {
     Requested,

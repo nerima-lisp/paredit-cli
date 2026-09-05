@@ -77,8 +77,6 @@ impl Finding for DeadBooleanOperandItem {
         ]
     }
 
-    /// The same sentence the `dead-boolean-operand` lint rule writes, so a
-    /// SARIF or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!(
             "{} short-circuits at literal {}; later operands are dead",
@@ -87,8 +85,6 @@ impl Finding for DeadBooleanOperandItem {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_boolean(
     view: &ExpressionView,
     boolean_form_count: &mut usize,
@@ -126,10 +122,7 @@ pub fn examine_boolean(
 /// file, with the number of `and`/`or` forms scanned as the denominator beside
 /// them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no dead operand here" for Common Lisp
-/// and "nothing was looked for" for Fennel, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_dead_boolean_operand_report(
     path: &Path,
     dialect: Dialect,
@@ -175,7 +168,6 @@ mod tests {
             .expect("build dead boolean operand report")
     }
 
-    /// The `(boolean_form_count, violations)` pair the report is built from.
     fn violations(input: &str) -> (u64, Vec<DeadBooleanOperandItem>) {
         let report = report(input);
         let count = report
@@ -236,8 +228,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =

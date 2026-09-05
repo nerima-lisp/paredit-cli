@@ -1,10 +1,6 @@
 //! `intern-dynamic-package-target`: an `intern` whose package argument is
 //! computed.
 //!
-//! The analysis lives in [`crate::intern_dynamic_package_target::domain`],
-//! which also backs the standalone `inspect intern-dynamic-package-target`
-//! command; this module only registers it with the lint suite and phrases its
-//! findings.
 
 use paredit_core_lint_engine::LintResult;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};

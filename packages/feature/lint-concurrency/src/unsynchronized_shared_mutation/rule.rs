@@ -1,10 +1,6 @@
 //! `unsynchronized-shared-mutation`: a global written on a new thread with
 //! nothing serializing the write.
 //!
-//! The analysis lives in [`crate::unsynchronized_shared_mutation::domain`],
-//! which also backs the standalone `inspect unsynchronized-shared-mutation`
-//! command; this module only registers it with the lint suite and phrases its
-//! findings.
 //!
 //! Expect this rule and `lint-safety`'s `global-mutation-in-function` to fire
 //! together on the same line: a thread thunk is a `lambda`, which is one of

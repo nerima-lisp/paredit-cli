@@ -1,10 +1,6 @@
 //! `asdf-perform-without-call-next-method`: a primary `perform` method that
 //! replaces ASDF's standard build step instead of extending it.
 //!
-//! The analysis lives in
-//! [`crate::asdf_perform_without_call_next_method::domain`], which also backs
-//! the standalone `inspect asdf-perform-without-call-next-method` command; this
-//! module only registers it with the lint suite and phrases its findings.
 //!
 //! Anchored on `defmethod`, not on `perform`: `perform` is the *name* of the
 //! generic function, which sits at child 1, and the engine's head index is keyed

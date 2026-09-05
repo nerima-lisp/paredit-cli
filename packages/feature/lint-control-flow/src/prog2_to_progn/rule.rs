@@ -1,8 +1,5 @@
 //! `prog2-to-progn`: a two-form prog2, which is just progn ((prog2 a b) is (progn a b)).
 //!
-//! The analysis lives in [`crate::prog2_to_progn::domain`], which also backs the
-//! standalone `inspect prog2-to-progn` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

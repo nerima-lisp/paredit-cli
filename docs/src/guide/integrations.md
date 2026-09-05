@@ -27,7 +27,7 @@ the request a general-purpose language server answers worst and this one
 answers from the tree it already has. In VS Code it is *Expand Selection*
 (`⌃⇧⌘→`); in Neovim, `vim.lsp.buf.selection_range()`.
 
-Two behaviours are deliberate and worth knowing:
+Two behaviours are deliberate:
 
 - **An unbalanced buffer reports only its parse failure.** While a paren is
   momentarily open, every rule is looking at a recovered tree, and a screen of
@@ -110,8 +110,8 @@ travel on a request the browser makes by itself. Binding off loopback needs
 `--allow-remote`; prefer an SSH tunnel.
 
 `--token <TOKEN>` pins the bearer token instead of minting one at startup, for
-a supervisor that must know it before the process starts — note that a token
-passed on a command line is visible in the process table, unlike the one
+a supervisor that must know it before the process starts. A token passed on a
+command line is visible in the process table, unlike the one
 `serve` prints to stderr by default. `--max-requests <N>` serves that many
 requests and exits, for scripts and tests that want a server for a bounded
 amount of work rather than a resident one.
@@ -135,7 +135,7 @@ already knows how to display findings.
 | `markdown` | A table | A pull request comment, an issue |
 | `github` | GitHub Actions workflow commands | Inline annotations on the diff |
 
-Two properties are worth knowing before wiring one of these into a gate.
+Two properties affect gate behavior.
 
 **An unexamined file is reported, not omitted.** Most of these analyses model
 Common Lisp only. A Fennel file handed to one of them is not clean — it was

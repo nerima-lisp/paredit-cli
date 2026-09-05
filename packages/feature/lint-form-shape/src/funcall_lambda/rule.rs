@@ -1,8 +1,5 @@
 //! `funcall-lambda`: a funcall of a lambda form, which applies directly ((funcall (lambda (x) x) a) is ((lambda (x) x) a)).
 //!
-//! The analysis lives in [`crate::funcall_lambda::domain`], which also backs the
-//! standalone `inspect funcall-lambda` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

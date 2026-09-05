@@ -1,9 +1,5 @@
 //! `multiple-value-setq-arity-mismatch`: a multiple-value-setq whose variable list disagrees with a literal (values ...).
 //!
-//! The analysis lives in
-//! [`crate::multiple_value_setq_arity_mismatch::domain`], which also backs the
-//! standalone `inspect multiple-value-setq-arity-mismatch` command; this module
-//! only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

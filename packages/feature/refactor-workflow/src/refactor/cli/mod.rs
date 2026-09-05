@@ -4,8 +4,6 @@ pub mod render;
 pub mod types;
 pub mod workflow;
 
-// Hoisted for the composition root (section 4.2): the argument type and run
-// function of each subcommand, which live in different modules here.
 pub use args::execute::WorkspaceRefactorExecuteArgs;
 pub use args::manifest::RefactorApplyArgs;
 pub use args::manifest::RefactorCheckArgs;

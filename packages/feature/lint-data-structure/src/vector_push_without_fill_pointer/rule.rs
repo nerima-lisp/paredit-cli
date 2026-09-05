@@ -1,10 +1,6 @@
 //! `vector-push-without-fill-pointer`: a `vector-push`/`vector-push-extend` on
 //! a vector this file made without a `:fill-pointer`.
 //!
-//! The analysis lives in [`crate::vector_push_without_fill_pointer::domain`],
-//! which documents the premise it corrects — that `:adjustable t` is what these
-//! operators require — and the SBCL run that refutes it. This module only
-//! registers the rule and phrases its findings.
 
 use paredit_core_cli::report::Finding;
 use paredit_core_lint_engine::LintResult;

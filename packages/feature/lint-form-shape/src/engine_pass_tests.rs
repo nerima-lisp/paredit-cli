@@ -46,7 +46,7 @@ static ENTRIES: [RuleEntry; 8] = [
     ),
 ];
 
-/// Every rule name this batch adds, sorted.
+/// Every rule name in this crate, sorted.
 const RULE_NAMES: [&str; 8] = [
     "destructuring-bind-unused-whole",
     "flet-single-use-inlinable",
@@ -148,7 +148,7 @@ fn every_rule_fires_through_the_real_dispatch() {
     );
 }
 
-/// Every name this batch claims is in fact the name the engine reports, so a
+/// Every declared name is the name the engine reports, so a
 /// typo in a `RuleMeta` cannot pass unnoticed.
 #[test]
 fn the_catalogue_names_match_the_names_the_engine_reports() {
@@ -233,7 +233,7 @@ fn a_comma_inside_a_hard_quote_silences_every_rule_but_the_one_that_is_about_it(
         fired("'(a ,(with-slots () obj (frob)))", Dialect::CommonLisp),
         Vec::<&str>::new()
     );
-    // The same shape, reached through a head this batch anchors on: the comma
+    // The same shape, reached through a head this crate anchors on: the comma
     // is the finding.
     assert_eq!(
         fired("(quote (a ,x))", Dialect::CommonLisp),
@@ -277,7 +277,7 @@ fn no_rule_runs_outside_common_lisp() {
     }
 }
 
-/// `HeadFilter::Heads`: a file with none of this batch's heads is never handed
+/// `HeadFilter::Heads`: a file with none of this crate's heads is never handed
 /// to any of these rules, which is what keeps the zero-finding benchmarks
 /// cheap.
 #[test]
@@ -522,8 +522,8 @@ fn candidate_counts(source: &str) -> Vec<(&'static str, u64)> {
 }
 
 /// The corpus must actually contain something each rule looks at. A sweep over
-/// a file with no candidates is a sweep that proves nothing, which is exactly
-/// how a previous batch shipped three rules its corpus never touched.
+/// a file with no candidates is a sweep that proves nothing, so the corpus
+/// must exercise every registered rule.
 #[test]
 fn the_correct_corpus_exercises_every_rule() {
     for (rule, count) in candidate_counts(CORRECT_CORPUS) {
@@ -553,7 +553,7 @@ fn the_defective_twin_fires_every_rule_exactly_once() {
     );
 }
 
-/// Every finding this batch produces on the repository's own committed `.lisp`
+/// Every finding these rules produce on the repository's own committed `.lisp`
 /// fixtures, each one validated against CLHS by hand.
 ///
 /// One entry, and it is a true positive:
@@ -685,7 +685,7 @@ static MEASURED_ENTRIES: [RuleEntry; 11] = [
     RuleEntry::new(&crate::the_arity::rule::META, &crate::the_arity::rule::RULE),
 ];
 
-/// `repeats` copies of a zero-finding block containing every head this batch
+/// `repeats` copies of a zero-finding block containing every head this crate
 /// anchors on, plus every head the controls anchor on.
 ///
 /// Zero findings on purpose: `clean/forms/*` is what the CI bench gate

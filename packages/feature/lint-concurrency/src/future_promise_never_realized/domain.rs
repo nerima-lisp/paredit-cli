@@ -136,8 +136,6 @@ fn mentions(forms: &[ExpressionView], name: &str) -> bool {
     false
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_binding(
     view: &ExpressionView,
     binding_count: &mut usize,

@@ -1,8 +1,5 @@
 //! `coerce-to-t`: a coerce to type t, which returns the object unchanged ((coerce x t) is x).
 //!
-//! The analysis lives in [`crate::coerce_to_t::domain`], which also backs the
-//! standalone `inspect coerce-to-t` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -1,8 +1,5 @@
 //! `unreachable-case-clause`: a case/typecase clause after a t/otherwise catch-all that can never run.
 //!
-//! The analysis lives in [`crate::unreachable_case_clause::domain`], which also backs the
-//! standalone `inspect unreachable-case-clause` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

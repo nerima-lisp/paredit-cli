@@ -231,8 +231,7 @@ pub fn examine(
 /// Collects every run-time-named function definition in one file, with the
 /// number of evaluated installing forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_symbol_function_fset_dynamic_name_report(
     path: &Path,
     dialect: Dialect,

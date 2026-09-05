@@ -275,8 +275,6 @@ fn assigns_global(tree: &SyntaxTree, wanted: &str) -> bool {
         })
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 ///
 /// The gate order is the whole cost story, and `bindings` is a **closure** for
 /// exactly that reason. A literal string in key position is a two-byte check on

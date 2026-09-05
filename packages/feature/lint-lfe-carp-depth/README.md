@@ -109,7 +109,7 @@ On **clean** code — the case a user actually pays for, since findings are rare
 same work, with the document-wide `node_context` descent placed *before* the
 cheap local check instead of after it. It costs ~1000x what the correctly
 ordered rule does, reproducing at larger scale the 450843 ns/call versus
-28 ns/call an earlier batch in this workspace measured. Both shipped rules
+28 ns/call measured for the corresponding cheap-first ordering. Both rules
 reach `node_context` only once a finding is otherwise ready to report, which is
 why their columns sit next to the no-op's.
 
@@ -159,16 +159,16 @@ Carp keeps its one shipped rule, `carp-deprecated-thread-macro`, in
 `packages/feature/lint-carp-idiom`. Shipping a second one audited against
 nothing would have been worse than shipping none.
 
-## Notes for the wiring pass
+## Registration
 
-The package is **unregistered on purpose**; `ENTRIES` is `cfg(test)` and names
-both rules in the order a registry should list them. Registering them will trip
-the pinned rule counts and the lint goldens.
+`ENTRIES` is `cfg(test)` and names both rules in registry order. The package is
+not part of the built-in catalog; adding it requires updating the pinned rule
+counts and lint goldens.
 
 `support::QuoteState` is copied from
 `packages/feature/lint-condition-system/src/support.rs`, as the other dialect
 packages also copy it. It should move to a shared home; a consolidation is
-already in flight. The copy here adds `is_pruned`, which distinguishes "do not
+not part of this package's scope. The copy here adds `is_pruned`, which distinguishes "do not
 report on this node" from "do not walk this subtree" — a hard `'` prunes, a
 `` ` `` does not, and collapsing the two made every unquoted call inside a
 macro template invisible.

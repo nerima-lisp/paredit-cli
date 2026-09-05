@@ -10,8 +10,6 @@
 //! no body form follows. A form with a body, or a malformed form missing its
 //! prefix entirely, is left alone.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -68,8 +66,6 @@ impl Finding for EmptyBodyItem {
         vec![("head", json!(self.head))]
     }
 
-    /// The same sentence the `empty-body` lint rule writes, so a SARIF or JUnit
-    /// consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!(
             "{} has no body; the test/spec runs, then nothing",
@@ -78,8 +74,6 @@ impl Finding for EmptyBodyItem {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_form(
     view: &ExpressionView,
     body_form_count: &mut usize,
@@ -107,10 +101,7 @@ pub fn examine_form(
 /// Collects every empty-bodied `when`/`unless`/`dolist`/`dotimes` in one file,
 /// with the number of such forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "every body-taking form here has a body"
-/// for Common Lisp and "nothing was looked for" for Fennel, and the two read
-/// identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_empty_body_report(
     path: &Path,
     dialect: Dialect,
@@ -156,7 +147,6 @@ mod tests {
             .expect("build empty body report")
     }
 
-    /// The `(body_form_count, violations)` pair the report is built from.
     fn bodies(input: &str) -> (u64, Vec<EmptyBodyItem>) {
         let report = report(input);
         let count = report
@@ -232,8 +222,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(when ready)", Dialect::Clojure).expect("parse");

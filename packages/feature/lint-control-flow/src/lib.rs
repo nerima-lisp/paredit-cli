@@ -48,7 +48,7 @@ mod engine_pass_tests {
     use paredit_core_syntax::dialect::Dialect;
     use paredit_core_syntax::sexpr::SyntaxTree;
 
-    /// Only the seven rules this batch added. A local catalogue rather than
+    /// Only this crate's seven rules. A local catalogue rather than
     /// the root's `REGISTRY`: this crate cannot name that (it is the
     /// composition root's, and naming it would be a cycle), and a catalogue of
     /// exactly these seven makes "which rule fired" an equality assertion
@@ -481,7 +481,7 @@ mod realistic_code_tests {
     /// The second liveness proof, on a real repository file rather than a
     /// string in this module: `tests/fixtures/lint_golden/broad.lisp` writes
     /// `(return-from blk nil)` at top level, with no `blk` anywhere, and this
-    /// batch's first rule sees it.
+    /// first rule in this crate sees it.
     ///
     /// Paired with the sweep above, the two together say the harness reads
     /// repository files, and that reading them can produce both answers.

@@ -1,11 +1,6 @@
 //! `dolist-result-form-references-loop-variable`: a `dolist` result form
 //! reading the loop variable, which the standard binds to `nil` there.
 //!
-//! The analysis lives in
-//! [`crate::dolist_result_form_references_loop_variable::domain`], which also
-//! backs the standalone `inspect dolist-result-form-references-loop-variable`
-//! command; this module only registers it with the lint suite and phrases its
-//! findings.
 
 use paredit_core_lint_engine::LintResult;
 

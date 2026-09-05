@@ -135,8 +135,6 @@ fn takes_a_lock(view: &ExpressionView) -> bool {
     head_is(view, LOCK_SCOPE_HEADS) || head_is(view, MANUAL_ACQUIRE_HEADS)
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_lock_scope(
     view: &ExpressionView,
     lock_form_count: &mut usize,

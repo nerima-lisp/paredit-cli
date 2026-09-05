@@ -1,8 +1,5 @@
 //! `explicit-nil-return`: a return/return-from with an explicit nil result, the default ((return nil) is (return)).
 //!
-//! The analysis lives in [`crate::explicit_nil_return::domain`], which also backs the
-//! standalone `inspect explicit-nil-return` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

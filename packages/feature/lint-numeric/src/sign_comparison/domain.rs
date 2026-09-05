@@ -17,8 +17,6 @@
 //! comparison, a `0.0`/`#x0` spelling, a degenerate `(= 0 0)`, and a
 //! reader-conditional operand are all left alone.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -64,8 +62,6 @@ pub struct SignComparisonItem {
     pub predicate: &'static str,
     /// The span of the non-zero operand `X`.
     ///
-    /// The rewrite's input, not the report's: the lint rule copies `X`'s source
-    /// to build `(predicate X)`, and the command has never printed it.
     pub operand_span: ByteSpan,
 }
 
@@ -94,8 +90,6 @@ impl Finding for SignComparisonItem {
         vec![("predicate", json!(self.predicate))]
     }
 
-    /// The same sentence the `sign-comparison` lint rule writes, so a SARIF or
-    /// JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!(
             "comparison against 0 has a dedicated predicate; use {}",
@@ -148,10 +142,7 @@ pub fn examine_comparison(
 /// Collects every sign comparison in one file, with the number of `=`/`>`/`<`
 /// forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no comparison against 0 here" for Common
-/// Lisp and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_sign_comparison_report(
     path: &Path,
     dialect: Dialect,
@@ -197,7 +188,6 @@ mod tests {
             .expect("build sign comparison report")
     }
 
-    /// The `(comparison_form_count, violations)` pair the report is built from.
     fn comparisons(input: &str) -> (u64, Vec<SignComparisonItem>) {
         let report = report(input);
         let count = report
@@ -301,8 +291,6 @@ mod tests {
         assert_eq!(violations[0].predicate, "plusp");
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(= n 0)", Dialect::Clojure).expect("parse");

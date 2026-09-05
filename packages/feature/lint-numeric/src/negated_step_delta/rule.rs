@@ -1,8 +1,5 @@
 //! `negated-step-delta`: an incf/decf with a negative literal delta, which flips the operator ((incf x -1) is (decf x)).
 //!
-//! The analysis lives in [`crate::negated_step_delta::domain`], which also backs the
-//! standalone `inspect negated-step-delta` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

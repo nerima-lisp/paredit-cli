@@ -283,8 +283,6 @@ fn reference_bindings_of(bindings: &ExpressionView) -> Vec<ReferenceBinding> {
     found
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_reference_bindings(
     view: &ExpressionView,
     reference_binding_count: &mut usize,

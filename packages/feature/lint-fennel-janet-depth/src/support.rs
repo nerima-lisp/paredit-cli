@@ -17,7 +17,7 @@
 //! The quote model is the two-counter one from
 //! `paredit_feature_lint_condition_system::support`, which is private to that
 //! crate; a single `i32` depth counter is wrong (`'` never clears, `` ` ``
-//! does) and has shipped as a false-positive source before. Both dialects have
+//! does) and produces false positives. Both dialects have
 //! `'`/`` ` ``/`,` — Fennel spells quasiquote `` ` `` and Janet spells it `~`,
 //! and the reader maps both onto [`ReaderPrefix::Quasiquote`] — so the guard is
 //! needed here for exactly the same reason it is needed in Common Lisp.

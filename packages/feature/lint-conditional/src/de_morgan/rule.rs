@@ -1,8 +1,5 @@
 //! `de-morgan`: an and/or of all negations, collapsible by De Morgan ((and (not a) (not b)) is (not (or a b))).
 //!
-//! The analysis lives in [`crate::de_morgan::domain`], which also backs the
-//! standalone `inspect de-morgan` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

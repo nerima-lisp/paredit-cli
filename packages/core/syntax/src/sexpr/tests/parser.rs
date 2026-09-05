@@ -2398,7 +2398,7 @@ fn lfe_hash_letter_collections_do_not_leak_into_other_dialects() {
     }
 }
 
-/// The two lexical switches this change added, pinned per dialect.
+/// The two LFE lexical switches, pinned per dialect.
 ///
 /// The table is worth more than the prose: `bar_quoting` replaced a boolean,
 /// and its mapping has to stay exactly what that boolean was for the ten
@@ -3113,8 +3113,7 @@ fn emacs_lisp_radix_arm_leaves_the_other_sharp_forms_refused() {
 /// `#x`/`#b`/`#o` are Common Lisp and Scheme radix syntax too, and `#<n>r` is
 /// Common Lisp's and LFE's, so this is the pin that would catch the arm being
 /// widened past the dialect it was written for. Each expectation below is what
-/// the dialect's own reader does, and every one of them was verified
-/// byte-identical between binaries built before and after this change:
+/// the dialect's own reader does:
 ///
 /// * Common Lisp already returned `None` for these bytes (CLHS 2.4.8.6-2.4.8.9),
 ///   so it always read them as single atoms. Emacs Lisp now matches it exactly.
@@ -3930,11 +3929,10 @@ fn scheme_reads_gambit_namespace_qualified_identifiers() {
 /// `##` does not leak into dialects that never asked for it, and does not
 /// regress the dialects that already read it their own way.
 ///
-/// Four of the nine already read `##car` as an ordinary token before this
-/// change: Clojure because `##Inf`/`##NaN` are its symbolic values, Fennel
+/// Four of the nine read `##car` as an ordinary token: Clojure because
+/// `##Inf`/`##NaN` are its symbolic values, Fennel
 /// because `#` is its `hashfn` shorthand, and LFE and Hy through their own
-/// tables. Asserting a refusal for them would fail on behaviour this change
-/// never touched.
+/// tables. Asserting a refusal for them would contradict their reader tables.
 #[test]
 fn scheme_hash_hash_stays_scoped_to_scheme() {
     for dialect in [
@@ -3956,7 +3954,7 @@ fn scheme_hash_hash_stays_scoped_to_scheme() {
     for dialect in [Dialect::Clojure, Dialect::Lfe, Dialect::Hy, Dialect::Fennel] {
         assert!(
             SyntaxTree::parse_with_dialect("(f ##car)", dialect).is_ok(),
-            "{dialect:?} read `##car` before this change and must still"
+            "{dialect:?} should read `##car` as an ordinary token"
         );
     }
 }

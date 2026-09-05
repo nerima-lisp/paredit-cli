@@ -14,8 +14,6 @@
 //! Complements [`crate::setf_arity::domain`] (which checks the argument
 //! *count*) by checking each place's *validity*.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -111,15 +109,11 @@ impl Finding for SetqNonVariableItem {
         ]
     }
 
-    /// The same sentence the `setq-non-variable` lint rule writes, so a SARIF
-    /// or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!("{} place {} is not a variable", self.operator, self.place)
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_setq(
     view: &ExpressionView,
     assignment_form_count: &mut usize,
@@ -159,10 +153,7 @@ pub fn examine_setq(
 /// Collects every `setq`/`psetq` place that is not a variable in one file, with
 /// the number of `setq`/`psetq` forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "every place here is a variable" for
-/// Common Lisp and "nothing was looked for" for Clojure, and the two read
-/// identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_setq_non_variable_report(
     path: &Path,
     dialect: Dialect,
@@ -208,7 +199,6 @@ mod tests {
             .expect("build setq non variable report")
     }
 
-    /// The `(assignment_form_count, violations)` pair the report is built from.
     fn violations(input: &str) -> (u64, Vec<SetqNonVariableItem>) {
         let report = report(input);
         let count = report
@@ -298,8 +288,6 @@ mod tests {
         assert_eq!(items.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =

@@ -1,8 +1,5 @@
 //! `char-case-fold`: a char= of two same-case-folded operands ((char= (char-downcase a) (char-downcase b)) is (char-equal a b)).
 //!
-//! The analysis lives in [`crate::char_case_fold::domain`], which also backs the
-//! standalone `inspect char-case-fold` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -1,9 +1,6 @@
 //! `giant-conditional-form`: a `let`/`let*`/`cond`/`case`-family form
 //! carrying more bindings or clauses than a configurable threshold.
 //!
-//! The analysis lives in [`crate::giant_conditional_form::domain`], which also
-//! backs the standalone `inspect giant-conditional-form` command; this module
-//! only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

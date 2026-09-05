@@ -157,8 +157,6 @@ pub fn is_exempt_system_name(name: &str) -> bool {
         .any(|segment| SUPPORT_SEGMENTS.contains(&segment))
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 ///
 /// `checked_system_count` counts only the systems this rule has an opinion
 /// about — see [`is_exempt_system_name`] on why support systems are excluded
@@ -194,10 +192,7 @@ pub fn examine_defsystem(
 /// Collects every primary system with no `:version` in one file, with the
 /// number of primary systems scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "every system here is versioned" for
-/// Common Lisp and "nothing was looked for" for Clojure, and the two read
-/// identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_asdf_system_missing_version_report(
     path: &Path,
     dialect: Dialect,

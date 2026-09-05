@@ -19,8 +19,6 @@
 //! beyond skipping an inner form that itself carries a reader prefix
 //! (`,(or …)`/`#'(or …)`), which is not a plain boolean subform.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -57,8 +55,6 @@ pub struct NestedBooleanItem {
     /// The span of the inner form's interior (`op`'s operands, parens excluded),
     /// which a fix splices in place of the wrapper.
     ///
-    /// The rewrite's input, not the report's: the lint rule slices it to build
-    /// the replacement, and the command has never printed it.
     pub inner_span: ByteSpan,
     /// The shared operator (`and`/`or`), for the finding message.
     pub operator: &'static str,
@@ -89,17 +85,12 @@ impl Finding for NestedBooleanItem {
         vec![("operator", json!(self.operator))]
     }
 
-    /// The same sentence the `nested-boolean` lint rule writes, so a SARIF or
-    /// JUnit consumer reading both sees one finding described one way.
-    /// Load-bearing here, since this finding has no text columns of its own.
     fn message(&self) -> String {
         let operator = self.operator;
         format!("{operator} nested in a {operator} flattens; its operands splice in")
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_boolean(
     view: &ExpressionView,
     boolean_form_count: &mut usize,
@@ -143,10 +134,7 @@ pub fn examine_boolean(
 /// in one file, with the number of `and`/`or` forms scanned as the denominator
 /// beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no redundant nesting here" for Common
-/// Lisp and "nothing was looked for" for Fennel, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_nested_boolean_report(
     path: &Path,
     dialect: Dialect,
@@ -192,7 +180,6 @@ mod tests {
             .expect("build nested boolean report")
     }
 
-    /// The `(boolean_form_count, violations)` pair the report is built from.
     fn nested(input: &str) -> (u64, Vec<NestedBooleanItem>) {
         let report = report(input);
         let count = report
@@ -283,8 +270,6 @@ mod tests {
         assert!(violations.is_empty());
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =

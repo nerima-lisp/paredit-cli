@@ -121,8 +121,6 @@ fn defines_its_own_methods(view: &ExpressionView) -> bool {
     })
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_generic_function_no_methods(
     tree: &SyntaxTree,
     view: &ExpressionView,
@@ -178,9 +176,7 @@ fn installs_methods_by_hand(tree: &SyntaxTree) -> bool {
 /// Collects every method-less generic function in one file, with the number of
 /// `defgeneric` forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "every generic here has a method" for
-/// Common Lisp and "nothing was looked for" for Clojure.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_generic_function_no_methods_report(
     path: &Path,
     dialect: Dialect,

@@ -1,8 +1,6 @@
 //! `docstring-example-stale-arity`: a worked example in a docstring calling the
 //! function it documents with an argument count that function no longer takes.
 //!
-//! The analysis lives in [`crate::docstring_example_stale_arity::domain`]; this
-//! module declares the rule's metadata and its head filter.
 
 use paredit_core_lint_engine::LintResult;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};

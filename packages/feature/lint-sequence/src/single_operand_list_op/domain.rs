@@ -18,8 +18,6 @@
 //! The fix replaces the whole form with the argument's source, so the rule is
 //! auto-fixable.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -64,9 +62,6 @@ pub struct SingleOperandListOpItem {
     pub span: ByteSpan,
     /// The span of the sole argument `x`.
     ///
-    /// The rewrite's input, not the report's: the lint rule reads it to splice
-    /// the argument in over the whole form, and neither renderer ever printed
-    /// it.
     pub arg_span: ByteSpan,
     /// The operator name (`append`/`nconc`/`list*`), for the finding message.
     pub head: String,
@@ -93,16 +88,12 @@ impl Finding for SingleOperandListOpItem {
         vec![("head", json!(self.head))]
     }
 
-    /// The same sentence the `single-operand-list-op` lint rule writes, so a
-    /// SARIF or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         let head = &self.head;
         format!("{head} of one argument returns it unchanged; ({head} x) is x")
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_form(
     view: &ExpressionView,
     list_op_form_count: &mut usize,
@@ -141,10 +132,7 @@ pub fn examine_form(
 /// Collects every single-argument `append`/`nconc`/`list*` in one file, with
 /// the number of such forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "every list op here does something" for
-/// Common Lisp and "nothing was looked for" for Clojure, and the two read
-/// identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_single_operand_list_op_report(
     path: &Path,
     dialect: Dialect,
@@ -190,7 +178,6 @@ mod tests {
             .expect("build single-operand list op report")
     }
 
-    /// The `(list_op_form_count, violations)` pair the report is built from.
     fn forms(input: &str) -> (u64, Vec<SingleOperandListOpItem>) {
         let report = report(input);
         let count = report
@@ -271,8 +258,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(append xs)", Dialect::Clojure).expect("parse");

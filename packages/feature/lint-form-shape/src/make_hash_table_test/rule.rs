@@ -1,8 +1,5 @@
 //! `make-hash-table-test`: a make-hash-table with an explicit :test 'eql, the default ((make-hash-table :test 'eql) is (make-hash-table)).
 //!
-//! The analysis lives in [`crate::make_hash_table_test::domain`], which also backs the
-//! standalone `inspect make-hash-table-test` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

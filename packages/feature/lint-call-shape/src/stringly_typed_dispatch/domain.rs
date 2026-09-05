@@ -275,9 +275,6 @@ fn form_context_at(tree: &SyntaxTree, target: ByteSpan, source: &str) -> Option<
     })
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// `cond` and `if` through the single dispatch pass instead of walking the tree
-/// again.
 pub fn examine_dispatch(
     tree: &SyntaxTree,
     view: &ExpressionView,

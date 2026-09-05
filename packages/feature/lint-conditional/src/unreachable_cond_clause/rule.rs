@@ -1,8 +1,5 @@
 //! `unreachable-cond-clause`: a cond clause after a t catch-all that can never run.
 //!
-//! The analysis lives in [`crate::unreachable_cond_clause::domain`], which also backs the
-//! standalone `inspect unreachable-cond-clause` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

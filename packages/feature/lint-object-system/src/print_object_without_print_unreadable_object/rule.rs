@@ -1,11 +1,6 @@
 //! `print-object-without-print-unreadable-object`: a `print-object` method that
 //! writes to the stream directly.
 //!
-//! The analysis lives in
-//! [`crate::print_object_without_print_unreadable_object::domain`], which also
-//! backs the standalone `inspect print-object-without-print-unreadable-object`
-//! command; this module only registers it with the lint suite and phrases its
-//! findings.
 
 use paredit_core_lint_engine::LintResult;
 

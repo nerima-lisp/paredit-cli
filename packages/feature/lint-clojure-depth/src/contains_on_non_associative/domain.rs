@@ -186,8 +186,6 @@ fn sequence_spelling(view: &ExpressionView) -> Option<String> {
         .then(|| list_head(view).map_or_else(|| "seq".to_owned(), |head| format!("{head} …")))
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_contains(
     view: &ExpressionView,
     contains_count: &mut usize,

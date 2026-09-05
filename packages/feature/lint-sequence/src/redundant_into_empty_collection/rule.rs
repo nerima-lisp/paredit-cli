@@ -1,9 +1,5 @@
 //! `redundant-into-empty-collection`: an into onto an empty vector or set, which is a direct conversion ((into [] coll) is (vec coll)).
 //!
-//! The analysis lives in [`crate::redundant_into_empty_collection::domain`],
-//! which also backs the standalone `inspect redundant-into-empty-collection`
-//! command; this module only registers it with the lint suite and phrases its
-//! findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -1,8 +1,5 @@
 //! `manual-incf`: a setf/setq that manually increments a variable ((setf x (1+ x)) is (incf x)).
 //!
-//! The analysis lives in [`crate::manual_incf::domain`], which also backs the
-//! standalone `inspect manual-incf` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

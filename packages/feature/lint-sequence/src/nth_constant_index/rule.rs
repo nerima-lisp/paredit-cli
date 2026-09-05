@@ -1,8 +1,5 @@
 //! `nth-constant-index`: an nth with a small constant index that has an ordinal accessor ((nth 0 x) is (first x)).
 //!
-//! The analysis lives in [`crate::nth_constant_index::domain`], which also backs the
-//! standalone `inspect nth-constant-index` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

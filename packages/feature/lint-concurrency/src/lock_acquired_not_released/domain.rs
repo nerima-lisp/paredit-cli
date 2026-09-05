@@ -201,8 +201,6 @@ fn protected_by_ancestor(chain: &[&ExpressionView]) -> bool {
     })
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 ///
 /// Needs the tree because the verdict depends on what encloses the acquisition,
 /// and [`paredit_core_lint_engine::engine::RuleContext`] carries no parent

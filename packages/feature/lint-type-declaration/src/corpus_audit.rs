@@ -2,11 +2,9 @@
 //! corpus of third-party Common Lisp and prints findings with their locations.
 //!
 //! Author-written tests encode the author's model of the language, not the
-//! language. A sibling batch shipped ten rules that passed their own suites and
-//! a sweep of this repository's fixtures; an audit over 3163 files nobody
-//! involved had written produced 653 findings, killed one rule outright and
-//! narrowed four more. So this exists, and it is `#[ignore]`d only because the
-//! corpus is not checked in.
+//! language. This audit uses third-party files to expose false positives that
+//! local fixtures may miss. It is `#[ignore]`d because the corpus is not
+//! checked in.
 //!
 //! ```text
 //! PAREDIT_DECL_CORPUS=/path/to/MANIFEST.txt \

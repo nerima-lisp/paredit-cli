@@ -1,9 +1,5 @@
 //! `set-membership-via-linear-scan`: a member against a long literal list of symbols, which is a set in disguise.
 //!
-//! The analysis lives in [`crate::set_membership_via_linear_scan::domain`],
-//! which also backs the standalone `inspect set-membership-via-linear-scan`
-//! command; this module only registers it with the lint suite and phrases its
-//! findings.
 
 use paredit_core_lint_engine::LintResult;
 

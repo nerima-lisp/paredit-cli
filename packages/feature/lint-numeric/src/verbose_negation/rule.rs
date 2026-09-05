@@ -1,8 +1,5 @@
 //! `verbose-negation`: negation written the long way ((- 0 x) and (* x -1) are (- x)).
 //!
-//! The analysis lives in [`crate::verbose_negation::domain`], which also backs the
-//! standalone `inspect verbose-negation` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

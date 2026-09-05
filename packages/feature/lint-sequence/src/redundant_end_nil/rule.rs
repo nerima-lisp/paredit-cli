@@ -1,8 +1,5 @@
 //! `redundant-end-nil`: a bounded-sequence call with an explicit :end nil, the default ((find x seq :end nil) is (find x seq)).
 //!
-//! The analysis lives in [`crate::redundant_end_nil::domain`], which also backs the
-//! standalone `inspect redundant-end-nil` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

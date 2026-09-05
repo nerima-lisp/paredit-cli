@@ -1,11 +1,6 @@
 //! `scheme-let-star-independent-bindings`: a `let*` whose bindings cannot
 //! depend on one another.
 //!
-//! The analysis lives in [`crate::let_star_independent_bindings::domain`],
-//! which also backs the standalone
-//! `inspect scheme-let-star-independent-bindings` command; this module only
-//! registers it with the lint suite and phrases its findings.
-
 use paredit_core_lint_engine::LintResult;
 
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};

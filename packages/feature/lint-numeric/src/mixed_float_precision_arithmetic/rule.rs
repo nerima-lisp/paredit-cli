@@ -1,10 +1,6 @@
 //! `mixed-float-precision-arithmetic`: a single-float literal beside a
 //! double-float literal in one arithmetic form.
 //!
-//! The analysis lives in [`crate::mixed_float_precision_arithmetic::domain`],
-//! which also backs the standalone `inspect mixed-float-precision-arithmetic`
-//! command; this module only registers it with the lint suite and phrases its
-//! findings.
 
 use paredit_core_lint_engine::LintResult;
 

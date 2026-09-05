@@ -1,11 +1,6 @@
 //! `go-block-blocking-channel-op`: a `!!` channel operation on a go-block
 //! thread.
 //!
-//! The analysis lives in
-//! [`crate::go_block_blocking_channel_op::domain`], which also backs the
-//! standalone `inspect go-block-blocking-channel-op` command; this module only
-//! registers it with the lint suite and phrases its findings.
-
 use paredit_core_lint_engine::LintResult;
 
 use crate::go_block_blocking_channel_op::domain::examine_go_block;

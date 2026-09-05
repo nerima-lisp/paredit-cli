@@ -1,8 +1,5 @@
 //! `nested-string-case`: nested string case ops where the outer dominates ((string-upcase (string-downcase s)) is (string-upcase s)).
 //!
-//! The analysis lives in [`crate::nested_string_case::domain`], which also backs the
-//! standalone `inspect nested-string-case` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

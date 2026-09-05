@@ -280,10 +280,7 @@ pub fn examine_match(
 /// Collects every unreachable `match` clause in one file, with the number of
 /// `match`-family forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no dead clause here" for Racket and
-/// "nothing was looked for" elsewhere, and the two read identically without the
-/// flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_match_unreachable_clause_report(
     path: &Path,
     dialect: Dialect,

@@ -15,8 +15,6 @@
 //! The fix rewrites `(code-char (char-code c))` as `c`, copying the character
 //! operand verbatim, so the rule is auto-fixable.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -65,8 +63,6 @@ impl Finding for CodeCharCharCodeItem {
         vec![("char_span", span_json(self.char_span))]
     }
 
-    /// The same sentence the `code-char-char-code` lint rule writes, so a SARIF
-    /// or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         "code-char of char-code is a round-trip; (code-char (char-code c)) is c".to_owned()
     }
@@ -76,8 +72,6 @@ fn span_json(span: ByteSpan) -> Value {
     json!({ "start": span.start().get(), "end": span.end().get() })
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
     code_char_form_count: &mut usize,
@@ -123,10 +117,7 @@ pub fn examine(
 /// Collects every `(code-char (char-code c))` in one file, with the number of
 /// `code-char` forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no round-trip here" for Common Lisp and
-/// "nothing was looked for" for Clojure, and the two read identically without
-/// the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_code_char_char_code_report(
     path: &Path,
     dialect: Dialect,
@@ -172,7 +163,6 @@ mod tests {
             .expect("build code char char code report")
     }
 
-    /// The `(code_char_form_count, violations)` pair the report is built from.
     fn code_chars(input: &str) -> (u64, Vec<CodeCharCharCodeItem>) {
         let report = report(input);
         let count = report
@@ -228,8 +218,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(code-char (char-code c))", Dialect::Clojure)

@@ -1,10 +1,6 @@
 //! `defpackage-without-in-package`: a file that declares a package, defines
 //! things, and never enters it.
 //!
-//! The analysis lives in [`crate::defpackage_without_in_package::domain`],
-//! which also backs the standalone `inspect defpackage-without-in-package`
-//! command; this module only registers it with the lint suite and phrases its
-//! findings.
 //!
 //! # Why this is `WholeTree` and not `Heads`
 //!

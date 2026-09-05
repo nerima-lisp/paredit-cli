@@ -223,8 +223,6 @@ fn calls_next_method(body: &[ExpressionView]) -> bool {
     false
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 ///
 /// `perform_method_count` counts only the methods this rule has an opinion
 /// about — primary `perform` methods on a build operation and a standard
@@ -297,10 +295,7 @@ pub const fn standard_component_classes() -> [&'static str; 4] {
 /// Collects every non-composing primary `perform` method in one file, with the
 /// number of in-scope `perform` methods scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "every such method composes" for Common
-/// Lisp and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_asdf_perform_without_call_next_method_report(
     path: &Path,
     dialect: Dialect,

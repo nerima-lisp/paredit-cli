@@ -1,8 +1,5 @@
 //! `append-list-to-cons`: a one-element append that is just a cons ((append (list x) rest) is (cons x rest)).
 //!
-//! The analysis lives in [`crate::append_list_to_cons::domain`], which also backs the
-//! standalone `inspect append-list-to-cons` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -1,7 +1,5 @@
 //! `todo-fixme-no-attribution`: a task marker with no owner, ticket, or date.
 //!
-//! The analysis lives in [`crate::todo_fixme_no_attribution::domain`]; this
-//! module declares the rule's metadata and its head filter.
 //!
 //! # Why this is `WholeTree` and not `Heads`
 //!

@@ -1,8 +1,5 @@
 //! `sign-comparison`: a =/</> comparison against 0 with a dedicated predicate ((= x 0) is (zerop x)).
 //!
-//! The analysis lives in [`crate::sign_comparison::domain`], which also backs the
-//! standalone `inspect sign-comparison` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

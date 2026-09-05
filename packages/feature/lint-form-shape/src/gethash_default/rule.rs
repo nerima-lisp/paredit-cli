@@ -1,8 +1,5 @@
 //! `gethash-default`: a gethash with an explicit nil default, the default ((gethash k h nil) is (gethash k h)).
 //!
-//! The analysis lives in [`crate::gethash_default::domain`], which also backs the
-//! standalone `inspect gethash-default` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

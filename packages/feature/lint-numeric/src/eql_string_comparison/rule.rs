@@ -1,8 +1,5 @@
 //! `eql-string-comparison`: an eq/eql compared against a string literal (never reliably eql).
 //!
-//! The analysis lives in [`crate::eql_string_comparison::domain`], which also backs the
-//! standalone `inspect eql-string-comparison` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

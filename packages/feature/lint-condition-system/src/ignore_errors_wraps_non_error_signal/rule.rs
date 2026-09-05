@@ -1,9 +1,5 @@
 //! `ignore-errors-wraps-non-error-signal`: a guard that guards nothing.
 //!
-//! The analysis lives in
-//! [`crate::ignore_errors_wraps_non_error_signal::domain`], which also backs the
-//! standalone `inspect ignore-errors-wraps-non-error-signal` command; this
-//! module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -1,8 +1,5 @@
 //! `nthcdr-small-index`: an nthcdr with a 1-4 count that has a named cdr accessor ((nthcdr 2 x) is (cddr x)).
 //!
-//! The analysis lives in [`crate::nthcdr_small_index::domain`], which also backs the
-//! standalone `inspect nthcdr-small-index` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

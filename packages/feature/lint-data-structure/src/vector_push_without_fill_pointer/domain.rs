@@ -235,8 +235,6 @@ fn assigns_global(tree: &SyntaxTree, wanted: &str) -> bool {
         })
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 ///
 /// The head match and the "is the vector a plain name" check are local reads on
 /// this node; only once both hold does anything ask for the binding table,

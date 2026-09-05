@@ -1,8 +1,5 @@
 //! `redundant-boolean-identity`: an and/or with a redundant identity operand (t in and, nil in or; (and a t b) is (and a b)).
 //!
-//! The analysis lives in [`crate::redundant_boolean_identity::domain`], which also backs the
-//! standalone `inspect redundant-boolean-identity` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

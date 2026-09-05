@@ -1,8 +1,5 @@
 //! `sleep-in-test`: a wall-clock sleep inside a test body.
 //!
-//! The analysis lives in [`crate::sleep_in_test::domain`], which also backs the
-//! standalone `inspect sleep-in-test` command; this module only registers it
-//! with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

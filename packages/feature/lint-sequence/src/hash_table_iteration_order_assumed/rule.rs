@@ -1,9 +1,5 @@
 //! `hash-table-iteration-order-assumed`: an element read by position out of a hash table's iteration, whose order is unspecified.
 //!
-//! The analysis lives in [`crate::hash_table_iteration_order_assumed::domain`],
-//! which also backs the standalone `inspect
-//! hash-table-iteration-order-assumed` command; this module only registers it
-//! with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

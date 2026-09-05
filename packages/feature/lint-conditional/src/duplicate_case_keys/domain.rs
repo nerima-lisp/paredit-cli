@@ -103,8 +103,6 @@ impl Finding for DuplicateCaseKeyItem {
         ]
     }
 
-    /// The same sentence the `duplicate-case-keys` lint rule writes, so a SARIF
-    /// or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!(
             "{} repeats key {} ({}×)",
@@ -113,8 +111,6 @@ impl Finding for DuplicateCaseKeyItem {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_case(
     view: &ExpressionView,
     case_form_count: &mut usize,
@@ -162,10 +158,7 @@ pub fn examine_case(
 /// Collects every duplicated `case`/`ecase`/`ccase` key in one file, with the
 /// number of such forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no repeated key here" for Common Lisp
-/// and "nothing was looked for" for Fennel, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_duplicate_case_key_report(
     path: &Path,
     dialect: Dialect,
@@ -211,7 +204,6 @@ mod tests {
             .expect("build duplicate case key report")
     }
 
-    /// The `(case_form_count, duplicates)` pair the report is built from.
     fn duplicates(input: &str) -> (u64, Vec<DuplicateCaseKeyItem>) {
         let report = report(input);
         let count = report
@@ -273,8 +265,6 @@ mod tests {
         assert!(duplicates.is_empty());
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(case x (:a 1) (:a 2))", Dialect::Clojure)

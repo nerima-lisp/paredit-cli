@@ -19,8 +19,6 @@
 //! The fix rewrites the whole `(not (OP a b))` form as `(COMPLEMENT a b)`,
 //! copying the operands' source verbatim, so the rule is auto-fixable.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -62,8 +60,6 @@ pub struct NegatedComparisonItem {
     pub complement: &'static str,
     /// The span covering the two operands (`a b`), reused verbatim in the fix.
     ///
-    /// The rewrite's input, not the report's: the lint rule slices it to build
-    /// the replacement, and the command has never printed it.
     pub operands_span: ByteSpan,
 }
 
@@ -89,8 +85,6 @@ impl Finding for NegatedComparisonItem {
         vec![("complement", json!(self.complement))]
     }
 
-    /// The same sentence the `negated-comparison` lint rule writes, so a SARIF
-    /// or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!(
             "negated comparison has a complement operator; use {}",
@@ -99,8 +93,6 @@ impl Finding for NegatedComparisonItem {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_negation(
     view: &ExpressionView,
     negation_form_count: &mut usize,
@@ -147,10 +139,7 @@ pub fn examine_negation(
 /// Collects every negated two-argument comparison in one file, with the number
 /// of `not`/`null` forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no negated comparison here" for Common
-/// Lisp and "nothing was looked for" for Fennel, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_negated_comparison_report(
     path: &Path,
     dialect: Dialect,
@@ -196,7 +185,6 @@ mod tests {
             .expect("build negated comparison report")
     }
 
-    /// The `(negation_form_count, violations)` pair the report is built from.
     fn negations(input: &str) -> (u64, Vec<NegatedComparisonItem>) {
         let report = report(input);
         let count = report
@@ -287,8 +275,6 @@ mod tests {
         assert_eq!(violations[0].complement, "/=");
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =

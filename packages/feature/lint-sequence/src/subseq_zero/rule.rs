@@ -1,8 +1,5 @@
 //! `subseq-zero`: a subseq from index 0, a whole-sequence copy ((subseq seq 0) is (copy-seq seq)).
 //!
-//! The analysis lives in [`crate::subseq_zero::domain`], which also backs the
-//! standalone `inspect subseq-zero` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -1,16 +1,10 @@
 # paredit-feature-lint-hy-depth
 
-Lint rules for Hy, grounded in the Python semantics Hy compiles to.
+Lint rules for Hy based on the semantics of its generated Python AST.
 
-Hy is Python in s-expressions: it compiles to a Python AST, so it inherits
-Python's semantics exactly, and Python's own linters are a ready-made,
-already-validated rule catalogue. This package is the layer *below* the obvious
-transplants — the ones the sibling `lint-hy-lfe-idiom` already took.
+## Scope
 
-## What this package does not contain, and why
-
-The obvious Ruff/pylint transplants are already shipped elsewhere. Anything
-proposed for this package had to clear them first:
+Related checks already live elsewhere:
 
 | Python rule | Status | Where |
 | --- | --- | --- |
@@ -26,8 +20,7 @@ gensym spellings (`hy.gensym`, `gensym`), Hy's binding forms (`let`, `with`,
 `for`) and reports `HygieneRisk::VariableCapture`. A macro hygiene lint rule
 here would restate it.
 
-Two further candidates were dropped before implementation, on facts rather than
-taste:
+Two other candidates are omitted:
 
 - **Threading-macro arity (`->`, `->>`).** Not viable inside a macro template,
   which is where the interesting cases are. See the quoting note below.
@@ -131,8 +124,8 @@ generated, or not Hy at all (one is a GPL licence text with a `.hy` extension;
 one is Hy's own `compiler_error.hy` test resource, deliberately malformed).
 
 **The real parse rate against valid Hy is 3594/3596, and the two residual
-over-refusals do *not* share a cause.** Both are reported here rather than
-fixed: `packages/core/**` is out of scope for this batch.
+over-refusals do *not* share a cause.** Both are in `packages/core/syntax`,
+outside this crate.
 
 ### Gap 1 — `~` immediately followed by an f-string
 
@@ -206,10 +199,9 @@ a Hy template is therefore sound except across `~(`.
 `support.rs` carries its own copy of the two-counter `QuoteState`
 (`hard: bool` + `quasi: u32`) from
 `packages/feature/lint-condition-system/src/support.rs`, as the other packages
-do. A single `i32` depth counter is wrong and has shipped in this workspace as a
-false-positive source twice. **A consolidation is in flight and this copy should
-move into it** — and whoever does that should keep the `~(`-produces-a-bare-`~`
-detail, which a flattening refactor would lose.
+do. A single `i32` depth counter cannot distinguish hard quotes from nested
+quasiquotes and therefore produces false positives. Any shared implementation
+must preserve the `~(`-produces-a-bare-`~` detail.
 
 ## Cost
 

@@ -1,8 +1,5 @@
 //! `handler-case-no-clauses`: a handler-case with no handler clauses, which is just its body ((handler-case x) is x).
 //!
-//! The analysis lives in [`crate::handler_case_no_clauses::domain`], which also backs the
-//! standalone `inspect handler-case-no-clauses` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

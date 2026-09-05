@@ -1,8 +1,5 @@
 //! `redundant-funcall`: a funcall of a sharp-quoted symbol ((funcall #'foo a b) is just (foo a b)).
 //!
-//! The analysis lives in [`crate::redundant_funcall::domain`], which also backs the
-//! standalone `inspect redundant-funcall` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

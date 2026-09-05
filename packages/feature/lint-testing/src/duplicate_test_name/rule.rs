@@ -1,10 +1,6 @@
 //! `duplicate-test-name`: two top-level test definitions in one file sharing a
 //! name.
 //!
-//! The analysis lives in [`crate::duplicate_test_name::domain`], which also
-//! backs the standalone `inspect duplicate-test-name` command; this module only
-//! registers it with the lint suite and phrases its findings.
-
 use paredit_core_lint_engine::LintResult;
 
 use crate::duplicate_test_name::domain::shadowing_test_definitions;

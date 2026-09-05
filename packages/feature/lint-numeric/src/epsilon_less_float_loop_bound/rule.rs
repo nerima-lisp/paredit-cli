@@ -1,9 +1,6 @@
 //! `epsilon-less-float-loop-bound`: a `do`/`do*` whose float accumulator is
 //! tested for exact equality against a bound that is not a float literal.
 //!
-//! The analysis lives in [`crate::epsilon_less_float_loop_bound::domain`], which
-//! also backs the standalone `inspect epsilon-less-float-loop-bound` command;
-//! this module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

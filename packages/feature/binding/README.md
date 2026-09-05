@@ -31,8 +31,8 @@ split point.
 
 - **No lint rules.** `shadowed_binding_report`, `empty_let_report`,
   `duplicate_let_binding_report` and friends mention `let` but are *rules*, and
-  belong to Phase 5's `feature/lint-*` packages. Section 5.2.1 lists several of
-  them under F5; grouping a rule with a refactoring because both say "let"
+  belong to `feature/lint-*` packages. Grouping a rule with a refactoring
+  because both say "let"
   would scatter the rule set for no benefit.
 - **No unused-binding removal.** That is `feature/remove-unused`.
 - **No scope analysis.** Whether a binding is captured is answered by

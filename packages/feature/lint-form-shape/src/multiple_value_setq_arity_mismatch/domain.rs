@@ -112,8 +112,6 @@ fn variable_names(list: &ExpressionView) -> Option<Vec<String>> {
     list.children.iter().map(bindable_variable_name).collect()
 }
 
-/// Examines one node. Shared with the lint suite's rule.
-///
 /// Cheapest predicate first: head comparison, then arity of the form itself,
 /// then the two operand shapes. Nothing allocates until both operands have been
 /// confirmed readable.

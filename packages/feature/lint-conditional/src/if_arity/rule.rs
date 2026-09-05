@@ -1,8 +1,5 @@
 //! `if-arity`: an if with the wrong number of arguments (Common Lisp if takes 2 or 3).
 //!
-//! The analysis lives in [`crate::if_arity::domain`], which also backs the
-//! standalone `inspect if-arity` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

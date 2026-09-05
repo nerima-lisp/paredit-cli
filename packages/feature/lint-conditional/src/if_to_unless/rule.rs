@@ -1,8 +1,5 @@
 //! `if-to-unless`: a three-argument if with then=nil ((if c nil e) is (unless c e)).
 //!
-//! The analysis lives in [`crate::if_to_unless::domain`], which also backs the
-//! standalone `inspect if-to-unless` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

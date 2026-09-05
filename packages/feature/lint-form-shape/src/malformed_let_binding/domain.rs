@@ -67,8 +67,6 @@ impl Finding for MalformedLetBindingItem {
         ]
     }
 
-    /// The same sentence the `malformed-let-binding` lint rule writes, so a
-    /// SARIF or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!(
             "let binding {} has {} elements; expected a symbol or (var value)",
@@ -77,8 +75,6 @@ impl Finding for MalformedLetBindingItem {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_let(
     view: &ExpressionView,
     let_form_count: &mut usize,
@@ -118,10 +114,7 @@ pub fn examine_let(
 /// Collects every malformed `let`/`let*` binding in one file, with the number of
 /// `let`/`let*` forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "every binding is well-formed" for Common
-/// Lisp and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_malformed_let_binding_report(
     path: &Path,
     dialect: Dialect,
@@ -167,7 +160,6 @@ mod tests {
             .expect("build malformed let binding report")
     }
 
-    /// The `(let_form_count, violations)` pair the report is built from.
     fn bindings(input: &str) -> (u64, Vec<MalformedLetBindingItem>) {
         let report = report(input);
         let count = report
@@ -241,8 +233,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =

@@ -3,7 +3,6 @@ mod render;
 pub mod types;
 pub mod workflow;
 
-// Hoisted for the composition root (section 4.2).
 pub use args::{
     CreateCheckpointArgs, DeleteCheckpointArgs, ListCheckpointsArgs, RestoreCheckpointArgs,
 };

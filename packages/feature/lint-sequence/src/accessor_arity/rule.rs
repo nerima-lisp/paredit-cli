@@ -1,8 +1,5 @@
 //! `accessor-arity`: an nth/elt/gethash/getf/... accessor with the wrong number of arguments.
 //!
-//! The analysis lives in [`crate::accessor_arity::domain`], which also backs the
-//! standalone `inspect accessor-arity` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

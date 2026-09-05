@@ -2,9 +2,6 @@
 //! of its own body, annotated with whether the target dialect guarantees
 //! tail-call optimization there.
 //!
-//! The analysis lives in [`crate::self_recursive_tail_call::domain`], which
-//! also backs the standalone `inspect self-recursive-tail-call` command; this
-//! module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

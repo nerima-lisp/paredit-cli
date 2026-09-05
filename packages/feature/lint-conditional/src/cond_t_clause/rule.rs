@@ -1,8 +1,5 @@
 //! `cond-t-clause`: a cond with one t clause that has a body ((cond (t a b)) is (progn a b)).
 //!
-//! The analysis lives in [`crate::cond_t_clause::domain`], which also backs the
-//! standalone `inspect cond-t-clause` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

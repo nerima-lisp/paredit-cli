@@ -61,8 +61,6 @@ impl Finding for AroundMethodMissingCallNextMethodItem {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_around_method_missing_call_next_method(
     tree: &SyntaxTree,
     view: &ExpressionView,
@@ -105,9 +103,7 @@ pub fn examine_around_method_missing_call_next_method(
 /// Collects every short-circuiting `:around` method in one file, with the
 /// number of `:around` methods scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: standard method combination is a Common Lisp concept, and an empty
-/// finding list would otherwise read as "every :around here is fine".
+/// Reports unsupported dialects as unmodelled.
 pub fn build_around_method_missing_call_next_method_report(
     path: &Path,
     dialect: Dialect,

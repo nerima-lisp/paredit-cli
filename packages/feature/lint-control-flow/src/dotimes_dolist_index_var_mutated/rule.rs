@@ -1,10 +1,6 @@
 //! `dotimes-dolist-index-var-mutated`: the iteration variable of a `dotimes`
 //! or `dolist` assigned inside the body.
 //!
-//! The analysis lives in
-//! [`crate::dotimes_dolist_index_var_mutated::domain`], which also backs the
-//! standalone `inspect dotimes-dolist-index-var-mutated` command; this module
-//! only registers it with the lint suite and phrases its findings.
 //!
 //! `Portability` rather than `Suspicious`: what the `dotimes` half reports is
 //! that CLHS leaves the binding strategy — and so the assignment's effect on

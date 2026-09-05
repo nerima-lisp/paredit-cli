@@ -16,14 +16,13 @@ mod contract;
 mod dependency_report;
 mod kill_ring_report;
 
-// Phase 2 facade (section 4.1). args/shared/gate - and shared's io, diff and
-// macos_acl submodules - now live in `paredit-core-cli`. `contract` stays here:
+// `args`, `shared`, and `gate` live in `paredit-core-cli`. `contract` stays here:
 // it enumerates three features' capabilities, which makes it composition root
-// (section 11.5.1).
+// data.
 use paredit_core_cli::{
     CliResult, CommandFailure, CommandResult, args, diagnosis, gate, messages, shared,
 };
-// Phase 3 facade: the composition root sees each slice's Args type and run fn.
+// The composition root imports each feature's CLI slice.
 use paredit_feature_change_summary::change_summary::cli as change_summary;
 use paredit_feature_code_metrics::cohesion_report::cli as cohesion_report;
 use paredit_feature_code_metrics::debt_score_report::cli as debt_score_report;
@@ -909,9 +908,7 @@ mod tests {
 
     #[test]
     fn cli_error_diagnostic_escapes_untrusted_controls() {
-        // A two-level typed chain standing in for what
-        // `anyhow!(..).context(..)` used to build: the point is that each link
-        // is escaped as its own value, not which library nested them.
+        // Each link in a two-level typed chain must be escaped independently.
         let error = paredit_core_cli::CliError::Io {
             context: "open failed".to_owned(),
             source: std::io::Error::other("bad\npath\t\u{1b}[31m\u{202e}"),

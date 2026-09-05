@@ -106,9 +106,6 @@ impl Finding for RedundantPrecisionCoercionItem {
         ]
     }
 
-    /// The same sentence the `redundant-precision-coercion` lint rule writes, so
-    /// a SARIF or JUnit consumer reading both sees one finding described one
-    /// way.
     fn message(&self) -> String {
         format!(
             "{} discards the float {} produces, and the conversion can change the result: \
@@ -151,8 +148,6 @@ fn float_coercion(view: &ExpressionView) -> Option<&'static str> {
         .then_some("coerce")
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 ///
 /// Work is bounded to the matched form's own first argument.
 pub fn examine(
@@ -191,10 +186,7 @@ pub fn examine(
 /// Collects every discarded float coercion in one file, with the number of
 /// truncating forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no discarded coercion here" for Common
-/// Lisp and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_redundant_precision_coercion_report(
     path: &Path,
     dialect: Dialect,
@@ -244,7 +236,6 @@ mod tests {
         .expect("build report")
     }
 
-    /// The `(truncation_form_count, violations)` pair the report is built from.
     fn coercions(input: &str) -> (u64, Vec<RedundantPrecisionCoercionItem>) {
         let report = report(input);
         let count = report

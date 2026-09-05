@@ -1,8 +1,5 @@
 //! `make-array-default-keyword`: a make-array call with an explicit :adjustable nil or :fill-pointer nil, the default ((make-array n :adjustable nil) is (make-array n)).
 //!
-//! The analysis lives in [`crate::make_array_default_keyword::domain`], which also backs the
-//! standalone `inspect make-array-default-keyword` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

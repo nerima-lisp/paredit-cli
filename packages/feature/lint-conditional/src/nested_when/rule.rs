@@ -1,8 +1,5 @@
 //! `nested-when`: a when whose only body is a when, mergeable by and ((when a (when b c)) is (when (and a b) c)).
 //!
-//! The analysis lives in [`crate::nested_when::domain`], which also backs the
-//! standalone `inspect nested-when` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

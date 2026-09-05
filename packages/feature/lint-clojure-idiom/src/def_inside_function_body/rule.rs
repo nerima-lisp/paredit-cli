@@ -1,8 +1,5 @@
 //! `def-inside-function-body`: a namespace Var interned at call time.
 //!
-//! The analysis lives in [`crate::def_inside_function_body::domain`], which
-//! also backs the standalone `inspect def-inside-function-body` command; this
-//! module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

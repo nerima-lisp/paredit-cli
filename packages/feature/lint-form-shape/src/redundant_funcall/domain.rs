@@ -22,8 +22,6 @@
 //! cut — from the `funcall` symbol up to the callee symbol — leaving the callee
 //! and every argument byte-identical. That makes the rule auto-fixable.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -65,8 +63,6 @@ pub struct RedundantFuncallItem {
     /// i.e. everything up to the callee symbol. Deleting this turns
     /// `(funcall #'foo a b)` into `(foo a b)`.
     ///
-    /// The rewrite's input, not the report's: the lint rule reads it to make
-    /// the cut, and the command never printed it.
     pub removal_span: ByteSpan,
 }
 
@@ -89,8 +85,6 @@ impl Finding for RedundantFuncallItem {
         vec![("callee", json!(self.callee))]
     }
 
-    /// The same sentence the `redundant-funcall` lint rule writes, so a SARIF
-    /// or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!(
             "funcall of #'{} is a direct call; (funcall #'{} …) is ({} …)",
@@ -99,8 +93,6 @@ impl Finding for RedundantFuncallItem {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_funcall(
     view: &ExpressionView,
     funcall_form_count: &mut usize,
@@ -137,10 +129,7 @@ pub fn examine_funcall(
 /// Collects every redundant `(funcall #'symbol …)` in one file, with the number
 /// of `funcall` forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no redundant funcall here" for Common
-/// Lisp and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_redundant_funcall_report(
     path: &Path,
     dialect: Dialect,
@@ -186,7 +175,6 @@ mod tests {
             .expect("build redundant funcall report")
     }
 
-    /// The `(funcall_form_count, violations)` pair the report is built from.
     fn funcalls(input: &str) -> (u64, Vec<RedundantFuncallItem>) {
         let report = report(input);
         let count = report
@@ -266,8 +254,6 @@ mod tests {
         assert_eq!(violations[0].callee, "h");
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =

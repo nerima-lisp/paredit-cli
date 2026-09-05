@@ -18,8 +18,6 @@
 //! This is the search-function sibling of `eql-string-comparison` and
 //! `eql-list-comparison`, which cover the same identity pitfall for `eq`/`eql`.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -130,8 +128,6 @@ impl Finding for EqlSearchLiteralItem {
         ]
     }
 
-    /// The same sentence the `eql-search-literal` lint rule writes, so a SARIF
-    /// or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!(
             "{} searches for literal {} with the default eql test; add :test",
@@ -140,8 +136,6 @@ impl Finding for EqlSearchLiteralItem {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_call(
     view: &ExpressionView,
     search_call_count: &mut usize,
@@ -170,10 +164,7 @@ pub fn examine_call(
 /// Collects every default-eql search for a string/list literal in one file,
 /// with the number of search calls scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no default-eql literal search here" for
-/// Common Lisp and "nothing was looked for" for Clojure, and the two read
-/// identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_eql_search_literal_report(
     path: &Path,
     dialect: Dialect,
@@ -219,7 +210,6 @@ mod tests {
             .expect("build eql search literal report")
     }
 
-    /// The `(search_call_count, violations)` pair the report is built from.
     fn searches(input: &str) -> (u64, Vec<EqlSearchLiteralItem>) {
         let report = report(input);
         let count = report
@@ -326,8 +316,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(member \"x\" items)", Dialect::Clojure)

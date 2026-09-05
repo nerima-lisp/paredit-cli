@@ -1,9 +1,6 @@
 //! `redundant-precision-coercion`: a float conversion discarded by the
 //! truncation wrapped immediately around it.
 //!
-//! The analysis lives in [`crate::redundant_precision_coercion::domain`], which
-//! also backs the standalone `inspect redundant-precision-coercion` command;
-//! this module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

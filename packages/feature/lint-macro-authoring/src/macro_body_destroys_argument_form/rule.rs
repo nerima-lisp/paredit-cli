@@ -1,10 +1,6 @@
 //! `macro-body-destroys-argument-form`: a macro expander applying a destructive
 //! operator directly to one of its own parameters.
 //!
-//! The analysis lives in
-//! [`crate::macro_body_destroys_argument_form::domain`], which documents the
-//! SBCL run showing the caller's source form being edited in place with no
-//! diagnostic. This module only registers the rule and phrases its findings.
 
 use paredit_core_cli::report::Finding;
 use paredit_core_lint_engine::LintResult;

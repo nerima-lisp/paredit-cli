@@ -1,9 +1,6 @@
 //! `nested-cond-flattenable`: a cond whose final t clause holds only another
 //! cond.
 //!
-//! The analysis lives in [`crate::nested_cond_flattenable::domain`], which also
-//! backs the standalone `inspect nested-cond-flattenable` command; this module
-//! only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -280,9 +280,8 @@ fn text_starts_with(view: &ExpressionView, character: Option<char>) -> bool {
 /// first group alone would be a table edit; covering the rest needs a
 /// per-form binder shape, and half-doing it would read `(dolist (x list) …)`
 /// as two bindings and report the *list* as a capturable name, which is the
-/// same defect [`binding_entries`] exists to avoid. Left as follow-up rather
-/// than partly done: a capturing `dolist`/`destructuring-bind` template
-/// reports clean today.
+/// same defect [`binding_entries`] exists to avoid. These forms remain outside
+/// this table until their binder shapes can be modeled explicitly.
 const PAREN_BINDING_FORMS: [&str; 4] = ["let", "let*", "flet", "labels"];
 
 /// Binding forms whose second child is a flat `[name value …]` binding

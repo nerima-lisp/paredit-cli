@@ -19,8 +19,6 @@
 //! `(progn …)`, the follow-on `redundant-body-progn` fix splices it during the
 //! same fixpoint pass, so `(if c (progn a b))` converges to `(when c a b)`.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -47,8 +45,6 @@ pub struct OneArmedIfItem {
     pub span: ByteSpan,
     /// The span of the `if` head symbol (lets a fix swap it for `when`).
     ///
-    /// The rewrite's input, not the report's: the lint rule replaces exactly
-    /// this token, and neither the old renderer nor this one prints it.
     pub head_span: ByteSpan,
 }
 
@@ -74,15 +70,11 @@ impl Finding for OneArmedIfItem {
         Vec::new()
     }
 
-    /// The same sentence the `one-armed-if` lint rule writes, so a SARIF or
-    /// JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         "if has no else branch; (if test then) is (when test then)".to_owned()
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_if(
     view: &ExpressionView,
     if_form_count: &mut usize,
@@ -115,10 +107,7 @@ pub fn examine_if(
 /// Collects every one-armed `if` in one file, with the number of `if` forms
 /// scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "every `if` has an else" for Common Lisp
-/// and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_one_armed_if_report(
     path: &Path,
     dialect: Dialect,
@@ -164,7 +153,6 @@ mod tests {
             .expect("build one-armed if report")
     }
 
-    /// The `(if_form_count, violations)` pair the report is built from.
     fn ifs(input: &str) -> (u64, Vec<OneArmedIfItem>) {
         let report = report(input);
         let count = report
@@ -230,8 +218,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =

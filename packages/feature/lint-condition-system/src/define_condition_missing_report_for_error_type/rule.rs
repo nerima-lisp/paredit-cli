@@ -1,11 +1,6 @@
 //! `define-condition-missing-report-for-error-type`: an error with nothing to
 //! say.
 //!
-//! The analysis lives in
-//! [`crate::define_condition_missing_report_for_error_type::domain`], which also
-//! backs the standalone `inspect define-condition-missing-report-for-error-type`
-//! command; this module only registers it with the lint suite and phrases its
-//! findings.
 
 use paredit_core_lint_engine::LintResult;
 

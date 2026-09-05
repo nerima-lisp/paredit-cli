@@ -32,8 +32,8 @@
 //! - **Top level is CLHS 3.2.3.1's recursion, not depth 0.** The body of a
 //!   top-level `progn`/`locally`/`macrolet`/`symbol-macrolet`/`eval-when` is
 //!   still top level, so an `eval-when` there is *correct* to name
-//!   `:compile-toplevel` and is not flagged. Getting this wrong is what produced
-//!   false positives in an earlier batch in this repository;
+//!   `:compile-toplevel` and is not flagged. Treating depth as top-level status
+//!   produces false positives;
 //!   [`crate::support::is_top_level_form`] enumerates the operators rather than
 //!   counting depth.
 //! - **The situation list must name something.** `(eval-when () …)` is dead
@@ -293,8 +293,7 @@ mod tests {
         assert!(findings("(eval-when (:compile-toplevel :load-toplevel) (f))\n").is_empty());
     }
 
-    /// CLHS 3.2.3.1's recursion. Getting this wrong is what produced false
-    /// positives in an earlier batch here.
+    /// CLHS 3.2.3.1's recursion prevents false positives in these forms.
     #[test]
     fn does_not_flag_inside_the_top_level_preserving_operators() {
         for source in [

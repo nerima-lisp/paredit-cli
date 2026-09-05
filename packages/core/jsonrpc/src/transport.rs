@@ -1,9 +1,7 @@
 //! Reading and writing JSON-RPC messages over a byte stream.
 //!
-//! Two framings, one reader. See the crate README for why they differ; the
-//! interesting part here is that the reader is written against a stream that
-//! misbehaves. An editor being killed mid-message is not an exceptional case in
-//! a language server's life, it is how most sessions end.
+//! Two framings share a reader designed for streams that can end mid-message.
+//! An editor being killed mid-message is how most language-server sessions end.
 
 use std::io::{BufRead, Write};
 

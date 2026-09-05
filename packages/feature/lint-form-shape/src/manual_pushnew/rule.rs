@@ -1,8 +1,5 @@
 //! `manual-pushnew`: a setf/setq that manually adjoins onto a variable ((setf x (adjoin e x)) is (pushnew e x)).
 //!
-//! The analysis lives in [`crate::manual_pushnew::domain`], which also backs the
-//! standalone `inspect manual-pushnew` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

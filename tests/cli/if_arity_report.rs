@@ -61,9 +61,6 @@ fn cli_does_not_flag_a_feature_conditional_else() {
         .stdout(predicate::str::contains("\"if_form_count\": 0"));
 }
 
-/// An empty finding list is ambiguous, so a dialect this rule does not model
-/// must be labelled rather than silently reported as clean. Emacs Lisp's `if`
-/// has an implicit-progn else, so four arguments is valid there.
 #[test]
 fn cli_labels_a_dialect_the_rule_does_not_model() {
     let dir = fresh_temp_dir("if-arity-report-unmodelled");
@@ -79,9 +76,6 @@ fn cli_labels_a_dialect_the_rule_does_not_model() {
         .stdout(predicate::str::contains("\"finding_count\": 0"));
 }
 
-/// The envelope's interchange formats, which this report reached by moving onto
-/// it. Asserted here only far enough to prove the command accepts them; their
-/// content is covered once in `report_interop`.
 #[test]
 fn cli_if_arity_emits_sarif() {
     let dir = fresh_temp_dir("if-arity-report-sarif");

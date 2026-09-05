@@ -1,8 +1,5 @@
 //! `butlast-default-count`: a butlast/nbutlast call with an explicit count of 1, the default ((butlast x 1) is (butlast x)).
 //!
-//! The analysis lives in [`crate::butlast_default_count::domain`], which also backs the
-//! standalone `inspect butlast-default-count` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

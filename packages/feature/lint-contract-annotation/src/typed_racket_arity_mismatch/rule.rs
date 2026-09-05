@@ -1,9 +1,6 @@
 //! `typed-racket-arity-mismatch`: a `(: name (-> …))` annotation whose arrow
 //! arity disagrees with the `define` below it.
 //!
-//! The analysis lives in [`crate::typed_racket_arity_mismatch::domain`], which
-//! also backs the standalone report; this module only registers it with the
-//! lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

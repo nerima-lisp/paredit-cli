@@ -147,10 +147,7 @@ pub fn examine_begin(
 /// Collects every single-form `begin` in one file, with the number of `begin`
 /// forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no single-form begin here" for Scheme
-/// and "nothing was looked for" for Common Lisp, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_begin_single_form_report(
     path: &Path,
     dialect: Dialect,

@@ -1,9 +1,3 @@
-//! The `eval-when-body-never-runs` lint rule: its adapter, detection, use case
-//! and command.
-//!
-//! One rule, one directory. `rule` is what the registry registers; the rest is
-//! the report it drives.
-
 pub mod cli;
 pub mod domain;
 pub mod rule;

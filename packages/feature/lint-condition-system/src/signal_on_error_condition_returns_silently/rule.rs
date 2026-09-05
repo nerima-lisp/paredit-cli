@@ -1,11 +1,6 @@
 //! `signal-on-error-condition-returns-silently`: an error signalled the way a
 //! notification is.
 //!
-//! The analysis lives in
-//! [`crate::signal_on_error_condition_returns_silently::domain`], which also
-//! backs the standalone `inspect signal-on-error-condition-returns-silently`
-//! command; this module only registers it with the lint suite and phrases its
-//! findings.
 
 use paredit_core_lint_engine::LintResult;
 

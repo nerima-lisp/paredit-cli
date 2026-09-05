@@ -100,9 +100,6 @@ impl Finding for DotimesBoundMutationItem {
         ]
     }
 
-    /// The same sentence the `dotimes-bound-mutation-has-no-effect` lint rule
-    /// writes, so a SARIF or JUnit consumer reading both sees one finding
-    /// described one way.
     fn message(&self) -> String {
         format!(
             "`{}` assigns `{}`, which dotimes evaluated once on entry; \
@@ -135,8 +132,6 @@ fn assignment_of(view: &ExpressionView, name: &str) -> Option<String> {
     assigns.then_some(head)
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_dotimes_bound_mutation(
     view: &ExpressionView,
     dotimes_form_count: &mut usize,
@@ -196,10 +191,7 @@ pub fn examine_dotimes_bound_mutation(
 /// Collects every ineffective `dotimes` bound mutation in one file, with the
 /// number of `dotimes` forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no bound is assigned here" for Common
-/// Lisp and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_dotimes_bound_mutation_report(
     path: &Path,
     dialect: Dialect,

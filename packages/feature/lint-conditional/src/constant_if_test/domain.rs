@@ -11,8 +11,6 @@
 //! The fix replaces the whole form with the live branch's exact source (or the
 //! literal `nil` for a false one-armed `if`), so the rule is auto-fixable.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -57,8 +55,6 @@ pub struct ConstantIfTestItem {
     /// The span of the live branch to keep, or `None` when the result is the
     /// literal `nil` (a false one-armed `if`).
     ///
-    /// The rewrite's input, not the report's: the lint rule reads it to splice
-    /// the live branch in, and the command never prints it.
     pub result_span: Option<ByteSpan>,
 }
 
@@ -89,8 +85,6 @@ impl Finding for ConstantIfTestItem {
         vec![("test", json!(self.test))]
     }
 
-    /// The same sentence the `constant-if-test` lint rule writes, so a SARIF or
-    /// JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         format!("if test is the constant {}; one branch is dead", self.test)
     }
@@ -108,8 +102,6 @@ impl Finding for ConstantIfTestItem {
 /// rewrite to drop.
 pub type ConstantTest<'a> = &'a dyn Fn(&ExpressionView) -> Option<bool>;
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_if(
     view: &ExpressionView,
     constant_test: ConstantTest<'_>,
@@ -156,10 +148,7 @@ pub fn examine_if(
 /// Collects every constant-test `if` in one file, with the number of `if` forms
 /// scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no constant test here" for Common Lisp
-/// and "nothing was looked for" for Fennel, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_constant_if_test_report(
     path: &Path,
     dialect: Dialect,
@@ -205,7 +194,6 @@ mod tests {
             .expect("build constant if test report")
     }
 
-    /// The `(if_form_count, violations)` pair the report is built from.
     fn ifs(input: &str) -> (u64, Vec<ConstantIfTestItem>) {
         let report = report(input);
         let count = report
@@ -290,8 +278,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(if t a b)", Dialect::Clojure).expect("parse");

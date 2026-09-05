@@ -1,10 +1,6 @@
 //! `asdf-self-referential-depends-on`: a system whose `:depends-on` names
 //! itself.
 //!
-//! The analysis lives in
-//! [`crate::asdf_self_referential_depends_on::domain`], which also backs the
-//! standalone `inspect asdf-self-referential-depends-on` command; this module
-//! only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

@@ -765,9 +765,8 @@ enum BindingShape {
     /// A lambda list (`defun`/`defmacro`/`lambda`, and a `flet`/`labels`
     /// binding's own): deliberately never descended into at all.
     /// `&optional`/`&key` default-value forms can contain real evaluated
-    /// code (`(x (compute-default))`), but recognizing that shape is out of
-    /// this batch's scope — a documented false negative, never a false
-    /// positive or an unsafe fix.
+    /// code (`(x (compute-default))`), but this walker does not recognize that
+    /// shape. This creates false negatives, not false positives or unsafe fixes.
     LambdaList,
     /// `let`/`let*`: each binding is a bare name or `(name init)`.
     LetBindings,

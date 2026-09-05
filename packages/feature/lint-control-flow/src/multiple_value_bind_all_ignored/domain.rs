@@ -150,8 +150,6 @@ fn mentions_any(body: &[ExpressionView], variables: &[String]) -> bool {
     false
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 ///
 /// Reads only the matched form's own subtree.
 pub fn examine_multiple_value_bind(

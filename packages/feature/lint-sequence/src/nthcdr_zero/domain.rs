@@ -12,8 +12,6 @@
 //! The fix rewrites `(nthcdr 0 list)` as `list`, copying the list operand from
 //! its exact source, so the rule is auto-fixable.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -45,9 +43,6 @@ pub struct NthcdrZeroItem {
     pub span: ByteSpan,
     /// The span of the list operand.
     ///
-    /// The rewrite's input, not the report's: the lint rule copies the list
-    /// source from it to replace the whole call, and the command has never
-    /// printed it.
     pub list_span: ByteSpan,
 }
 
@@ -74,15 +69,11 @@ impl Finding for NthcdrZeroItem {
         Vec::new()
     }
 
-    /// The same sentence the `nthcdr-zero` lint rule writes, so a SARIF or
-    /// JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         "nthcdr with a zero count returns the list unchanged; (nthcdr 0 x) is x".to_owned()
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
     nthcdr_form_count: &mut usize,
@@ -118,10 +109,7 @@ pub fn examine(
 /// Collects every `(nthcdr 0 list)` in one file, with the number of `nthcdr`
 /// forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no zero-count nthcdr here" for Common
-/// Lisp and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_nthcdr_zero_report(
     path: &Path,
     dialect: Dialect,
@@ -167,7 +155,6 @@ mod tests {
             .expect("build nthcdr zero report")
     }
 
-    /// The `(nthcdr_form_count, violations)` pair the report is built from.
     fn nthcdrs(input: &str) -> (u64, Vec<NthcdrZeroItem>) {
         let report = report(input);
         let count = report
@@ -239,8 +226,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(nthcdr 0 x)", Dialect::Clojure).expect("parse");

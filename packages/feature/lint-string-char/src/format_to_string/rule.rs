@@ -1,8 +1,5 @@
 //! `format-to-string`: a (format nil "~A"/"~S" x), which is (princ-to-string x)/(prin1-to-string x).
 //!
-//! The analysis lives in [`crate::format_to_string::domain`], which also backs the
-//! standalone `inspect format-to-string` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

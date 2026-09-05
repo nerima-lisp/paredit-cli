@@ -1,9 +1,5 @@
 //! `cerror-missing-continue-format`: a continuable error nobody explained.
 //!
-//! The analysis lives in [`crate::cerror_missing_continue_format::domain`],
-//! which also backs the standalone `inspect cerror-missing-continue-format`
-//! command; this module only registers it with the lint suite and phrases its
-//! findings.
 
 use paredit_core_lint_engine::LintResult;
 

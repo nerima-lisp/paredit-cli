@@ -1,10 +1,6 @@
 //! `hash-table-literal-string-key-under-eql`: a literal string key on a hash
 //! table whose test compares by identity.
 //!
-//! The analysis lives in
-//! [`crate::hash_table_literal_string_key_under_eql::domain`], which documents
-//! why the rule is scoped to literal keys and what that scoping costs. This
-//! module only registers it with the lint suite and phrases its findings.
 
 use paredit_core_cli::report::Finding;
 use paredit_core_lint_engine::LintResult;

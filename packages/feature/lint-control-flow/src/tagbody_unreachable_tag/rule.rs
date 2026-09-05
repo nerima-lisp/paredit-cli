@@ -1,8 +1,5 @@
 //! `tagbody-unreachable-tag`: a tagbody label no `go` in the form ever names.
 //!
-//! The analysis lives in [`crate::tagbody_unreachable_tag::domain`], which also
-//! backs the standalone `inspect tagbody-unreachable-tag` command; this module
-//! only registers it with the lint suite and phrases its findings.
 //!
 //! `ReportOnly` even though deleting a dead label looks safe: this rule cannot
 //! see macro expansions, and `paredit-feature-remove-unused`'s

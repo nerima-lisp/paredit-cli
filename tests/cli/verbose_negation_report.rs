@@ -42,8 +42,6 @@ fn cli_does_not_flag_trailing_zero_float_or_other_constant() {
         .stdout(predicate::str::contains("\"dialect_modelled\": true"));
 }
 
-/// An empty finding list is ambiguous, so a dialect this rule does not model
-/// must be labelled rather than silently reported as clean.
 #[test]
 fn cli_labels_a_dialect_the_rule_does_not_model() {
     let dir = fresh_temp_dir("verbose-negation-report-unmodelled");
@@ -59,9 +57,6 @@ fn cli_labels_a_dialect_the_rule_does_not_model() {
         .stdout(predicate::str::contains("\"finding_count\": 0"));
 }
 
-/// The envelope's interchange formats, which this report reached by moving onto
-/// it. This finding carries no fields of its own, so `message` is the whole of
-/// what a SARIF consumer gets.
 #[test]
 fn cli_verbose_negation_emits_sarif() {
     let dir = fresh_temp_dir("verbose-negation-report-sarif");

@@ -13,8 +13,6 @@
 //! `decf`), copying the head and place from their exact source, so the rule is
 //! auto-fixable.
 //!
-//! Reuses the shared whole-tree walk from
-//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -46,8 +44,6 @@ pub struct ExplicitStepDeltaItem {
     pub span: ByteSpan,
     /// The span of the `incf`/`decf` head symbol (preserves its exact source).
     ///
-    /// The rewrite's input, not the report's: the lint rule copies it into the
-    /// shortened form, and the command never prints it.
     pub head_span: ByteSpan,
     /// The span of the place operand (for reconstructing the fix).
     ///
@@ -81,16 +77,12 @@ impl Finding for ExplicitStepDeltaItem {
         vec![("operator", json!(self.operator))]
     }
 
-    /// The same sentence the `explicit-step-delta` lint rule writes, so a SARIF
-    /// or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         let operator = self.operator;
         format!("{operator} delta of 1 is the default; ({operator} x 1) is ({operator} x)")
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_step(
     view: &ExpressionView,
     step_form_count: &mut usize,
@@ -132,10 +124,7 @@ pub fn examine_step(
 /// Collects every explicit `1` delta on an `incf`/`decf` in one file, with the
 /// number of `incf`/`decf` forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no redundant delta here" for Common Lisp
-/// and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_explicit_step_delta_report(
     path: &Path,
     dialect: Dialect,
@@ -181,7 +170,6 @@ mod tests {
             .expect("build explicit step delta report")
     }
 
-    /// The `(step_form_count, violations)` pair the report is built from.
     fn steps(input: &str) -> (u64, Vec<ExplicitStepDeltaItem>) {
         let report = report(input);
         let count = report
@@ -262,8 +250,6 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(incf x 1)", Dialect::Clojure).expect("parse");

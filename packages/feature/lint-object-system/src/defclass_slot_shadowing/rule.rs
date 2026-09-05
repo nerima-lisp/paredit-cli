@@ -1,9 +1,6 @@
 //! `defclass-slot-shadowing`: a subclass slot that silently shadows a same-file
 //! superclass slot.
 //!
-//! The analysis lives in [`crate::defclass_slot_shadowing::domain`], which also
-//! backs the standalone `inspect defclass-slot-shadowing` command; this module
-//! only registers it with the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

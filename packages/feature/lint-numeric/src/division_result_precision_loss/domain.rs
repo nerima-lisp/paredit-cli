@@ -91,9 +91,6 @@ impl Finding for DivisionPrecisionLossItem {
         ]
     }
 
-    /// The same sentence the `division-result-precision-loss` lint rule writes,
-    /// so a SARIF or JUnit consumer reading both sees one finding described one
-    /// way.
     fn message(&self) -> String {
         format!(
             "integer division of {} by {} truncates towards zero and yields 0, discarding the \
@@ -103,8 +100,6 @@ impl Finding for DivisionPrecisionLossItem {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 ///
 /// Work is bounded to the matched form's own direct operands.
 pub fn examine(
@@ -180,10 +175,7 @@ fn literal_operand(view: &ExpressionView) -> Option<(i64, &str)> {
 /// Collects every value-discarding integer division in one file, with the
 /// number of `/` forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no truncating division here" for Emacs
-/// Lisp and "nothing was looked for" for Common Lisp — where `(/ 1 3)` is the
-/// exact ratio `1/3` and there is nothing to find at all.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_division_result_precision_loss_report(
     path: &Path,
     dialect: Dialect,
@@ -229,7 +221,6 @@ mod tests {
             .expect("build report")
     }
 
-    /// The `(division_form_count, violations)` pair the report is built from.
     fn divisions(input: &str) -> (u64, Vec<DivisionPrecisionLossItem>) {
         let report = report(input);
         let count = report

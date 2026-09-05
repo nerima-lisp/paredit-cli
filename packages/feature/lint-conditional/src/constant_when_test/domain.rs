@@ -64,8 +64,6 @@ pub struct ConstantWhenTestItem {
     /// For the "always runs" rewrite: the span from the form's opening paren
     /// through the test atom, replaced wholesale with `(progn`.
     ///
-    /// The rewrite's input, not the report's: the lint rule reads it to splice
-    /// the head down to `progn`, and the command never printed it.
     pub splice_span: ByteSpan,
 }
 
@@ -96,8 +94,6 @@ impl Finding for ConstantWhenTestItem {
         ]
     }
 
-    /// The same sentence the `constant-when-test` lint rule writes, so a SARIF
-    /// or JUnit consumer reading both sees one finding described one way.
     fn message(&self) -> String {
         if self.always_runs {
             format!(
@@ -113,8 +109,6 @@ impl Finding for ConstantWhenTestItem {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_when(
     view: &ExpressionView,
     when_form_count: &mut usize,
@@ -155,10 +149,7 @@ pub fn examine_when(
 /// Collects every constant-test `when`/`unless` in one file, with the number of
 /// `when`/`unless` forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no constant test here" for Common Lisp
-/// and "nothing was looked for" for Fennel, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_constant_when_test_report(
     path: &Path,
     dialect: Dialect,
@@ -204,7 +195,6 @@ mod tests {
             .expect("build constant when test report")
     }
 
-    /// The `(when_form_count, violations)` pair the report is built from.
     fn whens(input: &str) -> (u64, Vec<ConstantWhenTestItem>) {
         let report = report(input);
         let count = report
@@ -294,8 +284,6 @@ mod tests {
         assert!(violations[0].always_runs);
     }
 
-    /// A dialect this rule cannot read must say so, rather than return the
-    /// empty finding list a clean Common Lisp file returns.
     #[test]
     fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(when t a b)", Dialect::Clojure).expect("parse");

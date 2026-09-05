@@ -251,9 +251,6 @@ fn chain_context_at(
     })
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// `lambda` through the single dispatch pass instead of walking the tree again.
-///
 /// `max_nesting` is the deepest chain that is *not* reported.
 pub fn examine_lambda(
     tree: &SyntaxTree,
@@ -292,10 +289,7 @@ pub fn examine_lambda(
 /// Collects every over-nested anonymous lambda chain in one file, with the
 /// number of `lambda` forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no over-nested lambda here" for Common
-/// Lisp and "nothing was looked for" for Clojure, and the two read identically
-/// without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_deeply_nested_anonymous_lambda_report(
     path: &Path,
     dialect: Dialect,

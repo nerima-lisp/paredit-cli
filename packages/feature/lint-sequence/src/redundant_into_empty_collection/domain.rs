@@ -160,8 +160,6 @@ fn conversion_for(target: &ExpressionView) -> Option<Conversion> {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 ///
 /// # Cost
 ///
@@ -201,10 +199,7 @@ pub fn examine(
 /// Collects every `(into [] coll)` in one file, with the number of `into` forms
 /// scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "no redundant conversions here" for
-/// Clojure and "nothing was looked for" for Common Lisp, and the two read
-/// identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn collect_redundant_intos(
     path: &Path,
     dialect: Dialect,

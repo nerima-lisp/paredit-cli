@@ -10,8 +10,6 @@
 //! read through Hy's surface syntax. Neither Hy nor CPython rejects the shape:
 //! it compiles, it runs, and the dead branch is simply never taken.
 //!
-//! The analysis lives in [`crate::unreachable_except_clause::domain`]; this
-//! module registers it and phrases its findings.
 //!
 //! # Why this is not the sibling package's `hy-bare-except`
 //!

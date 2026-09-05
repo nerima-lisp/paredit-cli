@@ -144,8 +144,6 @@ fn simple_local_function(definition: &ExpressionView) -> Option<(String, usize)>
     Some((name, parameters.children.len()))
 }
 
-/// Examines one node. Shared with the lint suite's rule.
-///
 /// Cheapest predicate first: head comparison, then the binding list's *length*,
 /// then the body's length, then the one definition's shape. The whole-form
 /// occurrence count — the only part proportional to the form's size — runs last

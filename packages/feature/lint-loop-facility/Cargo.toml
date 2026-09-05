@@ -19,9 +19,9 @@ paredit-core-lint-engine = { path = "../../core/lint-engine" }
 # rather than reusing the one in the lint-iteration-flow package's
 # `loop_syntax.rs`. That is duplication and it is deliberate twice over:
 #
-# 1. A feature-to-feature dependency needs an entry in
-#    `tests/cli/feature_dependency_contract.rs`, which this batch is not
-#    permitted to edit.
+# 1. A feature-to-feature dependency must be declared in
+#    `tests/cli/feature_dependency_contract.rs`; this crate intentionally has
+#    no such dependency.
 # 2. The existing reader could not answer this crate's question anyway. It
 #    documents `and` as "tokenized but never interpreted" and lists `and` as a
 #    NAME_INTRODUCER, which deliberately over-collects in order to *lose*

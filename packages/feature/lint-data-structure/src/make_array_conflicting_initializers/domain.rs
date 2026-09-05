@@ -79,8 +79,6 @@ impl Finding for MakeArrayConflictingInitializersItem {
     }
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 ///
 /// Both keyword scans are local reads over this form's own operand list, so the
 /// quote check — the only thing here that descends from the root — runs solely

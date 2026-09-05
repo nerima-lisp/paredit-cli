@@ -1,9 +1,5 @@
 //! `nested-get-chain`: nested gets reading one path, which is get-in ((get (get m :a) :b) is (get-in m [:a :b])).
 //!
-//! The analysis lives in [`crate::nested_get_chain::domain`], which also backs
-//! the standalone `inspect nested-get-chain` command; this module only
-//! registers it with the lint suite and phrases its findings.
-
 use paredit_core_lint_engine::LintResult;
 
 use crate::nested_get_chain::domain::{examine, is_chain_link, message_for};

@@ -5,8 +5,8 @@
 //! matcher (`packages/feature/lint-custom/src/pattern.rs`, pre-unification)
 //! with no test anywhere comparing it against `packages/core/syntax/src/
 //! selector`'s — the two silently disagreed on `...` mid-list, on reader
-//! prefixes, and (until this change) on whether a literal string compared
-//! case-exactly. `defrule` is now a thin front end over the selector's own
+//! prefixes, and on whether a literal string compared case-exactly. `defrule`
+//! is a thin front end over the selector's own
 //! [`classify_atom`], so this file has two layers:
 //!
 //! - a structural check that the front end still *calls* the shared

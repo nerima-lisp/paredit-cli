@@ -9,9 +9,7 @@
 //! carries a parsed `--verbosity` value all the way to that function. A
 //! wiring mistake in any one of those three files per command — the wrong
 //! parameter position, a field that never got read — would compile (nothing
-//! type-checks the *value* flows correctly) and pass every existing test
-//! (none of which ever passed `--verbosity` before this change) while
-//! silently ignoring the flag.
+//! type-checks the *value* flows correctly) while silently ignoring the flag.
 //!
 //! `inspect todo` is the command under test: its `Finding` has four
 //! `json_fields` (`marker`, `note`, `author`, `definition`), which makes

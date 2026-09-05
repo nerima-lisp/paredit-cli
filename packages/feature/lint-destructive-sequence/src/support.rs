@@ -18,15 +18,14 @@
 //!
 //! # The quote model is two counters, not a depth
 //!
-//! [`QuoteState`] is copied from `paredit-feature-lint-condition-system::support`,
-//! as the other lint packages do with it; a consolidation into `packages/core`
-//! is in flight, and when it lands this module should be deleted.
+//! [`QuoteState`] follows the model in
+//! `paredit-feature-lint-condition-system::support`.
 //!
 //! `'` and `` ` `` are not the same thing. A comma inside `'(…)` is a comma
 //! character in a literal list, so `hard` never clears; a comma inside `` `(…) ``
 //! escapes back to code, so `quasi` counts up and down. A single `i32` depth
-//! counter is wrong and has shipped in this workspace as a false-positive
-//! source twice. This package genuinely needs the distinction: a macro template
+//! counter cannot represent both states and produces false positives. This
+//! package needs the distinction: a macro template
 //! that writes `` `(sort ,x #'<) `` is building code, not discarding a value,
 //! and one that writes `` `(progn ,(sort xs #'<) xs) `` is discarding one.
 

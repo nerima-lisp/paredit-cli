@@ -119,8 +119,6 @@ fn resolve(tree: &SyntaxTree, span: ByteSpan, name: &str) -> Resolution {
     .unwrap_or(Resolution::Unknown)
 }
 
-/// Examines one node. Shared with the lint suite's rule, which reaches every
-/// node through the single dispatch pass instead of walking the tree again.
 ///
 /// The tree is needed because the answer is about the node's *ancestors*, and
 /// a matched node carries no parent pointer. Only the one enclosing top-level
@@ -157,10 +155,7 @@ pub fn examine_return_from(
 /// Collects every unmatched `return-from` in one file, with the number of
 /// `return-from` forms scanned as the denominator beside them.
 ///
-/// A dialect this rule does not model is reported as unmodelled rather than as
-/// clean: an empty finding list means "every return-from here resolves" for
-/// Common Lisp and "nothing was looked for" for Clojure, and the two read
-/// identically without the flag.
+/// Reports unsupported dialects as unmodelled.
 pub fn build_return_from_unmatched_block_report(
     path: &Path,
     dialect: Dialect,

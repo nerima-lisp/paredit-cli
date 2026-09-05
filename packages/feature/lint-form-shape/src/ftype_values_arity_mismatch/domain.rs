@@ -203,8 +203,6 @@ fn defun_named(tree: &SyntaxTree, index: usize, name: &str) -> Option<Expression
     matches.then_some(view)
 }
 
-/// Examines one node. Shared with the lint suite's rule.
-///
 /// Cheapest predicate first, and the ordering is load-bearing: the head
 /// comparison and the whole `ftype`/`function`/`(values …)` shape are read out
 /// of the matched node alone, and only a `declaim` that survives all of that

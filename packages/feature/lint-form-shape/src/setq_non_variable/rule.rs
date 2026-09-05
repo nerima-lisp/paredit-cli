@@ -1,8 +1,5 @@
 //! `setq-non-variable`: a setq/psetq place that is not a variable (a list, literal, or constant).
 //!
-//! The analysis lives in [`crate::setq_non_variable::domain`], which also backs the
-//! standalone `inspect setq-non-variable` command; this module only registers it with
-//! the lint suite and phrases its findings.
 
 use paredit_core_lint_engine::LintResult;
 

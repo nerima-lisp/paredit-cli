@@ -27,11 +27,9 @@ one crate and the dependency graph has a cycle that Cargo cannot express. So
 the engine is handed a `RuleCatalog` and stays ignorant of which rules exist
 and of how many there are.
 
-That "how many" mattered more than it looks. The engine used to size a
-`[bool; RULE_COUNT]` from a registry constant, which made the engine's *types*
-depend on the registry's cardinality — a coupling no amount of module
-reshuffling would have separated. It is now sized from the catalogue at
-runtime, built once per file rather than per node.
+The engine sizes its state from the catalogue at runtime, avoiding a type-level
+dependency on the registry's cardinality. The state is built once per file,
+not per node.
 
 Also not here:
 
