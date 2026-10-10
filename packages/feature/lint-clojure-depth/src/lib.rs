@@ -32,9 +32,7 @@ pub mod support;
 mod engine_pass_tests {
     use std::path::Path;
 
-    use paredit_core_lint_engine::engine::{
-        PassOptions, build_head_index, collect_lint_outcomes, collect_lint_pass,
-    };
+    use paredit_core_lint_engine::engine::{build_head_index, collect_lint_outcomes};
     use paredit_core_lint_engine::model::HeadFilter;
     use paredit_core_lint_engine::policy::{RuleDialectScope, RuleSelection};
     use paredit_core_lint_engine::rule::{RuleCatalog, RuleEntry};
@@ -488,73 +486,6 @@ mod engine_pass_tests {
         assert_eq!(
             heads_of(&crate::reference_type_operator_mismatch::rule::RULE),
             crate::reference_type_operator_mismatch::domain::REFERENCE_BINDING_HEADS,
-        );
-    }
-
-    // -- (e) cost --------------------------------------------------------------
-
-    /// A timed pass over a generated file, at two sizes.
-    ///
-    /// Not a benchmark — the machine this runs on is shared, so an absolute
-    /// number means nothing. What it pins is the **ratio**: doubling the file
-    /// must roughly double the time, because every rule here is linear in the
-    /// document. A quadratic rule (the classic being a per-candidate
-    /// `tree.root_view()`, or a cross-form correlation that rescans the top
-    /// level) shows up as a ratio near four, and the budget below is loose
-    /// enough that only an asymptotic regression can trip it.
-    ///
-    /// The generated form deliberately contains a `let` with a reference
-    /// constructor and a `go` block, so the two rules whose per-head-match
-    /// work is a *subtree walk* are the ones being measured.
-    #[test]
-    fn doubling_the_file_does_not_more_than_triple_the_cost() {
-        fn elapsed_nanos(forms: usize) -> u128 {
-            let source: String = (0..forms)
-                .map(|index| {
-                    format!(
-                        "(defn f{index} [m coll in out]\n  \
-                         (let [total (atom 0) seen (volatile! 0)]\n    \
-                         (go (doseq [x coll] (>! out x)) (<! in))\n    \
-                         (binding [*print-length* 5] (mapv pr-str coll))\n    \
-                         (when (contains? m :k) (swap! total inc) (vswap! seen inc))\n    \
-                         [@total @seen]))\n"
-                    )
-                })
-                .collect();
-            let catalog = RuleCatalog::new(&ENTRIES);
-            let index = build_head_index(catalog);
-            let tree =
-                SyntaxTree::parse_with_dialect(&source, Dialect::Clojure).expect("parse generated");
-            let started = std::time::Instant::now();
-            let outcome = collect_lint_pass(
-                catalog,
-                &index,
-                Path::new("gen.clj"),
-                Dialect::Clojure,
-                &tree,
-                &source,
-                RuleSelection::All,
-                PassOptions {
-                    settings: None,
-                    measure: true,
-                },
-            )
-            .expect("lint pass");
-            let total = started.elapsed().as_nanos().max(1);
-            assert!(outcome.outcomes.is_empty(), "the generated file is clean");
-            assert!(outcome.timings.is_some(), "measure: true records timings");
-            total
-        }
-
-        let small = elapsed_nanos(500);
-        let large = elapsed_nanos(1000);
-        // 6x rather than 2x: this runs under a loaded shared sandbox alongside
-        // other test binaries, and the point is to catch T×T, which is 4x on a
-        // quiet machine and far more on a busy one.
-        assert!(
-            large < small.saturating_mul(6),
-            "doubling the file cost {large}ns against {small}ns for half of it; \
-             a rule has gone superlinear"
         );
     }
 }

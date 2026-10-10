@@ -12,7 +12,9 @@
 //! subtree. The walk stops at the first same-named nested block, so deep
 //! nesting is linear in the form rather than quadratic in its depth.
 
+use crate::support::CONTROL_FLOW_DIALECTS;
 use paredit_core_lint_engine::LintResult;
+use paredit_core_lint_engine::policy::RuleDialectScope;
 
 use crate::block_name_shadows_outer_block::domain::{examine_block, message_for};
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
@@ -31,7 +33,10 @@ pub const META: RuleMeta = RuleMeta::new(
 );
 
 /// `examine_block` only ever matches a `block` head.
-const HEADS: [NormalizedHead; 1] = [NormalizedHead::new("block")];
+const HEADS: [NormalizedHead; 2] = [
+    NormalizedHead::new("block"),
+    NormalizedHead::new("cl-block"),
+];
 
 #[derive(Debug)]
 pub struct Rule;
@@ -39,6 +44,10 @@ pub struct Rule;
 pub const RULE: Rule = Rule;
 
 impl LintRule for Rule {
+    fn dialect_scope(&self) -> RuleDialectScope {
+        RuleDialectScope::new(&CONTROL_FLOW_DIALECTS)
+    }
+
     fn head_filter(&self) -> HeadFilter {
         HeadFilter::Heads(&HEADS)
     }
@@ -51,7 +60,13 @@ impl LintRule for Rule {
     ) -> LintResult<()> {
         let mut block_form_count = 0;
         let mut items = Vec::new();
-        examine_block(context.tree(), view, &mut block_form_count, &mut items);
+        examine_block(
+            context.tree(),
+            context.dialect(),
+            view,
+            &mut block_form_count,
+            &mut items,
+        );
         for item in items {
             sink.report(item.span, message_for(&item.block_name));
         }

@@ -34,7 +34,8 @@
 
 set -euo pipefail
 
-cd "$(git rev-parse --show-toplevel)"
+precheck_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+cd "$precheck_root"
 
 doc_test_package="${1:-}"
 
@@ -46,11 +47,9 @@ run() {
 # 1. Broadest, fastest signal: most iterations die here.
 run cargo clippy --all-targets --all-features -- -D warnings
 
-# 2. `cargo fmt --all` reformats in place. It is not `cargo clippy --fix`,
-# which does not touch formatting, and it is deliberately not `nix fmt` here -
-# `nix fmt` rewrites Lisp fixtures too and can take minutes when it rebuilds
-# the formatter derivation, which is wasted work every time only Rust changed.
-run cargo fmt --all
+# 2. Check formatting without changing another session's working-tree edits.
+# The full Nix formatting check below also covers Nix and Lisp sources.
+run cargo fmt --all --check
 
 # 3. The full test suite under cargo-nextest, ~80-125s locally.
 run cargo nextest run --locked
@@ -65,6 +64,7 @@ fi
 # 5. The two cheapest full Nix checks, closest to what the real gate runs:
 # the pinned-newer clippy and the treefmt formatting check (Rust, Nix, and
 # Lisp sources together). Still short of the full gate - see above.
-run nix build ".#checks.x86_64-linux.clippy" ".#checks.x86_64-linux.formatting" --no-link
+precheck_system="$(nix eval --impure --raw --expr builtins.currentSystem)"
+run nix build ".#checks.${precheck_system}.clippy" ".#checks.${precheck_system}.formatting" --no-link
 
 printf 'precheck: cheap checks passed - `nix flake check` is the remaining gate\n'

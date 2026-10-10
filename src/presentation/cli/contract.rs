@@ -267,7 +267,7 @@ impl SupportStatus {
 /// here, the stack floor is the first thing to check — and note that an
 /// inherited `RUST_MIN_STACK` from the environment silently overrides
 /// `.cargo/config.toml`, because cargo's `[env]` is unforced.
-const INTROSPECTION_COMMANDS: [&str; 344] = [
+const INTROSPECTION_COMMANDS: [&str; 346] = [
     "inspect diff",
     "inspect check",
     "inspect dialect",
@@ -286,6 +286,7 @@ const INTROSPECTION_COMMANDS: [&str; 344] = [
     "inspect impact",
     "inspect workspace",
     "inspect sources",
+    "inspect dotfiles",
     "inspect dependencies",
     "inspect packages",
     "inspect definitions",
@@ -318,6 +319,7 @@ const INTROSPECTION_COMMANDS: [&str; 344] = [
     "inspect api-surface",
     "inspect api-diff",
     "inspect test-map",
+    "inspect test-risk",
     "inspect symbol-index",
     "inspect keyword-arity",
     "inspect unreachable-expressions",
@@ -681,8 +683,10 @@ const STRUCTURAL_COMMANDS: [&str; 33] = [
     "migrate run",
 ];
 
-const SEMANTIC_COMMANDS: [&str; 87] = [
+const SEMANTIC_COMMANDS: [&str; 89] = [
     "refactor step",
+    "refactor bulk",
+    "refactor unwrap-body",
     "refactor create-checkpoint",
     "refactor list-checkpoints",
     "refactor restore-checkpoint",
@@ -779,7 +783,7 @@ const SEMANTIC_COMMANDS: [&str; 87] = [
 /// more, yet it answers for Emacs Lisp alone — its own gate says so, the same
 /// way `refactor rename-at` sits at the scope tier and is gated to three
 /// dialects.
-const SYNTAX_TIER_REPORTS: [&str; 21] = [
+const SYNTAX_TIER_REPORTS: [&str; 22] = [
     "inspect context-at",
     "inspect diff",
     "inspect elisp-file",
@@ -793,6 +797,7 @@ const SYNTAX_TIER_REPORTS: [&str; 21] = [
     "inspect find-symbol",
     "inspect workspace",
     "inspect sources",
+    "inspect dotfiles",
     "inspect writability",
     "inspect data-check",
     "inspect kill-ring",
@@ -848,10 +853,15 @@ const SCOPE_TIER_REPORTS: [&str; 36] = [
     "inspect call-cycles",
 ];
 
-/// Refactor plumbing that moves whole forms or drives the manifest workflow.
-/// None of it reads an operator name, so it is complete for every dialect.
-const SYNTAX_TIER_REFACTORS: [&str; 21] = [
+/// Reports whose model recognizes Common Lisp and Emacs Lisp forms only.
+const COMMON_LISP_FAMILY_REPORTS: [&str; 1] = ["inspect test-risk"];
+
+/// Structural refactors and workflow plumbing that need no dialect-specific
+/// semantic model. This tier does not promise preservation of program meaning.
+const SYNTAX_TIER_REFACTORS: [&str; 23] = [
     "refactor step",
+    "refactor bulk",
+    "refactor unwrap-body",
     "refactor create-checkpoint",
     "refactor list-checkpoints",
     "refactor restore-checkpoint",
@@ -925,6 +935,8 @@ fn capability_tier(command_path: &str, category: CommandCategory) -> CapabilityT
                 CapabilityTier::Syntax
             } else if SCOPE_TIER_REPORTS.contains(&command_path) {
                 CapabilityTier::Scope
+            } else if COMMON_LISP_FAMILY_REPORTS.contains(&command_path) {
+                CapabilityTier::CommonLispFamily
             } else {
                 CapabilityTier::CommonLispSemantics
             }
@@ -1114,12 +1126,9 @@ pub(super) fn support_status(command_path: &str, dialect: &str) -> SupportStatus
         "refactor inline-function" => Some(supports_inline_function_dialect(dialect)),
         "refactor inline-let" => Some(supports_inline_let_dialect(dialect)),
         "inspect elisp-file" => Some(supports_emacs_lisp_file_report_dialect(dialect)),
-        // The only two rules in this catalogue whose scope is not plain
-        // `CommonLispSemantics`. `leftover-print-debug` reuses its own
-        // `heads_for` directly, so this matrix cannot drift from what the
-        // rule actually recognizes; `leftover-trace-call`'s CL+Elisp scope
-        // has no existing tier to reuse (`CommonLispFamily` is wired for
-        // `Semantic`-category commands only), so it is stated inline.
+        // `leftover-print-debug` reuses its own `heads_for` directly, so this
+        // matrix cannot drift from what the rule actually recognizes;
+        // `leftover-trace-call`'s CL+Elisp scope is stated inline.
         "inspect leftover-print-debug" => Some(!leftover_print_debug_heads_for(dialect).is_empty()),
         "inspect leftover-trace-call" => {
             Some(matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp))
@@ -1271,7 +1280,7 @@ fn dialect_depth_report() -> Value {
 /// The category [`crate::presentation::cli::capabilities::classify`] keys its
 /// own write and error-code classification on, so that classification cannot
 /// drift from the dialect contract's own per-command inventory — this *is*
-/// the 358-command list the dialect contract publishes, read a second way.
+/// the command inventory the dialect contract publishes, read a second way.
 pub(super) fn command_category(command_path: &str) -> Option<CommandCategory> {
     COMMAND_GROUPS
         .iter()
@@ -1304,6 +1313,10 @@ mod tests {
         let tables = [
             ("SYNTAX_TIER_REPORTS", SYNTAX_TIER_REPORTS.as_slice()),
             ("SCOPE_TIER_REPORTS", SCOPE_TIER_REPORTS.as_slice()),
+            (
+                "COMMON_LISP_FAMILY_REPORTS",
+                COMMON_LISP_FAMILY_REPORTS.as_slice(),
+            ),
             ("SYNTAX_TIER_REFACTORS", SYNTAX_TIER_REFACTORS.as_slice()),
             ("SCOPE_TIER_REFACTORS", SCOPE_TIER_REFACTORS.as_slice()),
             (

@@ -1085,9 +1085,8 @@ fn lint_report_fix(
     // sides, and the rewrite already had to reparse to be adopted at all) is
     // silently left out of the headline rather than guessed at.
     let mut change_summaries: Vec<ChangeSummary> = Vec::new();
-    // Deferred writes for `--group-by-impact-area`: every file this run would
-    // otherwise have written immediately, paired with its declared-package
-    // group key. Empty, and never consulted, on every other run.
+    // Validate every rewritten file before starting any write. Grouped runs
+    // also retain the declared-package key for each independent transaction.
     let mut deferred_writes: Vec<(std::path::PathBuf, String, String)> = Vec::new();
 
     for file in files {
@@ -1215,11 +1214,7 @@ fn lint_report_fix(
                 if let Some(summary) = summarise(&input.text, &text, dialect) {
                     change_summaries.push(summary);
                 }
-                if args.group_by_impact_area {
-                    deferred_writes.push((file.clone(), text.clone(), group_key));
-                } else {
-                    write_file_with_rollback(file.clone(), text)?;
-                }
+                deferred_writes.push((file.clone(), text, group_key));
             }
             fixes_applied += applied;
             file_fixes.push(LintFileFix {
@@ -1265,15 +1260,9 @@ fn lint_report_fix(
         let mut any_written = false;
         for (group, members) in group_writes_by_key(deferred_writes) {
             let file_count = members.len();
-            // Each group is its own all-or-nothing transaction — the same
-            // atomicity `write_files_with_rollback` already gives a single
-            // `--fix` run without grouping. Grouping changes how many
-            // transactions there are, not what one transaction does: a group
-            // that fails is left exactly as it was before this run, and the
-            // groups that already wrote stay written rather than being
-            // rolled back over a *later* group's failure, since undoing a
-            // successful group to punish an unrelated one is the
-            // all-or-nothing behavior this flag exists to opt out of.
+            // Each group is an independent rollback transaction. A group's
+            // write failure does not undo earlier successful groups or stop
+            // later groups from being attempted.
             match write_files_with_rollback(members.clone()) {
                 Ok(()) => {
                     any_written = true;
@@ -1310,6 +1299,13 @@ fn lint_report_fix(
             return Err(total_file_failure(file_failures).into());
         }
         note_partial_file_failures(&file_failures);
+    } else {
+        // Prevalidation prevents syntax refusals from leaving partial edits;
+        // individual writes still fail fast on I/O errors, without a batch
+        // rollback guarantee.
+        for (path, content, _group) in deferred_writes {
+            write_file_with_rollback(path, content)?;
+        }
     }
 
     let headline = build_fix_headline(&change_summaries, file_fixes.len());

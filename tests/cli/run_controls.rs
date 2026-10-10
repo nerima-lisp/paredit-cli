@@ -392,14 +392,46 @@ fn capabilities_publishes_the_gate_flags_of_each_command() {
     );
 }
 
-/// The convention, enforced. Every gate must be one of the three spellings,
-/// must name the exit status it produces, and must explain itself.
+#[test]
+fn capabilities_publishes_the_api_diff_impact_gate() {
+    let report = capabilities();
+    let commands = every_command(&report);
+    let command = commands
+        .iter()
+        .find(|(path, _)| path == "inspect api-diff")
+        .expect("inspect api-diff");
+    let gates = command.1["gates"].as_array().expect("gates");
+    assert_eq!(gates.len(), 1);
+    assert_eq!(gates[0]["flag"], "--intended-bump");
+    assert_eq!(gates[0]["kind"], "severity");
+    assert_eq!(gates[0]["exit_code"], 3);
+    assert!(
+        command.1["possible_error_codes"]
+            .as_array()
+            .expect("error codes")
+            .iter()
+            .any(|code| code == "gate.failed")
+    );
+}
+
+/// Every gate must follow the naming convention or its API-diff exception,
+/// name the exit status it produces, and explain itself.
 #[test]
 fn every_published_gate_follows_the_convention() {
     let report = capabilities();
     let mut total = 0;
 
     for (path, command) in every_command(&report) {
+        if command.get("gates").is_some() || command.get("unconditional_gates").is_some() {
+            assert!(
+                command["possible_error_codes"]
+                    .as_array()
+                    .expect("error codes")
+                    .iter()
+                    .any(|code| code == "gate.failed"),
+                "{path}: {command}"
+            );
+        }
         let Some(gates) = command["gates"].as_array() else {
             continue;
         };
@@ -417,7 +449,11 @@ fn every_published_gate_follows_the_convention() {
             );
 
             match kind {
-                "severity" => assert_eq!(flag, "--fail-on", "{path}"),
+                "severity" => assert!(
+                    flag == "--fail-on"
+                        || (path == "inspect api-diff" && flag == "--intended-bump"),
+                    "{path} {flag}"
+                ),
                 "presence" => assert!(flag.starts_with("--fail-on-"), "{path} {flag}"),
                 "minimum" => assert!(flag.starts_with("--require-"), "{path} {flag}"),
                 other => panic!("{path} {flag} has unknown gate kind {other}"),
@@ -440,6 +476,45 @@ fn a_command_with_no_gate_has_no_gates_field() {
         .find(|(path, _)| path == "edit select")
         .expect("edit select");
     assert!(select.1["gates"].is_null(), "{}", select.1);
+    assert!(select.1["unconditional_gates"].is_null(), "{}", select.1);
+}
+
+#[test]
+fn capabilities_publishes_the_unconditional_dotfiles_gate() {
+    fn assert_namespace_has_no_gate(commands: &[serde_json::Value]) {
+        for command in commands {
+            if let Some(children) = command["commands"].as_array() {
+                assert!(command.get("unconditional_gates").is_none(), "{command}");
+                assert_namespace_has_no_gate(children);
+            }
+        }
+    }
+    let report = capabilities();
+    assert_namespace_has_no_gate(report["commands"].as_array().expect("commands"));
+    let commands = every_command(&report);
+    let gated: Vec<_> = commands
+        .iter()
+        .filter(|(_, command)| command.get("unconditional_gates").is_some())
+        .collect();
+    assert_eq!(gated.len(), 1, "{gated:?}");
+    let (path, command) = gated[0];
+    assert_eq!(path, "inspect dotfiles");
+    assert!(command.get("gates").is_none(), "{command}");
+    let gates = command["unconditional_gates"].as_array().expect("gates");
+    assert_eq!(gates.len(), 1, "{gates:?}");
+    let gate = &gates[0];
+    assert_eq!(gate["kind"], "presence");
+    assert_eq!(gate["exit_code"], 3);
+    assert!(gate["help"].as_str().is_some_and(|help| !help.is_empty()));
+    assert!(gate.get("flag").is_none(), "{gate}");
+    assert!(
+        command["possible_error_codes"]
+            .as_array()
+            .expect("error codes")
+            .iter()
+            .any(|code| code == "gate.failed"),
+        "{command}"
+    );
 }
 
 // --- H18: the message language ---

@@ -1,4 +1,35 @@
-# 機能追加候補カタログ（2026-08-01 版・重点13区分）
+# Feature candidates
+
+## Current implementation reconciliation
+
+The catalog below is a historical planning snapshot for v1.3.0, not a statement
+that its candidates remain absent. Its source locations, counts, and claims
+about current behavior belong to that snapshot. Use the
+[command reference](../reference/api.md) and `inspect capabilities` for the
+supported command surface.
+
+| Candidate | Current scope |
+| --- | --- |
+| C4: test risk | `inspect test-risk` ranks named Common Lisp and Emacs Lisp functions using static complexity and test-name linkage. It does not measure executed coverage or prove safety. Unsupported analysis is reported rather than treated as zero risk. |
+| D3: bulk edits | `refactor bulk` validates a versioned request against one original syntax tree and an input hash. It supports `wrap` and syntactic `rename-in-form`, rejects conflicting spans, and validates the final source before writing. It is not an arbitrary command pipeline or a multi-file transaction. |
+| H11: dotfiles | `inspect dotfiles` reports supported dotfile metadata. It does not evaluate configuration code or guarantee complete application-specific validation. |
+| B12: edit preflight | Multiple kills, selected refactor steps, and lint fix batches validate their proposed source before writes. Source files and kill-ring updates do not form one atomic transaction; impact-area groups are independent batches. |
+| A4/A8: dialect reporting | Emacs Lisp constant initializers and dialect capability tiers have implementations. This does not imply full typing or effect-analysis parity across dialects. |
+
+Existing commands also cover license reports, export/cycle analysis, condition
+and naming checks, formatter options, checkpoint identity checks, schema rules,
+and kill-ring repair. Their presence does not establish every broader guarantee
+proposed below. In particular, a checkpoint is not an undo journal, and static
+declarative-style metrics are not a proof of purity.
+
+Candidates involving runtime evaluation, macro hygiene, additional dialect
+semantics, executed test coverage, accessibility audits, and measured performance
+remain separate work unless the documented implementation explicitly covers
+them. No performance improvement is claimed for the bulk command without a
+benchmark. The historical list is retained for traceability rather than marked
+complete wholesale.
+
+## Historical v1.3.0 planning snapshot
 
 対象: `nerima-lisp/paredit-cli` v1.3.0
 目的: 「次に何を作るか」を選ぶための候補の網羅。採否は未決。

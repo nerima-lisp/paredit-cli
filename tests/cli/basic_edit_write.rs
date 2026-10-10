@@ -1,6 +1,176 @@
 use super::*;
 
 #[test]
+fn edit_kill_paths_use_the_original_snapshot_and_source_order() {
+    let dir = fresh_temp_dir("edit-kill-paths-snapshot");
+    let file = dir.join("source.lisp");
+    let ring = dir.join("ring.json");
+    fs::write(&file, "(a b c d)\n(keep)\n").expect("write source");
+    paredit()
+        .args([
+            "edit",
+            "kill",
+            "--paths",
+            "0.1",
+            "--paths",
+            "0.3",
+            "--write",
+            "--to-ring",
+            "--file",
+        ])
+        .arg(&file)
+        .arg("--ring")
+        .arg(&ring)
+        .assert()
+        .success();
+    assert_eq!(fs::read(&file).expect("read source"), b"(a c)\n(keep)\n");
+    let contents: serde_json::Value =
+        serde_json::from_slice(&fs::read(&ring).expect("read ring")).expect("ring JSON");
+    assert_eq!(contents["entries"][0]["text"], "d");
+    assert_eq!(contents["entries"][1]["text"], "b");
+}
+
+#[test]
+fn edit_kill_malformed_ring_preserves_source_bytes() {
+    let dir = fresh_temp_dir("edit-kill-malformed-ring");
+    let file = dir.join("source.lisp");
+    let ring = dir.join("ring.json");
+    let source = b"(a b)\r\n(keep)  \r\n";
+    fs::write(&file, source).expect("write source");
+    fs::write(&ring, b"invalid JSON\n").expect("write ring");
+    paredit()
+        .args([
+            "edit",
+            "kill",
+            "--path",
+            "0.1",
+            "--write",
+            "--to-ring",
+            "--file",
+        ])
+        .arg(&file)
+        .arg("--ring")
+        .arg(&ring)
+        .assert()
+        .failure();
+    assert_eq!(fs::read(&file).expect("read source"), source);
+    assert_eq!(fs::read(&ring).expect("read ring"), b"invalid JSON\n");
+}
+
+#[test]
+fn edit_kill_paths_refuse_invalid_batches_without_any_write() {
+    for paths in [
+        ["0.1", "0.1"],
+        ["0.1", "00.01"],
+        ["0", "0.1"],
+        ["0.1", "0"],
+        ["0.1", "99"],
+        ["0.1", "not-a-path"],
+    ] {
+        let dir = fresh_temp_dir("edit-kill-paths-invalid");
+        let file = dir.join("source.lisp");
+        let ring = dir.join("ring.json");
+        let source = "(α β γ)\r\n(keep)  \r\n".as_bytes();
+        let ring_bytes =
+            b"{\"schema_version\":1,\"entries\":[{\"text\":\"old\",\"origin\":null}]}\n";
+        fs::write(&file, source).expect("write source");
+        fs::write(&ring, ring_bytes).expect("write ring");
+        paredit()
+            .args([
+                "edit",
+                "kill",
+                "--paths",
+                paths[0],
+                "--paths",
+                paths[1],
+                "--write",
+                "--to-ring",
+                "--file",
+            ])
+            .arg(&file)
+            .arg("--ring")
+            .arg(&ring)
+            .assert()
+            .failure()
+            .stdout(predicate::str::is_empty());
+        assert_eq!(fs::read(&file).expect("read source"), source, "{paths:?}");
+        assert_eq!(fs::read(&ring).expect("read ring"), ring_bytes, "{paths:?}");
+    }
+}
+
+#[test]
+fn edit_kill_paths_reverse_adjacent_and_top_level_targets() {
+    let dir = fresh_temp_dir("edit-kill-paths-adjacent");
+    let file = dir.join("source.lisp");
+    fs::write(&file, "(a b c d)\n").expect("write source");
+    paredit()
+        .args([
+            "edit", "kill", "--paths", "0.3", "--paths", "0.2", "--paths", "0.1", "--write",
+            "--file",
+        ])
+        .arg(&file)
+        .assert()
+        .success();
+    assert_eq!(fs::read(&file).expect("read source"), b"(a)\n");
+    let dir = fresh_temp_dir("edit-kill-paths-top-level");
+    let file = dir.join("source.lisp");
+    fs::write(&file, "(α)\r\n(keep)  \r\n(γ)\r\n").expect("write source");
+    paredit()
+        .args([
+            "edit", "kill", "--paths", "2", "--paths", "0", "--write", "--file",
+        ])
+        .arg(&file)
+        .assert()
+        .success();
+    assert_eq!(fs::read(&file).expect("read source"), b"(keep)  \r\n");
+}
+
+#[test]
+fn edit_kill_paths_stdout_and_diff_preserve_input_bytes() {
+    let dir = fresh_temp_dir("edit-kill-paths-preview");
+    let file = dir.join("source.lisp");
+    let source = b"(a b c)\n(keep)  \n";
+    fs::write(&file, source).expect("write source");
+    paredit()
+        .args(["edit", "kill", "--paths", "0.1", "--paths", "0.2", "--file"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout("(a)\n(keep)  \n");
+    paredit()
+        .args([
+            "edit", "kill", "--paths", "0.1", "--paths", "0.2", "--diff", "--file",
+        ])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("-(a b c)"));
+    assert_eq!(fs::read(&file).expect("read source"), source);
+    paredit()
+        .args(["edit", "kill", "--paths", "0.1", "--paths", "0.2"])
+        .write_stdin("(a b c)  \r\n(keep)  \r\n")
+        .assert()
+        .success()
+        .stdout("(a)  \r\n(keep)  \r\n");
+}
+
+#[test]
+fn edit_kill_paths_stdin_and_write_requirement() {
+    paredit()
+        .args(["edit", "kill", "--paths", "0.1", "--paths", "0.2"])
+        .write_stdin("(a b c)\n")
+        .assert()
+        .success()
+        .stdout("(a)\n");
+    paredit()
+        .args(["edit", "kill", "--paths", "0.1", "--write"])
+        .write_stdin("(a b c)\n")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--write requires --file"));
+}
+
+#[test]
 fn edit_wrap_write_updates_file_in_place_and_prints_nothing() {
     let dir = fresh_temp_dir("edit-wrap-write");
     let file = dir.join("source.lisp");

@@ -502,14 +502,17 @@ mod corpus_sweep_tests {
 ///   wrong: a rule that is dispatched once per *definition* rather than once per
 ///   `in-package` pays its whole-file scan N times, and N×file is the quadratic
 ///   this codebase has found twice at 480 definitions.
-/// - **Wall clock.** Noisy, so it is measured best-of-several and asserted only
-///   loosely — enough to separate linear (ratio ≈ 2 per doubling) from
-///   quadratic (ratio ≈ 4), and no tighter.
+/// - **Rule-body cost.** Thread CPU time on Linux and macOS excludes waiting;
+///   other platforms use wall time. Both entries use the same test-only clock
+///   wrapper. Best-of-several ratios remain sensitive to clock overhead and
+///   machine state, so inefficient scan implementations also exercise the gates.
 #[cfg(test)]
 mod measurement {
+    use std::cell::Cell;
     use std::path::Path;
     use std::time::Duration;
 
+    use paredit_core_cli::report::Finding;
     use paredit_core_lint_engine::LintResult;
     use paredit_core_lint_engine::engine::{
         PassOptions, RuleContext, RuleSink, build_head_index, collect_lint_pass,
@@ -517,10 +520,13 @@ mod measurement {
     use paredit_core_lint_engine::model::{
         Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
     };
-    use paredit_core_lint_engine::policy::RuleSelection;
+    use paredit_core_lint_engine::policy::{RuleDialectScope, RuleSelection};
     use paredit_core_lint_engine::rule::{LintRule, RuleCatalog, RuleEntry};
     use paredit_core_syntax::dialect::Dialect;
     use paredit_core_syntax::sexpr::{ExpressionView, SyntaxTree};
+
+    use crate::package_circular_in_package_chain::domain::{chain_reentries, switched_package};
+    use crate::support::{InPackageEntry, is_unevaluated_at, top_level_in_package_chain_through};
 
     /// The control.
     ///
@@ -529,8 +535,8 @@ mod measurement {
     /// scans the whole manifest text rather than only `[dependencies]` — so a
     /// *dev*-dependency on a shipped rule would trip it too. The control is
     /// therefore declared here: a `Heads` rule that matches the file's dense
-    /// head and does nothing at all, which measures pure dispatch overhead and
-    /// isolates what this package's rule adds on top of it.
+    /// head and does nothing. Its measured interval includes clock overhead,
+    /// not the engine's complete dispatch traversal or view construction.
     #[derive(Debug)]
     struct DispatchOnly;
 
@@ -572,6 +578,193 @@ mod measurement {
     /// indexes its rows.
     const SUBJECT: usize = 0;
     const CONTROL_POSITION: usize = 1;
+
+    thread_local! {
+        static CPU_TIMINGS: Cell<[(Duration, u64); 2]> = const {
+            Cell::new([(Duration::ZERO, 0); 2])
+        };
+    }
+
+    #[derive(Debug)]
+    struct CpuTimedRule {
+        position: usize,
+        rule: &'static dyn LintRule,
+    }
+
+    impl LintRule for CpuTimedRule {
+        fn head_filter(&self) -> HeadFilter {
+            self.rule.head_filter()
+        }
+
+        fn dialect_scope(&self) -> RuleDialectScope {
+            self.rule.dialect_scope()
+        }
+
+        fn check(
+            &self,
+            context: &RuleContext<'_>,
+            view: &ExpressionView,
+            sink: &mut RuleSink<'_, '_>,
+        ) -> LintResult<()> {
+            #[cfg(any(target_os = "linux", target_os = "macos"))]
+            let started = thread_cpu_time();
+            #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+            let started = std::time::Instant::now();
+
+            let result = self.rule.check(context, view, sink);
+
+            #[cfg(any(target_os = "linux", target_os = "macos"))]
+            let elapsed = thread_cpu_time()
+                .checked_sub(started)
+                .expect("thread CPU clock is monotonic");
+            #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+            let elapsed = started.elapsed();
+            CPU_TIMINGS.with(|timings| {
+                let mut entries = timings.get();
+                entries[self.position].0 += elapsed;
+                entries[self.position].1 += 1;
+                timings.set(entries);
+            });
+            result
+        }
+    }
+
+    static CPU_RULES: [CpuTimedRule; 2] = [
+        CpuTimedRule {
+            position: SUBJECT,
+            rule: ENTRIES[SUBJECT].rule(),
+        },
+        CpuTimedRule {
+            position: CONTROL_POSITION,
+            rule: ENTRIES[CONTROL_POSITION].rule(),
+        },
+    ];
+
+    static CPU_ENTRIES: [RuleEntry; 2] = [
+        RuleEntry::new(ENTRIES[SUBJECT].meta(), &CPU_RULES[SUBJECT]),
+        RuleEntry::new(
+            ENTRIES[CONTROL_POSITION].meta(),
+            &CPU_RULES[CONTROL_POSITION],
+        ),
+    ];
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[allow(unsafe_code)]
+    fn thread_cpu_time() -> Duration {
+        let mut time = std::mem::MaybeUninit::<libc::timespec>::uninit();
+        // SAFETY: the live timespec is initialized on success and read only then.
+        let result =
+            unsafe { libc::clock_gettime(libc::CLOCK_THREAD_CPUTIME_ID, time.as_mut_ptr()) };
+        assert_eq!(result, 0, "clock_gettime(CLOCK_THREAD_CPUTIME_ID) failed");
+        // SAFETY: clock_gettime returned zero, so time is initialized.
+        let time = unsafe { time.assume_init() };
+        let seconds = u64::try_from(time.tv_sec).expect("CPU time seconds are nonnegative");
+        let nanos = u32::try_from(time.tv_nsec).expect("CPU time nanoseconds are nonnegative");
+        assert!(nanos < 1_000_000_000, "normalized timespec nanoseconds");
+        Duration::new(seconds, nanos)
+    }
+
+    /// Reconstruct each top-level form's active package by rescanning its
+    /// prefix, then recover the switch chain from those ownership regions.
+    /// This computes the chain, but needs quadratic work in the number of forms.
+    fn quadratic_chain(tree: &SyntaxTree) -> Vec<InPackageEntry> {
+        let mut chain: Vec<InPackageEntry> = Vec::new();
+        for root_index in 0..tree.root_children().len() {
+            if let Some(entry) = top_level_in_package_chain_through(tree, root_index).pop() {
+                if chain
+                    .last()
+                    .is_none_or(|previous| previous.root_index != entry.root_index)
+                {
+                    chain.push(entry);
+                }
+            }
+        }
+        chain
+    }
+
+    /// An unbounded scan using the fully materialized document, including all
+    /// definitions after the switch. The views supply the actual chain entries.
+    fn materialized_chain(tree: &SyntaxTree) -> Vec<InPackageEntry> {
+        tree.root_view()
+            .children
+            .iter()
+            .enumerate()
+            .filter_map(|(root_index, form)| {
+                let package = switched_package(form)?;
+                if is_unevaluated_at(tree, form.span) {
+                    return None;
+                }
+                let designator_span = form.children.get(1)?.span;
+                Some(InPackageEntry {
+                    root_index,
+                    span: form.span,
+                    package,
+                    written: tree
+                        .source()
+                        .get(designator_span.start().get()..designator_span.end().get())?
+                        .to_owned(),
+                })
+            })
+            .collect()
+    }
+
+    #[derive(Debug)]
+    struct InefficientScan {
+        chain: fn(&SyntaxTree) -> Vec<InPackageEntry>,
+    }
+
+    impl LintRule for InefficientScan {
+        fn head_filter(&self) -> HeadFilter {
+            ENTRIES[SUBJECT].rule().head_filter()
+        }
+
+        fn dialect_scope(&self) -> RuleDialectScope {
+            ENTRIES[SUBJECT].rule().dialect_scope()
+        }
+
+        fn check(
+            &self,
+            context: &RuleContext<'_>,
+            view: &ExpressionView,
+            sink: &mut RuleSink<'_, '_>,
+        ) -> LintResult<()> {
+            for item in chain_reentries(&(self.chain)(context.tree())) {
+                if item.span == view.span {
+                    sink.report(item.span, item.message());
+                }
+            }
+            Ok(())
+        }
+    }
+
+    static QUADRATIC_SCAN: InefficientScan = InefficientScan {
+        chain: quadratic_chain,
+    };
+    static UNBOUNDED_SCAN: InefficientScan = InefficientScan {
+        chain: materialized_chain,
+    };
+    static QUADRATIC_CPU_RULE: CpuTimedRule = CpuTimedRule {
+        position: SUBJECT,
+        rule: &QUADRATIC_SCAN,
+    };
+    static UNBOUNDED_CPU_RULE: CpuTimedRule = CpuTimedRule {
+        position: SUBJECT,
+        rule: &UNBOUNDED_SCAN,
+    };
+    static QUADRATIC_ENTRIES: [RuleEntry; 2] = [
+        RuleEntry::new(ENTRIES[SUBJECT].meta(), &QUADRATIC_CPU_RULE),
+        RuleEntry::new(
+            ENTRIES[CONTROL_POSITION].meta(),
+            &CPU_RULES[CONTROL_POSITION],
+        ),
+    ];
+    static UNBOUNDED_ENTRIES: [RuleEntry; 2] = [
+        RuleEntry::new(ENTRIES[SUBJECT].meta(), &UNBOUNDED_CPU_RULE),
+        RuleEntry::new(
+            ENTRIES[CONTROL_POSITION].meta(),
+            &CPU_RULES[CONTROL_POSITION],
+        ),
+    ];
 
     /// A file with `definitions` top-level definitions, a `defpackage`, and a
     /// realistic three-switch `in-package` chain that doubles back once.
@@ -623,7 +816,12 @@ mod measurement {
     }
 
     fn measure_once(source: &str) -> Measured {
-        let catalog = RuleCatalog::new(&ENTRIES);
+        measure_once_in_catalog(source, &CPU_ENTRIES)
+    }
+
+    fn measure_once_in_catalog(source: &str, entries: &'static [RuleEntry; 2]) -> Measured {
+        CPU_TIMINGS.with(|timings| timings.set([(Duration::ZERO, 0); 2]));
+        let catalog = RuleCatalog::new(entries);
         let index = build_head_index(catalog);
         let tree = SyntaxTree::parse_with_dialect(source, Dialect::CommonLisp).expect("parse");
         let outcome = collect_lint_pass(
@@ -642,18 +840,25 @@ mod measurement {
         .expect("lint pass");
         let timings = outcome.timings.expect("measure: true produces timings");
         let rows: Vec<(usize, Duration, u64)> = timings.entries().collect();
+        let cpu_timings = CPU_TIMINGS.with(Cell::get);
+        assert_eq!(rows.len(), 2, "both registered entries must be measured");
+        for (position, _, invocations) in &rows {
+            assert_eq!(
+                cpu_timings[*position].1, *invocations,
+                "CPU and dispatcher counts"
+            );
+        }
         Measured {
-            subject: rows[SUBJECT].1,
+            subject: cpu_timings[SUBJECT].0,
             subject_invocations: rows[SUBJECT].2,
-            control: rows[CONTROL_POSITION].1,
+            control: cpu_timings[CONTROL_POSITION].0,
             control_invocations: rows[CONTROL_POSITION].2,
             findings: outcome.outcomes.len(),
         }
     }
 
-    /// Best of `runs`, by the subject's own time. A single timed run on a
-    /// loaded machine is not a measurement; the minimum is the least
-    /// contaminated sample available.
+    /// Best of `runs`, by the subject's own time, retaining the control from
+    /// the same pass. CPU time removes waiting, not clock or allocator overhead.
     fn measure(source: &str, runs: usize) -> Measured {
         let mut best = measure_once(source);
         for _ in 1..runs {
@@ -695,13 +900,9 @@ mod measurement {
     /// stops after the switch it was dispatched at — so quadrupling the
     /// definitions must not multiply the cost.
     ///
-    /// The assertion is stated **against the control measured in the same
-    /// pass**, not against a microsecond constant. An earlier version used a
-    /// constant tuned on `--release` and then failed in `debug`, where every
-    /// number is about ten times larger; a comparison between two rules in one
-    /// pass has no such profile dependence. The control is dispatched once per
-    /// `defun`, so "cheaper than the control" says this rule did not read the
-    /// definitions — which is exactly the property the bound exists for.
+    /// The comparison uses the no-op control in the same pass, including one
+    /// clock interval per `defun`. It is a relative cost check, not proof that
+    /// definitions were unread or that debug and release have identical ratios.
     #[test]
     fn the_ordinary_one_switch_file_costs_almost_nothing() {
         const RUNS: usize = 9;
@@ -724,12 +925,8 @@ mod measurement {
         assert_eq!(small.findings, 0);
         assert_eq!(large.findings, 0);
 
-        // The whole point of bounding the scan: a switch at the top of the file
-        // does not read the file below it. A rule that walked all 4096
-        // definitions once would cost about what the control costs being
-        // dispatched at all 4096 of them; this one costs a small fraction of
-        // it. Removing the bound in `top_level_in_package_chain_through` makes
-        // this fail, which is how it was checked.
+        // Compare one bounded rule-body interval with 4096 no-op intervals.
+        // The unbounded negative control below checks this gate's sensitivity.
         let subject_us = large.subject.as_secs_f64() * 1e6;
         let control_us = large.control.as_secs_f64() * 1e6;
         assert!(
@@ -748,14 +945,12 @@ mod measurement {
         );
     }
 
-    /// The noisy half: how the cost grows with the file.
+    /// How the measured rule-body cost grows with the file.
     ///
     /// The step is **4x**, not 2x, on purpose. A doubling separates linear
-    /// (≈2.0) from quadratic (≈4.0) by a factor the machine's own noise can
-    /// cover — three consecutive runs of an earlier version of this test
-    /// produced 2.59, 2.78 and 3.19 for identical code. Quadrupling separates
-    /// them by 4.0 against 16.0, which nothing short of a real regression
-    /// crosses.
+    /// (≈2.0) from quadratic (≈4.0) by a smaller gap than quadrupling, which
+    /// separates their ideal ratios by 4.0 against 16.0. Clock overhead and
+    /// machine state can still affect those ratios.
     #[test]
     fn the_cost_grows_linearly_with_the_file() {
         const RUNS: usize = 9;
@@ -788,25 +983,16 @@ mod measurement {
             return;
         }
         let ratio = large_us / small_us;
-        // The control is dispatched once per `defun`, so its own cost is linear
-        // in the file by construction. Measuring it in the same pass gives a
-        // reference that absorbs whatever the machine was doing at the time,
-        // which a bare constant cannot: a loaded machine moves both ratios
-        // together.
+        // The control has one clock interval per defun. It is a same-pass
+        // reference, not a guarantee that machine effects move both ratios alike.
         let control_ratio = (large.control.as_secs_f64() * 1e6).max(f64::MIN_POSITIVE)
             / (small.control.as_secs_f64() * 1e6).max(f64::MIN_POSITIVE);
         println!(
             "4x ratio: {ratio:.2} (control {control_ratio:.2}; \
              linear is ~4.0, quadratic is ~16.0)"
         );
-        // Both bounds have to hold. The absolute one catches a regression on a
-        // quiet machine; the relative one catches it on a busy one. Neither is
-        // set at 4.0: the observed gap above linear is not algorithmic — the
-        // number of forms visited is exactly linear, and the invocation count
-        // is pinned separately — but the scan chases node ids through a larger
-        // array in the larger file, so its cost *per form visited* grows.
-        // Measured at ~20ns per form at 2048 definitions and ~30ns at 4096.
-        // That is cache locality, and it is bounded.
+        // Both bounds have to hold. The quadratic negative control below must
+        // violate each independently; no cache or scheduling cause is assumed.
         assert!(
             ratio < 9.0,
             "cost grew {ratio:.2}x when the file quadrupled ({small_us:.1}us -> {large_us:.1}us); \
@@ -817,6 +1003,96 @@ mod measurement {
             "cost grew {ratio:.2}x when the file quadrupled, against {control_ratio:.2}x for a \
              control rule measured in the same pass; a rule that rescans the whole file on \
              every invocation grows about four times as fast as one that does not"
+        );
+    }
+
+    /// Validate every sample's dispatch and finding counts before selecting
+    /// the minimum, using the same clock and paired control as the shipped rule.
+    fn measure_negative(
+        source: &str,
+        entries: &'static [RuleEntry; 2],
+        subject_invocations: u64,
+        control_invocations: u64,
+        findings: usize,
+    ) -> Measured {
+        (0..9)
+            .map(|_| {
+                let measured = measure_once_in_catalog(source, entries);
+                assert_eq!(measured.subject_invocations, subject_invocations);
+                assert_eq!(measured.control_invocations, control_invocations);
+                assert_eq!(measured.findings, findings);
+                measured
+            })
+            .min_by_key(|measured| measured.subject)
+            .expect("nine measured samples")
+    }
+
+    #[test]
+    fn negative_controls_reconstruct_the_same_chain() {
+        for source in [
+            source_with(16),
+            ordinary_file(16),
+            "(in-package :cl-user)\n\
+             '(in-package :ignored)\n\
+             (in-package :app)\n\
+             (defun f () (in-package :nested))\n\
+             (in-package :app)\n\
+             (in-package :other)\n\
+             (in-package :app)\n"
+                .to_owned(),
+        ] {
+            let tree = SyntaxTree::parse_with_dialect(&source, Dialect::CommonLisp).expect("parse");
+            let expected = crate::support::top_level_in_package_chain(&tree);
+            assert_eq!(quadratic_chain(&tree), expected);
+            assert_eq!(materialized_chain(&tree), expected);
+        }
+    }
+
+    #[test]
+    fn the_chain_cost_gates_reject_quadratic_work() {
+        let small = measure_negative(&source_with(1024), &QUADRATIC_ENTRIES, 3, 1025, 1);
+        let large = measure_negative(&source_with(4096), &QUADRATIC_ENTRIES, 3, 4097, 1);
+        let small_us = small.subject.as_secs_f64() * 1e6;
+        let large_us = large.subject.as_secs_f64() * 1e6;
+        assert!(small_us >= 10.0, "the unchanged chain gate must be active");
+        let ratio = large_us / small_us;
+        let control_ratio = (large.control.as_secs_f64() * 1e6).max(f64::MIN_POSITIVE)
+            / (small.control.as_secs_f64() * 1e6).max(f64::MIN_POSITIVE);
+        println!(
+            "quadratic chain: {small_us:.2}us -> {large_us:.2}us; \
+             4x ratio {ratio:.2}, control {control_ratio:.2}"
+        );
+        assert!(
+            ratio >= 9.0,
+            "the absolute chain gate accepted quadratic work: ratio {ratio:.2}"
+        );
+        assert!(
+            ratio >= control_ratio * 2.2,
+            "the relative chain gate accepted quadratic work: ratio {ratio:.2}, \
+             control {control_ratio:.2}"
+        );
+    }
+
+    #[test]
+    fn the_ordinary_cost_gates_reject_an_unbounded_scan() {
+        let small = measure_negative(&ordinary_file(1024), &UNBOUNDED_ENTRIES, 1, 1024, 0);
+        let large = measure_negative(&ordinary_file(4096), &UNBOUNDED_ENTRIES, 1, 4096, 0);
+        let subject_us = large.subject.as_secs_f64() * 1e6;
+        let control_us = large.control.as_secs_f64() * 1e6;
+        let growth = subject_us / (small.subject.as_secs_f64() * 1e6).max(f64::MIN_POSITIVE);
+        println!(
+            "unbounded ordinary scan: {:.2}us -> {subject_us:.2}us; \
+             4x ratio {growth:.2}, large control {control_us:.2}us",
+            small.subject.as_secs_f64() * 1e6,
+        );
+        assert!(
+            subject_us >= control_us,
+            "the ordinary cost comparison accepted an unbounded scan: \
+             subject {subject_us:.2}us, control {control_us:.2}us"
+        );
+        assert!(
+            growth >= 2.5,
+            "the ordinary growth gate accepted an unbounded scan: ratio {growth:.2}"
         );
     }
 }

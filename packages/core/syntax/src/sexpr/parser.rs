@@ -287,7 +287,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Returns `true` when only whitespace precedes byte `start` on its line.
-    fn is_line_start(&self, start: usize) -> bool {
+    const fn is_line_start(&self, start: usize) -> bool {
         let mut index = start;
         while index > 0 {
             let byte = self.bytes[index - 1];
@@ -1123,7 +1123,7 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn skip_string(&mut self) -> std::result::Result<(), ParseError> {
+    const fn skip_string(&mut self) -> std::result::Result<(), ParseError> {
         let start = self.pos;
         self.advance();
         let mut escaped = false;
@@ -1177,7 +1177,7 @@ impl<'a> Parser<'a> {
             && self.peek_byte() == Some(b'|')
     }
 
-    fn current_byte(&self) -> u8 {
+    const fn current_byte(&self) -> u8 {
         self.bytes[self.pos.get()]
     }
 

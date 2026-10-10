@@ -11,8 +11,12 @@ repository.workspace = true
 
 [dependencies]
 paredit-core-syntax = { path = "../../core/syntax" }
+paredit-core-semantics = { path = "../../core/semantics" }
 paredit-core-cli = { path = "../../core/cli" }
+paredit-feature-project-analysis = { path = "../project-analysis" }
 clap = { workspace = true }
+cap-std = { workspace = true }
+cap-primitives = "4.0"
 serde_json = { workspace = true }
 
 # Mandatory: without it this package silently opts out of the workspace lint

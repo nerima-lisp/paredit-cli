@@ -103,13 +103,16 @@
 //!
 //! # What runs unattended
 //!
-//! Only the **invocation counts** and the ordering assertions that are decided
-//! by the head index and by control flow rather than by the clock. The
+//! Invocation counts, ordering and locality checks run unattended. On Linux
+//! and macOS, locality checks measure each rule's thread CPU time: descheduling
+//! between different rule invocations must not change their relative cost.
+//! Other platforms use the wall clock. The
 //! **doubling ratios are benchmarks, not tests**, and are `#[ignore]`d: a ratio
 //! between two wall-clock durations is unstable under parallel load at any
 //! threshold, and this machine reported a load average above 20 while these were
 //! taken. Read the ratios, not the durations.
 
+use std::cell::Cell;
 use std::path::Path;
 use std::time::Duration;
 
@@ -324,6 +327,121 @@ const COLUMNS: [&str; 5] = [
 
 // -- measurement --------------------------------------------------------------
 
+thread_local! {
+    static CPU_TIMINGS: Cell<[(Duration, u64); 5]> = const {
+        Cell::new([(Duration::ZERO, 0); 5])
+    };
+}
+
+#[derive(Debug)]
+struct CpuTimedRule(usize);
+
+impl LintRule for CpuTimedRule {
+    fn head_filter(&self) -> HeadFilter {
+        ENTRIES[self.0].rule().head_filter()
+    }
+
+    fn dialect_scope(&self) -> RuleDialectScope {
+        ENTRIES[self.0].rule().dialect_scope()
+    }
+
+    fn check(
+        &self,
+        context: &RuleContext<'_>,
+        view: &ExpressionView,
+        sink: &mut RuleSink<'_, '_>,
+    ) -> LintResult {
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        let started = thread_cpu_time();
+        #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+        let started = std::time::Instant::now();
+
+        let result = ENTRIES[self.0].rule().check(context, view, sink);
+
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        let elapsed = thread_cpu_time()
+            .checked_sub(started)
+            .expect("thread CPU clock is monotonic");
+        #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+        let elapsed = started.elapsed();
+        CPU_TIMINGS.with(|timings| {
+            let mut entries = timings.get();
+            entries[self.0].0 += elapsed;
+            entries[self.0].1 += 1;
+            timings.set(entries);
+        });
+        result
+    }
+}
+
+static CPU_RULES: [CpuTimedRule; 5] = [
+    CpuTimedRule(0),
+    CpuTimedRule(1),
+    CpuTimedRule(2),
+    CpuTimedRule(3),
+    CpuTimedRule(4),
+];
+
+static CPU_ENTRIES: [RuleEntry; 5] = [
+    RuleEntry::new(ENTRIES[0].meta(), &CPU_RULES[0]),
+    RuleEntry::new(ENTRIES[1].meta(), &CPU_RULES[1]),
+    RuleEntry::new(ENTRIES[2].meta(), &CPU_RULES[2]),
+    RuleEntry::new(ENTRIES[3].meta(), &CPU_RULES[3]),
+    RuleEntry::new(ENTRIES[4].meta(), &CPU_RULES[4]),
+];
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[allow(unsafe_code)]
+fn thread_cpu_time() -> Duration {
+    let mut time = std::mem::MaybeUninit::<libc::timespec>::uninit();
+    // SAFETY: the live timespec is initialized on success and read only then.
+    let result = unsafe { libc::clock_gettime(libc::CLOCK_THREAD_CPUTIME_ID, time.as_mut_ptr()) };
+    assert_eq!(result, 0, "clock_gettime(CLOCK_THREAD_CPUTIME_ID) failed");
+    // SAFETY: clock_gettime returned zero, so time is initialized.
+    let time = unsafe { time.assume_init() };
+    let seconds = u64::try_from(time.tv_sec).expect("CPU time seconds are nonnegative");
+    let nanos = u32::try_from(time.tv_nsec).expect("CPU time nanoseconds are nonnegative");
+    assert!(nanos < 1_000_000_000, "normalized timespec nanoseconds");
+    Duration::new(seconds, nanos)
+}
+
+fn measure_cpu(source: &str) -> Vec<(&'static str, Duration, u64)> {
+    CPU_TIMINGS.with(|timings| timings.set([(Duration::ZERO, 0); 5]));
+    let catalog = RuleCatalog::new(&CPU_ENTRIES);
+    let index = build_head_index(catalog);
+    let tree = SyntaxTree::parse_with_dialect(source, Dialect::CommonLisp).expect("parse");
+    let outcome = collect_lint_pass(
+        catalog,
+        &index,
+        Path::new("cost.lisp"),
+        Dialect::CommonLisp,
+        &tree,
+        source,
+        RuleSelection::All,
+        PassOptions {
+            settings: None,
+            measure: true,
+        },
+    )
+    .expect("measured lint pass");
+    assert!(outcome.outcomes.is_empty(), "cost fixture must be clean");
+    let timings = CPU_TIMINGS.with(Cell::get);
+    outcome
+        .timings
+        .expect("measure: true produces timings")
+        .entries()
+        .map(|(position, _, invocations)| {
+            let (elapsed, cpu_invocations) = timings[position];
+            assert_eq!(cpu_invocations, invocations, "CPU and dispatcher counts");
+            (
+                catalog.entries()[position].meta().name().as_str(),
+                elapsed,
+                invocations,
+            )
+        })
+        .collect()
+}
+
 fn measure(source: &str) -> Vec<(&'static str, Duration, u64)> {
     let catalog = RuleCatalog::new(&ENTRIES);
     let index = build_head_index(catalog);
@@ -516,11 +634,11 @@ fn cost_a_string_datum_never_reaches_the_hierarchy() {
     for index in 0..400 {
         source.push_str(&format!("(defun step{index} (s) (error \"boom ~A\" s))\n"));
     }
-    let rows = measure(&source);
+    let rows = measure_cpu(&source);
     let hierarchy = nanos_of(&rows, "cost-control-file-hierarchy");
     let noop = nanos_of(&rows, "cost-control-noop");
     // A generous bound: the point is orders of magnitude, not a threshold, and
-    // a wall-clock comparison under parallel load cannot carry a tight one.
+    // the fixed bound also accommodates clocks on unsupported platforms.
     assert!(
         hierarchy < noop.saturating_mul(50).max(2_000_000),
         "a string datum must fail the cheap check before the hierarchy walk: \
@@ -528,21 +646,34 @@ fn cost_a_string_datum_never_reaches_the_hierarchy() {
     );
 }
 
-/// The shipped rules must both stay within an order of magnitude of the shipped
+/// The shipped rules must both stay within two orders of magnitude of the shipped
 /// *control*, and decisively below the rejected shape, on the zero-finding
 /// fixture. This is the regression this file guards.
 ///
-/// Ratios, not absolute durations: under parallel load the durations move
-/// together, so a comparison taken in the same pass is the only stable reading.
+/// CPU time excludes unrelated scheduling waits, not the rule's actual work.
 #[test]
 fn cost_the_shipped_rules_are_local() {
     // Deliberately small: this runs in the unoptimized profile, where the
     // rejected shape's quadratic term is expensive enough to dominate the
     // package's whole test run. The separation it asserts is four orders of
     // magnitude, so it does not need a large n to be visible.
-    let rows = measure(&clean_source(150));
+    let rows = measure_cpu(&clean_source(150));
+    for (rule, expected) in [
+        ("cost-control-noop", 751),
+        ("cost-control-shipped-local", 751),
+        ("cost-control-file-hierarchy", 301),
+        ("condition-type-datum-with-string-initarg", 601),
+        ("unwind-protect-cleanup-signals", 150),
+    ] {
+        assert_eq!(invocations_of(&rows, rule), expected, "{rule} calls");
+    }
     let hierarchy = nanos_of(&rows, "cost-control-file-hierarchy");
     let shipped_control = nanos_of(&rows, "cost-control-shipped-local").max(1);
+    assert!(
+        hierarchy / shipped_control >= 100,
+        "the rejected hierarchy ({hierarchy}ns) must fail the same 100x locality \
+         gate relative to the shipped control ({shipped_control}ns)"
+    );
 
     for rule in [
         "condition-type-datum-with-string-initarg",

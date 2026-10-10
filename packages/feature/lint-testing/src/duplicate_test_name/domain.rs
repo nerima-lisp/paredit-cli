@@ -224,6 +224,118 @@ pub fn build_duplicate_test_name_report(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::Cell;
+    use std::time::Duration;
+
+    use paredit_core_lint_engine::LintResult;
+    use paredit_core_lint_engine::engine::{
+        RuleContext, RuleSink, build_head_index, collect_lint_outcomes,
+    };
+    use paredit_core_lint_engine::model::HeadFilter;
+    use paredit_core_lint_engine::policy::{RuleDialectScope, RuleSelection};
+    use paredit_core_lint_engine::rule::{LintRule, RuleCatalog, RuleEntry};
+
+    use crate::duplicate_test_name::rule::{META, RULE};
+
+    thread_local! {
+        static RULE_TIMING: Cell<(Duration, u64)> = const { Cell::new((Duration::ZERO, 0)) };
+    }
+
+    #[derive(Debug)]
+    struct MeasuredRule {
+        rebuild: bool,
+    }
+
+    impl LintRule for MeasuredRule {
+        fn head_filter(&self) -> HeadFilter {
+            RULE.head_filter()
+        }
+
+        fn dialect_scope(&self) -> RuleDialectScope {
+            RULE.dialect_scope()
+        }
+
+        fn check(
+            &self,
+            context: &RuleContext<'_>,
+            view: &ExpressionView,
+            sink: &mut RuleSink<'_, '_>,
+        ) -> LintResult {
+            let (result, elapsed) = measure_analysis(|| {
+                if self.rebuild {
+                    let root = context.tree().root_view();
+                    RULE.check(context, &root, sink)
+                } else {
+                    RULE.check(context, view, sink)
+                }
+            });
+            RULE_TIMING.with(|timing| {
+                let (duration, calls) = timing.get();
+                timing.set((duration + elapsed, calls + 1));
+            });
+            result
+        }
+    }
+
+    static MEASURED_RULES: [MeasuredRule; 2] = [
+        MeasuredRule { rebuild: false },
+        MeasuredRule { rebuild: true },
+    ];
+    static MEASURED_ENTRIES: [[RuleEntry; 1]; 2] = [
+        [RuleEntry::new(&META, &MEASURED_RULES[0])],
+        [RuleEntry::new(&META, &MEASURED_RULES[1])],
+    ];
+
+    fn measure_analysis<T>(analysis: impl FnOnce() -> T) -> (T, Duration) {
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        let started = thread_cpu_time();
+        #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+        let started = std::time::Instant::now();
+        let result = analysis();
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        let elapsed = thread_cpu_time()
+            .checked_sub(started)
+            .expect("thread CPU clock is monotonic");
+        #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+        let elapsed = started.elapsed();
+        (result, elapsed)
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[allow(unsafe_code)]
+    fn thread_cpu_time() -> Duration {
+        let mut time = std::mem::MaybeUninit::<libc::timespec>::uninit();
+        // SAFETY: the live timespec is initialized on success and read only then.
+        let result =
+            unsafe { libc::clock_gettime(libc::CLOCK_THREAD_CPUTIME_ID, time.as_mut_ptr()) };
+        assert_eq!(result, 0, "clock_gettime(CLOCK_THREAD_CPUTIME_ID) failed");
+        // SAFETY: clock_gettime returned zero, so time is initialized.
+        let time = unsafe { time.assume_init() };
+        let seconds = u64::try_from(time.tv_sec).expect("CPU time seconds are nonnegative");
+        let nanos = u32::try_from(time.tv_nsec).expect("CPU time nanoseconds are nonnegative");
+        assert!(nanos < 1_000_000_000, "normalized timespec nanoseconds");
+        Duration::new(seconds, nanos)
+    }
+
+    fn measured_rule_path(tree: &SyntaxTree, source: &str, rebuild: bool) -> Duration {
+        RULE_TIMING.with(|timing| timing.set((Duration::ZERO, 0)));
+        let catalog = RuleCatalog::new(&MEASURED_ENTRIES[usize::from(rebuild)]);
+        let index = build_head_index(catalog);
+        let outcomes = collect_lint_outcomes(
+            catalog,
+            &index,
+            Path::new("t.lisp"),
+            Dialect::CommonLisp,
+            tree,
+            source,
+            RuleSelection::All,
+        )
+        .expect("run actual rule");
+        assert!(outcomes.is_empty());
+        let (elapsed, calls) = RULE_TIMING.with(Cell::get);
+        assert_eq!(calls, 1, "WholeTree must dispatch exactly once");
+        elapsed
+    }
 
     fn findings(input: &str, dialect: Dialect) -> Vec<DuplicateTestNameItem> {
         let tree = SyntaxTree::parse_with_dialect(input, dialect).expect("parse input");
@@ -540,45 +652,44 @@ mod tests {
 
     // -- the other cost invariant --------------------------------------------
 
-    /// The rule path must answer from the view it is given and never rebuild
-    /// the document.
-    ///
-    /// A ratio rather than a budget, because a ratio is what survives a loaded
-    /// machine: both sides are timed on the same input in the same process, so
-    /// a busy CPU slows them together and the quotient does not move. What
-    /// moves it is the regression — `check` calling
-    /// [`build_duplicate_test_name_report`] again, which is how this rule was
-    /// written when `bench-compare` measured it at +22% on files containing no
-    /// test at all.
-    ///
-    /// The two sides are not comparable work and are not meant to be. The
-    /// report walks every node for the denominator and materializes the
-    /// document to do it; the rule walks the top level of a view it already
-    /// has. That is precisely the gap being asserted, and it is large — a
-    /// twentieth or less in practice — so the half-of budget below fails only
-    /// on a rule that has gone back to doing the report's work.
+    /// Measure the actual rule's analysis, excluding dispatcher's view creation.
+    /// Thread CPU time excludes scheduler waits on Linux and macOS; it does not
+    /// eliminate contention costs. Other platforms retain wall-clock timing.
+    /// The report also materializes the document and counts every test form.
     #[test]
     fn the_rule_path_does_not_rebuild_the_document() {
         let source = many_tests(4000, None);
         let tree = SyntaxTree::parse_with_dialect(&source, Dialect::CommonLisp).expect("parse");
-        let root = tree.root_view();
-
-        let started = std::time::Instant::now();
-        let violations = shadowing_test_definitions(&root, Dialect::CommonLisp);
-        let rule_path = started.elapsed();
-
-        let started = std::time::Instant::now();
-        let report =
+        let rule_path = measured_rule_path(&tree, &source, false);
+        let (report, report_path) = measure_analysis(|| {
             build_duplicate_test_name_report(Path::new("t.lisp"), Dialect::CommonLisp, &tree)
-                .expect("build report");
-        let report_path = started.elapsed();
+                .expect("build report")
+        });
 
-        assert!(violations.is_empty());
         assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("test_form_count", json!(4000))]);
         assert!(
             rule_path * 2 < report_path,
             "the rule path took {rule_path:?} against the report's {report_path:?}; it is doing \
              the report's work again rather than reading the view it was handed"
+        );
+    }
+
+    #[test]
+    fn the_cost_gate_rejects_rebuilding_the_document() {
+        let source = many_tests(4000, None);
+        let tree = SyntaxTree::parse_with_dialect(&source, Dialect::CommonLisp).expect("parse");
+        let rebuilding_path = measured_rule_path(&tree, &source, true);
+        let (report, report_path) = measure_analysis(|| {
+            build_duplicate_test_name_report(Path::new("t.lisp"), Dialect::CommonLisp, &tree)
+                .expect("build report")
+        });
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("test_form_count", json!(4000))]);
+        assert!(
+            rebuilding_path * 2 >= report_path,
+            "the unchanged half-of gate accepted one root_view rebuild: \
+             {rebuilding_path:?} against the report's {report_path:?}"
         );
     }
 
@@ -613,6 +724,35 @@ mod tests {
                     .collect::<Vec<_>>(),
                 "the rule and the report disagree on `{source}`"
             );
+            let expected = report
+                .findings
+                .iter()
+                .map(|item| (item.span, item.message(), item.kind()))
+                .collect::<Vec<_>>();
+            for entries in &MEASURED_ENTRIES {
+                RULE_TIMING.with(|timing| timing.set((Duration::ZERO, 0)));
+                let catalog = RuleCatalog::new(entries);
+                let index = build_head_index(catalog);
+                let actual = collect_lint_outcomes(
+                    catalog,
+                    &index,
+                    Path::new("t.lisp"),
+                    Dialect::CommonLisp,
+                    &tree,
+                    source,
+                    RuleSelection::All,
+                )
+                .expect("run actual rule")
+                .into_iter()
+                .map(|outcome| {
+                    let (finding, fix) = outcome.into_parts();
+                    assert!(fix.is_none(), "duplicate names are report-only");
+                    (finding.span, finding.message, finding.rule)
+                })
+                .collect::<Vec<_>>();
+                assert_eq!(actual, expected, "actual rule disagrees on `{source}`");
+                assert_eq!(RULE_TIMING.with(Cell::get).1, 1);
+            }
         }
     }
 

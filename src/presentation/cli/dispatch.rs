@@ -581,6 +581,12 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
             command::InspectCommand::TestMap(args) => {
                 test_map_report::workflow::test_map_report(args)?;
             }
+            command::InspectCommand::TestRisk(args) => {
+                paredit_feature_project_inventory::test_risk_report(args)?;
+            }
+            command::InspectCommand::Dotfiles(args) => {
+                paredit_feature_project_inventory::dotfiles_report(args)?;
+            }
             command::InspectCommand::SymbolIndex(args) => {
                 symbol_index_report::workflow::symbol_index_report(args)?;
             }
@@ -1120,6 +1126,9 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
             command::RefactorCommand::Step(args) => {
                 refactor_step::workflow::refactor_step(args)?;
             }
+            command::RefactorCommand::Bulk(args) => {
+                paredit_feature_refactor_workflow::refactor_bulk(args)?;
+            }
             command::RefactorCommand::CreateCheckpoint(args) => {
                 refactor_checkpoint::workflow::create_checkpoint(args)?;
             }
@@ -1226,6 +1235,7 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
                 rename::unwrap_function_calls::unwrap_function_calls(args)?;
             }
             command::RefactorCommand::UnwrapCall(args) => unwrap_call::unwrap_call(args)?,
+            command::RefactorCommand::UnwrapBody(args) => unwrap_body::unwrap_body(args)?,
             command::RefactorCommand::ThreadExpression(args) => {
                 thread_expression::thread_expression(args)?;
             }

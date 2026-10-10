@@ -42,21 +42,35 @@ struct PareditConfigFileReport {
 /// skips dot-directories by default — and flags a `defrule` clause still
 /// written in the pattern grammar's pre-unification style.
 ///
-/// Never itself a reason to fail: this is a migration aid a project runs on
-/// purpose, not a gate on every other command, so every finding here is
-/// reported and none of them turns into an `Err`. A rule file that is
+/// Syntax and migration findings remain advisory, but an incomplete read
+/// fails rather than reporting an unchecked directory as clean. A rule file that is
 /// genuinely broken already fails the run that loads it by default (see
 /// `custom::load`); what this adds is a way to see that *before* running a
 /// command that loads rules, and a nudge for a clause that still works but
 /// could be clearer.
-fn check_paredit_config() -> Vec<PareditConfigFileReport> {
+fn check_paredit_config() -> CliResult<Vec<PareditConfigFileReport>> {
     let directory = Path::new(DEFAULT_PAREDIT_RULE_DIRECTORY);
-    let Ok(entries) = std::fs::read_dir(directory) else {
-        return Vec::new();
+    let entries = match std::fs::read_dir(directory) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(source) => {
+            return Err(CliError::Io {
+                context: format!("failed to read rule directory {}", directory.display()),
+                source,
+            });
+        }
     };
     let mut paths: Vec<PathBuf> = entries
-        .filter_map(std::result::Result::ok)
-        .map(|entry| entry.path())
+        .map(|entry| {
+            entry
+                .map(|entry| entry.path())
+                .map_err(CliError::io(format!(
+                    "failed to read entry in rule directory {}",
+                    directory.display()
+                )))
+        })
+        .collect::<CliResult<Vec<_>>>()?
+        .into_iter()
         .filter(|path| {
             path.extension()
                 .is_some_and(|extension| extension == "lisp")
@@ -68,14 +82,8 @@ fn check_paredit_config() -> Vec<PareditConfigFileReport> {
     let mut merged = paredit_feature_lint_custom::Ruleset::default();
     for path in &paths {
         let display = path.display().to_string();
-        let Ok(text) = std::fs::read_to_string(path) else {
-            reports.push(PareditConfigFileReport {
-                path: display,
-                syntax_errors: vec!["could not be read".to_owned()],
-                issues: Vec::new(),
-            });
-            continue;
-        };
+        let text = std::fs::read_to_string(path)
+            .map_err(CliError::io(format!("failed to read rule file {display}")))?;
 
         // The dialect-aware path, not `SyntaxTree::parse`: a rule file is
         // read as Common Lisp everywhere else in this feature
@@ -144,7 +152,7 @@ fn check_paredit_config() -> Vec<PareditConfigFileReport> {
         });
     }
 
-    reports
+    Ok(reports)
 }
 
 /// Validates that input is a balanced S-expression document.
@@ -164,11 +172,9 @@ pub(in crate::presentation::cli) fn check(args: CheckArgs) -> CliResult<()> {
     let (input, dialect) = read_input_and_dialect(args.file, args.dialect)?;
     let mut errors = SyntaxTree::find_parse_errors(&input.text, dialect);
 
-    // Computed either way `--output` is asked for, but never a reason this
-    // function returns `Err`: see `check_paredit_config`'s own documentation
-    // for why it is advice rather than a gate.
+    // Findings are advisory in either output mode; an incomplete read is not.
     let paredit_config_reports = if paredit_config {
-        check_paredit_config()
+        check_paredit_config()?
     } else {
         Vec::new()
     };

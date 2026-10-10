@@ -101,6 +101,7 @@ pub fn plan_extract_local_function(
         request.selection.span(),
     )?;
     reject_non_local_control_transfer(&request.selection.view())?;
+    super::mutation::reject_free_variable_mutation(&request.selection.view())?;
 
     let mut params = request.explicit_params;
     let inferred_params = if request.infer_params {
@@ -1165,6 +1166,95 @@ mod tests {
             infer_params: true,
             recursive,
         })
+    }
+
+    #[test]
+    fn rejects_assignment_to_free_variable_cells() {
+        for selected in [
+            "(setq x 1)",
+            "(psetq x 1)",
+            "(setf x 1)",
+            "(psetf x 1)",
+            "(incf x)",
+            "(decf x)",
+            "(push 1 x)",
+            "(pushnew 1 x)",
+            "(pop x)",
+            "(rotatef x y)",
+            "(shiftf x 1)",
+            "(multiple-value-setq (x y) (values 1 2))",
+            "(setf (values x y) (values 1 2))",
+            "(setf (the integer x) 1)",
+            "(setf (getf x :value) 1)",
+            "(setf (ldb (byte 8 0) x) 1)",
+            "(setf (mask-field (byte 8 0) x) 1)",
+            "(with-input-from-string (stream \"data\" :index x) (read stream))",
+            "(cl:with-input-from-string (stream \"data\" :START 0 :INDEX x) (read stream))",
+            "(let ((x (setq x 1))) x)",
+            "(destructuring-bind (&optional (local (setq x 1))) nil local)",
+            "(progn (let ((x 0)) (setq x 1)) (setq x 2))",
+            "(let ((x nil)) (symbol-macrolet ((x y)) (push 1 x)))",
+            "`(value ,(setq x 1))",
+            "(quasiquote (unquote (setq x 1)))",
+            "(quasiquote (quote (unquote (setq x 1))))",
+            "`'(,(setq x 1))",
+        ] {
+            let input = format!("(defun render (x y) (progn {selected} x))");
+            let result = plan(
+                &input,
+                &Path::from_indexes(vec![0, 3, 1]),
+                &Path::from_indexes(vec![0, 3]),
+                false,
+            );
+            assert!(
+                matches!(
+                    result,
+                    Err(crate::error::ExtractionError::Scope(
+                        ExtractionScopeError::MutatesFreeVariable { .. }
+                    ))
+                ),
+                "{selected}: {result:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn permits_internal_cells_and_mutation_of_objects_referenced_by_free_variables() {
+        for selected in [
+            "(let ((x 0)) (setq x 1))",
+            "(let* ((x 0) (y (setq x 1))) y)",
+            "(progn x (let ((x 0)) (incf x)))",
+            "(lambda (x) (setq x 1))",
+            "(lambda (&optional (x 0)) (setq x 1))",
+            "(lambda (&key ((:value x) 0)) (incf x))",
+            "(lambda (&KEY ((:value x) 0)) (incf x))",
+            "(flet ((change (x) (setq x 1))) (change x))",
+            "(multiple-value-bind (x y) (values 1 2) (setq x y))",
+            "(destructuring-bind (x &optional (y 0)) x (setq y x))",
+            "(dolist (x y) (setq x 1))",
+            "(do ((x 0 (1+ x))) ((> x 2)) (setq x 1))",
+            "(setf (car x) 1)",
+            "(incf (car x))",
+            "(push 1 (cdr x))",
+            "(setf (getf (car x) :value) 1)",
+            "(let ((x nil)) (setf (getf x :value) 1))",
+            "(with-input-from-string (stream \"data\") (read stream))",
+            "(with-input-from-string (stream \"data\" :index (car x)) (read stream))",
+            "(let ((x 0)) (with-input-from-string (stream \"data\" :index x) (read stream)))",
+            "(rplaca x 1)",
+            "'(setq x 1)",
+            "(quote (setq x 1))",
+            "`(setq x 1)",
+        ] {
+            let input = format!("(defun render (x y) (progn {selected} x))");
+            let result = plan(
+                &input,
+                &Path::from_indexes(vec![0, 3, 1]),
+                &Path::from_indexes(vec![0, 3]),
+                false,
+            );
+            assert!(result.is_ok(), "{selected}: {result:?}");
+        }
     }
 
     #[test]

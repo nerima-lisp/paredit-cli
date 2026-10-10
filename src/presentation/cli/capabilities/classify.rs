@@ -5,7 +5,7 @@
 //! Both questions are answered *structurally*, from the command's own clap
 //! argument list and its dialect-contract category (see
 //! [`super::super::contract::command_category`]) — never from a hand-kept
-//! table naming all 358 leaf commands one at a time. A table like that is
+//! table naming every leaf command one at a time. A table like that is
 //! wrong within a release, the same reason [`super::gate_kind`] reads a
 //! naming convention instead of one. Two things make the convention-based
 //! reading sound here:
@@ -103,7 +103,7 @@ fn has_long(args: &[&Arg], long: &str) -> bool {
 /// shared read/parse/serialize plumbing every command goes through on the
 /// way to its own logic (`paredit_core_cli::shared::read_input_and_dialect`
 /// and friends, `CliError::Io | NotUtf8 | Parse | JsonBare | TimedOut` in
-/// `code_for_cli_error`). Every one of the 358 dialect-contract commands
+/// `code_for_cli_error`). Every dialect-contract command
 /// reads at least one file or stdin, so this group applies to all of them.
 const BASELINE_CODES: [ErrorCode; 7] = [
     ErrorCode::EnvironmentIo,
@@ -187,10 +187,8 @@ const WRITE_CODES: [ErrorCode; 10] = [
 /// `--ring`: `ArgumentError::KillRingIndexOutOfRange`.
 const KILL_RING_CODES: [ErrorCode; 1] = [ErrorCode::ArgumentKillRingIndex];
 
-/// A policy gate flag (`--fail-on`, `--fail-on-*`, `--require-* N`) is
-/// present, so `GateFailed` is reachable — read the same way
-/// [`super::gate_reports`] already does, not duplicated as a second
-/// argument scan.
+/// A flag-controlled or unconditional policy gate makes `GateFailed`
+/// reachable, using the same classification as the published gate metadata.
 const GATE_CODES: [ErrorCode; 1] = [ErrorCode::GateFailed];
 
 /// Commands whose own workflow can reach a code no structural signal on the
@@ -199,6 +197,17 @@ const GATE_CODES: [ErrorCode; 1] = [ErrorCode::GateFailed];
 /// classification's mechanical groups (above) would otherwise under-report,
 /// found by reading the command's own `workflow.rs`, not by guessing.
 const COMMAND_SPECIFIC_CODES: &[(&[&str], &[ErrorCode])] = &[
+    // Bulk selectors and symbol names live in the request JSON rather than
+    // in `--at`/`--select`, so the argument-based groups cannot see them.
+    (
+        &["refactor", "bulk"],
+        &[
+            ErrorCode::SelectionPathInvalid,
+            ErrorCode::SelectionPathNotReachable,
+            ErrorCode::InputShapeRefused,
+            ErrorCode::InputSymbolInvalid,
+        ],
+    ),
     // Runs an external verification command named on the command line
     // (`--apply-to`/the patch's own recorded command).
     (&["refactor", "patch"], &[ErrorCode::EnvironmentUnavailable]),
@@ -295,7 +304,9 @@ pub(super) fn possible_error_codes(
         }
     }
 
-    if args.iter().any(|arg| super::gate_kind(arg).is_some()) {
+    if args.iter().any(|arg| super::gate_kind(arg).is_some())
+        || super::unconditional_gate_help(path).is_some()
+    {
         codes.extend(GATE_CODES.iter().map(|code| code.label()));
     }
 

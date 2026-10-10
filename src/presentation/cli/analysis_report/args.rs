@@ -39,10 +39,10 @@ pub struct CheckArgs {
     /// any dot-directory is), so a syntax error there can otherwise sit
     /// unnoticed until the next `inspect lint` run loads it. This also flags
     /// a `:pattern`/`:fix` clause still written in `defrule`'s
-    /// pre-unification style — a non-trailing `...` — as a nudge toward the
+    /// pre-unification style (a non-trailing `...`) as a nudge toward the
     /// clearer `?name...` spelling; it still matches exactly as it always
-    /// has, so this is advice, not an error, and never fails a run that has
-    /// nothing else wrong with it.
+    /// has, so migration and syntax findings are advisory. Failures to read
+    /// an existing rules directory or rule file are errors.
     #[arg(long)]
     pub paredit_config: bool,
 }

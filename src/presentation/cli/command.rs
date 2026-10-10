@@ -125,10 +125,11 @@ use super::{
     unreachable_case_clause_report, unreachable_cond_clause_report, unreachable_expression_report,
     unsynchronized_shared_mutation_report, unthread_expression, unused_export_report,
     unused_local_callable_report, unused_nickname_report, unused_package_report,
-    unwind_protect_no_cleanup_report, unwrap_call, use_widening_report, value_propagation_report,
-    values_list_of_list_report, verbose_negation_report, when_unless_implicit_nil_misused_report,
-    with_accessors_empty_binding_list_report, with_open_file_redundant_direction_default_report,
-    with_open_returns_lazy_seq_report, workspace_report, writability_report, zero_divisor_report,
+    unwind_protect_no_cleanup_report, unwrap_body, unwrap_call, use_widening_report,
+    value_propagation_report, values_list_of_list_report, verbose_negation_report,
+    when_unless_implicit_nil_misused_report, with_accessors_empty_binding_list_report,
+    with_open_file_redundant_direction_default_report, with_open_returns_lazy_seq_report,
+    workspace_report, writability_report, zero_divisor_report,
 };
 use clap::Subcommand;
 
@@ -551,6 +552,10 @@ pub(super) enum InspectCommand {
     ApiDiff(api_diff_report::args::ApiDiffReportArgs),
     /// Pair definitions with the tests that name them, and report both sides that have no counterpart.
     TestMap(test_map_report::args::TestMapReportArgs),
+    /// Rank functions without a naming-convention test link by structural complexity, not execution coverage.
+    TestRisk(paredit_feature_project_inventory::TestRiskReportArgs),
+    /// Inventory .paredit metadata without reading bodies or following symlinks.
+    Dotfiles(paredit_feature_project_inventory::DotfilesReportArgs),
     /// Index every symbol to its definition site and occurrence offsets, for editor and agent caches.
     SymbolIndex(symbol_index_report::args::SymbolIndexReportArgs),
     /// Check call sites against &optional, &rest, and &key lambda lists, including unknown keyword names.
@@ -957,6 +962,9 @@ pub(super) enum RefactorCommand {
     /// Walk a preview manifest one edit at a time, taking only the steps you
     /// accept.
     Step(refactor_step::args::RefactorStepArgs),
+    /// Apply disjoint structural operations against one original file snapshot.
+    /// Syntactic renames do not resolve bindings or guarantee semantic equivalence.
+    Bulk(paredit_feature_refactor_workflow::RefactorBulkArgs),
     /// Record the current content of files as a named checkpoint.
     CreateCheckpoint(refactor_checkpoint::args::CreateCheckpointArgs),
     /// List every registered checkpoint.
@@ -1039,6 +1047,9 @@ pub(super) enum RefactorCommand {
     UnwrapFunctionCalls(rename::args::UnwrapFunctionCallsArgs),
     /// Replace one selected wrapper call with one selected argument.
     UnwrapCall(unwrap_call::UnwrapCallArgs),
+    /// Replace a selected wrapper with its body, with multiple forms restricted to sequence positions.
+    /// Structural only; lexical scope and evaluation semantics are not preserved.
+    UnwrapBody(unwrap_body::UnwrapBodyArgs),
     /// Convert a selected nested call chain into a thread-first or thread-last pipeline.
     ThreadExpression(thread_expression::ThreadExpressionArgs),
     /// Convert a selected thread-first or thread-last pipeline into nested calls.

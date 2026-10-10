@@ -1,6 +1,80 @@
 use super::*;
 
 #[test]
+fn cli_extract_local_function_refuses_free_cell_mutation_without_writing() {
+    let dir = fresh_temp_dir("extract-local-mutation");
+    let file = dir.join("render.lisp");
+    for selected in [
+        "(push 1 x)",
+        "(with-input-from-string (stream \"data\" :index x) (read stream))",
+    ] {
+        let input = format!("(defun render (x) (progn {selected} x))\n");
+        fs::write(&file, &input).expect("write fixture");
+        for write in [false, true] {
+            let mut cmd = paredit();
+            cmd.args([
+                "refactor",
+                "extract-local-function",
+                "--path",
+                "0.3.1",
+                "--enclosing-path",
+                "0.3",
+                "--name",
+                "compute",
+                "--infer-params",
+                "--output",
+                "json",
+            ])
+            .arg("--file")
+            .arg(&file);
+            if write {
+                cmd.arg("--write");
+            }
+            cmd.assert()
+                .failure()
+                .stderr(predicate::str::contains("assignment to free variable 'x'"));
+            assert_eq!(
+                fs::read_to_string(&file).expect("read unchanged fixture"),
+                input
+            );
+        }
+    }
+}
+
+#[test]
+fn cli_extract_local_function_allows_local_cell_and_object_mutation() {
+    for (selected, expected) in [
+        (
+            "(let ((x nil)) (push 1 x))",
+            "(compute () (let ((x nil)) (push 1 x)))",
+        ),
+        ("(setf (car x) 1)", "(compute (x) (setf (car x) 1))"),
+    ] {
+        let mut cmd = paredit();
+        cmd.args([
+            "refactor",
+            "extract-local-function",
+            "--dialect",
+            "common-lisp",
+            "--path",
+            "0.3.1",
+            "--enclosing-path",
+            "0.3",
+            "--name",
+            "compute",
+            "--infer-params",
+            "--output",
+            "json",
+        ])
+        .write_stdin(format!("(defun render (x) (progn {selected} x))"))
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"written\": false"))
+        .stdout(predicate::str::contains(expected));
+    }
+}
+
+#[test]
 fn cli_plans_extract_local_function_with_inferred_params() {
     let mut cmd = paredit();
     cmd.args([

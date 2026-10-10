@@ -54,6 +54,7 @@
 //! [`RuleContext`]: paredit_core_lint_engine::engine::RuleContext
 //! [`HeadFilter::Heads`]: paredit_core_lint_engine::model::HeadFilter::Heads
 
+use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::reader::atom_symbol_text;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path, ReaderPrefix, SyntaxTree};
 use paredit_core_syntax::view_query::{
@@ -907,6 +908,329 @@ pub fn run_rule_fixed(
         (finding.message, fixed)
     })
     .collect()
+}
+
+pub const CONTROL_FLOW_DIALECTS: [Dialect; 2] = [Dialect::CommonLisp, Dialect::EmacsLisp];
+
+#[must_use]
+pub fn operator_is(head: &str, dialect: Dialect, cl: &str, el: &str) -> bool {
+    if dialect == Dialect::EmacsLisp {
+        head == el
+    } else {
+        paredit_core_syntax::view_query::symbol_is(head, cl)
+    }
+}
+
+#[must_use]
+pub fn symbol_name_for_dialect(view: &ExpressionView, dialect: Dialect) -> Option<String> {
+    if dialect != Dialect::EmacsLisp {
+        return normalized_symbol(view);
+    }
+    let text = atom_symbol_text(view).filter(|text| !text.is_empty())?;
+    let mut chars = text.chars();
+    let mut name = String::new();
+    while let Some(ch) = chars.next() {
+        name.push(if ch == '\\' { chars.next()? } else { ch });
+    }
+    Some(name)
+}
+
+#[must_use]
+pub fn plain_name_for_dialect(view: &ExpressionView, dialect: Dialect) -> Option<String> {
+    if dialect != Dialect::EmacsLisp {
+        return plain_name(view);
+    }
+    if !view.reader_prefixes.is_empty() || is_string_literal(view) || !view.children.is_empty() {
+        return None;
+    }
+    let text = atom_symbol_text(view)?;
+    // Character and dispatch numeric reader forms need numeric reader identity.
+    if text.starts_with('?') || text.starts_with('#') || text.parse::<f64>().is_ok() {
+        return None;
+    }
+    symbol_name_for_dialect(view, dialect)
+}
+
+impl Tag {
+    pub fn read_for_dialect(view: &ExpressionView, dialect: Dialect) -> Option<Self> {
+        if dialect != Dialect::EmacsLisp {
+            return Self::read(view);
+        }
+        if !view.reader_prefixes.is_empty() || is_string_literal(view) || !view.children.is_empty()
+        {
+            return None;
+        }
+        let text = atom_symbol_text(view)?;
+        if let Ok(integer) = text.parse::<i64>() {
+            return Some(Self::Integer(integer));
+        }
+        plain_name_for_dialect(view, dialect).map(Self::Symbol)
+    }
+
+    pub fn mention_for_dialect(view: &ExpressionView, dialect: Dialect) -> Option<Self> {
+        if dialect != Dialect::EmacsLisp {
+            return Self::mention(view);
+        }
+        if is_string_literal(view) || !view.children.is_empty() {
+            return None;
+        }
+        let text = atom_symbol_text(view)?;
+        if let Ok(integer) = text.parse::<i64>() {
+            return Some(Self::Integer(integer));
+        }
+        symbol_name_for_dialect(view, dialect).map(Self::Symbol)
+    }
+}
+
+fn el_transparent_operator(head: &str) -> bool {
+    matches!(
+        head,
+        "if" | "when"
+            | "unless"
+            | "cond"
+            | "and"
+            | "or"
+            | "progn"
+            | "prog1"
+            | "prog2"
+            | "let"
+            | "let*"
+            | "lambda"
+            | "function"
+            | "quote"
+            | "defun"
+            | "defmacro"
+            | "setq"
+            | "while"
+            | "catch"
+            | "throw"
+            | "condition-case"
+            | "unwind-protect"
+            | "cl-return"
+            | "cl-return-from"
+            | "go"
+            | "cl-tagbody"
+            | "cl-multiple-value-bind"
+            | "cl-flet"
+            | "cl-labels"
+            | "list"
+            | "cons"
+            | "car"
+            | "cdr"
+            | "message"
+            | "print"
+            | "princ"
+            | "+"
+            | "-"
+            | "*"
+            | "/"
+            | "eq"
+            | "eql"
+            | "equal"
+            | "not"
+            | "null"
+            | "identity"
+            | "ignore"
+    )
+}
+
+pub fn block_scope_for_dialect(
+    chain: &[&ExpressionView],
+    index: usize,
+    dialect: Dialect,
+) -> BlockScope {
+    if dialect != Dialect::EmacsLisp {
+        return block_scope(chain, index);
+    }
+    let Some(view) = chain.get(index) else {
+        return BlockScope::Unknown;
+    };
+    let Some(head) = list_head(view) else {
+        return BlockScope::Transparent;
+    };
+    // A cl-flet/labels binding establishes its block only in the lambda body,
+    // not in another binding or in the enclosing form's body.
+    if let (Some(bindings), Some(form)) = (
+        index.checked_sub(1).and_then(|at| chain.get(at)),
+        index.checked_sub(2).and_then(|at| chain.get(at)),
+    ) {
+        if list_head(form).is_some_and(|head| matches!(head, "cl-flet" | "cl-labels"))
+            && form
+                .children
+                .get(1)
+                .is_some_and(|list| list.span == bindings.span)
+        {
+            let in_body = chain.get(index + 1).is_some_and(|next| {
+                view.children
+                    .iter()
+                    .skip(2)
+                    .any(|child| child.span == next.span)
+            });
+            if view.children.get(1).is_some_and(is_paren_list) && in_body {
+                return view
+                    .children
+                    .first()
+                    .and_then(|name| plain_name_for_dialect(name, dialect))
+                    .map_or(BlockScope::Unknown, BlockScope::Named);
+            }
+            return BlockScope::Unknown;
+        }
+        if list_head(form).is_some_and(|head| {
+            matches!(
+                head,
+                "let" | "let*" | "cl-prog" | "cl-prog*" | "cl-do" | "cl-do*"
+            )
+        }) && form
+            .children
+            .get(1)
+            .is_some_and(|list| list.span == bindings.span)
+            && view
+                .children
+                .first()
+                .and_then(|name| plain_name_for_dialect(name, dialect))
+                .is_some()
+        {
+            return BlockScope::Transparent;
+        }
+    }
+    if head == "cl-block" {
+        return view
+            .children
+            .get(1)
+            .and_then(|name| plain_name_for_dialect(name, dialect))
+            .map_or(BlockScope::Unknown, BlockScope::Named);
+    }
+    if head == "cl-loop" {
+        for pair in view.children[1..].windows(2) {
+            if atom_text(&pair[0]).is_some_and(|name| matches!(name, "named" | ":named")) {
+                return plain_name_for_dialect(&pair[1], dialect)
+                    .map_or(BlockScope::Unknown, BlockScope::Named);
+            }
+        }
+        return BlockScope::Named("nil".to_owned());
+    }
+    if matches!(
+        head,
+        "cl-do"
+            | "cl-do*"
+            | "cl-dolist"
+            | "cl-dotimes"
+            | "cl-prog"
+            | "cl-prog*"
+            | "cl-do-symbols"
+            | "cl-do-all-symbols"
+    ) {
+        return BlockScope::Named("nil".to_owned());
+    }
+    if matches!(
+        head,
+        "cl-defun" | "cl-defmacro" | "cl-defsubst" | "cl-iter-defun"
+    ) {
+        let in_body = chain.get(index + 1).is_some_and(|next| {
+            view.children
+                .iter()
+                .skip(3)
+                .any(|child| child.span == next.span)
+        });
+        if !in_body {
+            return BlockScope::Unknown;
+        }
+        return view
+            .children
+            .get(1)
+            .and_then(|name| plain_name_for_dialect(name, dialect))
+            .map_or(BlockScope::Unknown, BlockScope::Named);
+    }
+    if el_transparent_operator(head) {
+        BlockScope::Transparent
+    } else {
+        BlockScope::Unknown
+    }
+}
+
+#[must_use]
+pub fn tagbody_body_start_for_dialect(head: &str, dialect: Dialect) -> Option<usize> {
+    if dialect != Dialect::EmacsLisp {
+        return tagbody_body_start(head);
+    }
+    match head {
+        "cl-tagbody" => Some(1),
+        "cl-prog" | "cl-prog*" => Some(2),
+        _ => None,
+    }
+}
+
+#[must_use]
+pub fn direct_tags_for_dialect(view: &ExpressionView, dialect: Dialect) -> Vec<(Tag, ByteSpan)> {
+    if dialect != Dialect::EmacsLisp {
+        return direct_tags(view);
+    }
+    let Some(start) =
+        list_head(view).and_then(|head| tagbody_body_start_for_dialect(head, dialect))
+    else {
+        return Vec::new();
+    };
+    view.children
+        .iter()
+        .skip(start)
+        .filter_map(|child| Tag::read_for_dialect(child, dialect).map(|tag| (tag, child.span)))
+        .collect()
+}
+
+#[must_use]
+pub fn tagbody_body_in_scope(chain: &[&ExpressionView], index: usize, dialect: Dialect) -> bool {
+    if dialect != Dialect::EmacsLisp {
+        return true;
+    }
+    let Some(view) = chain.get(index) else {
+        return false;
+    };
+    let Some(start) =
+        list_head(view).and_then(|head| tagbody_body_start_for_dialect(head, dialect))
+    else {
+        return false;
+    };
+    chain.get(index + 1).is_some_and(|next| {
+        view.children
+            .iter()
+            .skip(start)
+            .any(|child| child.span == next.span)
+    })
+}
+
+#[must_use]
+pub fn contains_unknown_el_operator(view: &ExpressionView, dialect: Dialect) -> bool {
+    if dialect != Dialect::EmacsLisp {
+        return false;
+    }
+    let mut unknown = false;
+    for_each_evaluated_subview(view, |node| {
+        if is_paren_list(node)
+            && list_head(node).is_some_and(|head| {
+                !el_transparent_operator(head)
+                    && !matches!(
+                        head,
+                        "cl-block"
+                            | "cl-loop"
+                            | "cl-do"
+                            | "cl-do*"
+                            | "cl-dolist"
+                            | "cl-dotimes"
+                            | "cl-prog"
+                            | "cl-prog*"
+                            | "cl-do-symbols"
+                            | "cl-do-all-symbols"
+                            | "cl-defun"
+                            | "cl-defmacro"
+                            | "cl-defsubst"
+                            | "cl-iter-defun"
+                    )
+            })
+        {
+            unknown = true;
+        }
+    });
+    unknown
 }
 
 #[cfg(test)]

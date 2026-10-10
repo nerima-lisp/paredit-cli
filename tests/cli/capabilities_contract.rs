@@ -264,7 +264,7 @@ fn leaf_commands_by_path(
     out
 }
 
-/// FR-011: every command the dialect contract counts (the 467 commands
+/// FR-011: every command the dialect contract counts (the 471 commands
 /// across `inspect`/`edit`/`refactor`/`query`/`fix`/`migrate`) carries a
 /// `writes` flag and a non-empty `possible_error_codes` set. A missing or
 /// empty set would mean a command nobody classified — the exact drift this
@@ -282,7 +282,7 @@ fn every_dialect_contract_command_has_a_writes_flag_and_a_non_empty_error_code_s
         .collect();
     assert_eq!(
         dialect_paths.len(),
-        467,
+        471,
         "the dialect contract's own command inventory changed size; update this test's \
          expectation alongside it"
     );
@@ -355,6 +355,29 @@ fn baseline_read_codes_reach_a_representative_of_every_command_family() {
     }
 }
 
+#[test]
+fn bulk_request_selectors_and_symbols_publish_their_error_codes() {
+    let report = capabilities_json_with_args(&["--schema-version", "3"]);
+    let leaves = leaf_commands_by_path(&report);
+    let command = leaves.get("refactor bulk").expect("bulk leaf");
+    assert_eq!(command["writes"], true);
+    let codes = command["possible_error_codes"]
+        .as_array()
+        .expect("bulk codes");
+    for expected in [
+        "selection.path-invalid",
+        "selection.path-not-reachable",
+        "input.shape-refused",
+        "input.symbol-invalid",
+        "refusal.target-changed",
+    ] {
+        assert!(
+            codes.iter().any(|code| code == expected),
+            "bulk is missing {expected}: {codes:?}"
+        );
+    }
+}
+
 /// `writes` is derived from the command's own `--write`/`--fix`/`--apply`/
 /// `--in-place` flags plus a short verb-named allowlist, not a hand-kept
 /// per-command table — these are the load-bearing cases that convention has
@@ -372,6 +395,8 @@ fn writes_matches_the_write_flag_and_verb_convention() {
         ("fix plan", false),
         ("fix list", false),
         ("inspect check", false),
+        ("inspect dotfiles", false),
+        ("inspect test-risk", false),
         ("inspect lint", true),
         ("edit wrap", true),
         ("edit select", false),
@@ -380,6 +405,8 @@ fn writes_matches_the_write_flag_and_verb_convention() {
         ("refactor rename-symbol", false),
         ("refactor rename-symbols", true),
         ("refactor apply", true),
+        ("refactor bulk", true),
+        ("refactor unwrap-body", true),
         ("refactor plan", false),
         ("query find", false),
         ("query replace", true),

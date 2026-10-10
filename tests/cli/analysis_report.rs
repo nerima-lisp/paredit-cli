@@ -243,8 +243,7 @@ fn cli_check_text_reports_every_syntax_error_one_per_line() {
 // ---------------------------------------------------------------------------
 // `inspect check --paredit-config`: a migration aid over `.paredit/rules`,
 // which ordinary discovery never sees because a `.paredit` directory is
-// hidden. It never fails the run on its own — see the flag's own help — so
-// every case below still expects `success()`.
+// hidden. Syntax/migration findings are advisory; incomplete reads fail.
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -343,6 +342,49 @@ fn cli_check_paredit_config_reports_a_clean_directory_with_no_issues() {
         ))
         .stdout(predicate::str::contains("\"issues\": []"))
         .stdout(predicate::str::contains("\"syntax_errors\": []"));
+}
+
+#[test]
+fn cli_check_paredit_config_accepts_a_missing_rule_directory_when_requested() {
+    let dir = fresh_temp_dir("check-paredit-config-requested-absent");
+    paredit()
+        .current_dir(&dir)
+        .args(["inspect", "check", "--paredit-config", "--output", "json"])
+        .write_stdin("(f)")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"files\": []"));
+}
+
+#[test]
+fn cli_check_paredit_config_refuses_an_unreadable_directory() {
+    let dir = fresh_temp_dir("check-paredit-config-not-directory");
+    fs::create_dir(dir.join(".paredit")).expect("create metadata directory");
+    fs::write(dir.join(".paredit/rules"), "not a directory").expect("write blocking file");
+    paredit()
+        .current_dir(&dir)
+        .args(["inspect", "check", "--paredit-config", "--output", "json"])
+        .write_stdin("(f)")
+        .assert()
+        .failure()
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::contains("failed to read rule directory"));
+}
+
+#[test]
+fn cli_check_paredit_config_refuses_an_unreadable_rule_file() {
+    let dir = fresh_temp_dir("check-paredit-config-invalid-utf8");
+    let rules = dir.join(".paredit/rules");
+    fs::create_dir_all(&rules).expect("create rule directory");
+    fs::write(rules.join("broken.lisp"), [0xff]).expect("write invalid UTF-8 rule file");
+    paredit()
+        .current_dir(&dir)
+        .args(["inspect", "check", "--paredit-config", "--output", "json"])
+        .write_stdin("(f)")
+        .assert()
+        .failure()
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::contains("failed to read rule file"));
 }
 
 #[test]

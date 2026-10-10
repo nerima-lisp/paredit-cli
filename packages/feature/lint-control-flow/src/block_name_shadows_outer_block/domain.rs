@@ -26,7 +26,7 @@
 //! making an exit local, and the two spellings there are *not* identical: one
 //! is a `defun`, the other a `block`.
 //!
-//! Scope: Common Lisp only.
+//! Scope: Common Lisp and Emacs Lisp cl-lib forms.
 
 use std::path::Path;
 
@@ -35,11 +35,12 @@ use paredit_core_lint_engine::LintResult;
 use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head, symbol_is};
+use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
 use serde_json::{Value, json};
 
 use crate::support::{
-    for_each_evaluated_subview, for_each_evaluated_subview_where, is_unevaluated_at, plain_name,
+    contains_unknown_el_operator, for_each_evaluated_subview, for_each_evaluated_subview_where,
+    is_unevaluated_at, operator_is, plain_name_for_dialect,
 };
 
 #[derive(Debug, Clone)]
@@ -88,22 +89,33 @@ pub fn message_for(block_name: &str) -> String {
 }
 
 /// The name of a `(block name …)`, or `None` for anything else.
-fn block_name(view: &ExpressionView) -> Option<String> {
-    if !is_paren_list(view) || !list_head(view).is_some_and(|head| symbol_is(head, "block")) {
+fn block_name(view: &ExpressionView, dialect: Dialect) -> Option<String> {
+    if !is_paren_list(view)
+        || !list_head(view).is_some_and(|head| operator_is(head, dialect, "block", "cl-block"))
+    {
         return None;
     }
-    view.children.get(1).and_then(plain_name)
+    view.children
+        .get(1)
+        .and_then(|name| plain_name_for_dialect(name, dialect))
 }
 
 /// Whether `view`'s subtree holds a `(return-from name …)` in evaluated code.
-fn contains_exit_to(view: &ExpressionView, name: &str) -> bool {
+fn contains_exit_to(view: &ExpressionView, dialect: Dialect, name: &str) -> bool {
     let mut found = false;
     for_each_evaluated_subview(view, |subview| {
         if found || !is_paren_list(subview) {
             return;
         }
-        if list_head(subview).is_some_and(|head| symbol_is(head, "return-from")) {
-            found = subview.children.get(1).and_then(plain_name).as_deref() == Some(name);
+        if list_head(subview)
+            .is_some_and(|head| operator_is(head, dialect, "return-from", "cl-return-from"))
+        {
+            found = subview
+                .children
+                .get(1)
+                .and_then(|name| plain_name_for_dialect(name, dialect))
+                .as_deref()
+                == Some(name);
         }
     });
     found
@@ -113,14 +125,18 @@ fn contains_exit_to(view: &ExpressionView, name: &str) -> bool {
 /// Reads only the matched form's own subtree.
 pub fn examine_block(
     tree: &SyntaxTree,
+    dialect: Dialect,
     view: &ExpressionView,
     block_form_count: &mut usize,
     violations: &mut Vec<BlockNameShadowsOuterBlockItem>,
 ) {
-    let Some(name) = block_name(view) else {
+    let Some(name) = block_name(view, dialect) else {
         return;
     };
     *block_form_count += 1;
+    if contains_unknown_el_operator(view, dialect) {
+        return;
+    }
 
     // The spans of the shadowing blocks, and whether each holds an exit to the
     // shared name. Spans rather than views because the walk hands out
@@ -132,11 +148,14 @@ pub fn examine_block(
             // Stop at the first same-named block: what is inside *it* is that
             // block's own finding, not this one's, so a triple nesting is two
             // findings rather than three.
-            subview.span == view.span || block_name(subview).as_deref() != Some(name.as_str())
+            subview.span == view.span
+                || block_name(subview, dialect).as_deref() != Some(name.as_str())
         },
         |subview| {
-            if subview.span != view.span && block_name(subview).as_deref() == Some(name.as_str()) {
-                shadowing.push((subview.span, contains_exit_to(subview, &name)));
+            if subview.span != view.span
+                && block_name(subview, dialect).as_deref() == Some(name.as_str())
+            {
+                shadowing.push((subview.span, contains_exit_to(subview, dialect, &name)));
             }
         },
     );
@@ -165,7 +184,7 @@ pub fn build_block_name_shadows_outer_block_report(
     dialect: Dialect,
     tree: &SyntaxTree,
 ) -> LintResult<FileFindings<BlockNameShadowsOuterBlockItem>> {
-    if dialect != Dialect::CommonLisp {
+    if !matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
         return Ok(FileFindings::new(
             path.to_path_buf(),
             dialect,
@@ -181,7 +200,13 @@ pub fn build_block_name_shadows_outer_block_report(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_block(tree, subview, &mut block_form_count, &mut violations);
+            examine_block(
+                tree,
+                dialect,
+                subview,
+                &mut block_form_count,
+                &mut violations,
+            );
         });
     }
 

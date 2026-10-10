@@ -2,6 +2,7 @@
 
 pub mod error;
 pub mod refactor;
+pub mod refactor_bulk;
 pub mod refactor_checkpoint;
 pub mod refactor_step;
 
@@ -18,6 +19,7 @@ pub use refactor::cli::{VerifyRefactorArgs, verify_refactor};
 pub use refactor::cli::{WorkspaceRefactorExecuteArgs, workspace_refactor_execute};
 pub use refactor::cli::{WorkspaceRefactorPlanArgs, workspace_refactor_plan};
 pub use refactor::cli::{WorkspaceRefactorPreviewArgs, workspace_refactor_preview};
+pub use refactor_bulk::cli::{RefactorBulkArgs, refactor_bulk};
 pub use refactor_checkpoint::cli::{CreateCheckpointArgs, create_checkpoint};
 pub use refactor_checkpoint::cli::{DeleteCheckpointArgs, delete_checkpoint};
 pub use refactor_checkpoint::cli::{ListCheckpointsArgs, list_checkpoints};

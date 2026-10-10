@@ -26,7 +26,8 @@
 //! cannot see that it does. A false negative there is the deliberate price of
 //! never flagging one.
 //!
-//! Scope: Common Lisp only.
+//! Scope: Common Lisp and Emacs Lisp cl-lib forms. Emacs Lisp only gives
+//! `cl-prog` and `cl-prog*` implicit tagbody bodies, and symbols retain case.
 
 use std::path::Path;
 
@@ -35,10 +36,13 @@ use paredit_core_lint_engine::LintResult;
 use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head, symbol_is};
+use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
 use serde_json::{Value, json};
 
-use crate::support::{BlockScope, Tag, block_scope, direct_tags, with_lexical_chain};
+use crate::support::{
+    BlockScope, Tag, block_scope_for_dialect, direct_tags_for_dialect, operator_is,
+    tagbody_body_in_scope, with_lexical_chain,
+};
 
 #[derive(Debug, Clone)]
 pub struct GoToUndefinedTagItem {
@@ -86,7 +90,7 @@ enum Resolution {
     Unknown,
 }
 
-fn resolve(tree: &SyntaxTree, span: ByteSpan, tag: &Tag) -> Resolution {
+fn resolve(tree: &SyntaxTree, dialect: Dialect, span: ByteSpan, tag: &Tag) -> Resolution {
     with_lexical_chain(tree, span, |chain| {
         if chain.unevaluated {
             return Resolution::Unknown;
@@ -95,16 +99,17 @@ fn resolve(tree: &SyntaxTree, span: ByteSpan, tag: &Tag) -> Resolution {
             let Some(node) = chain.nodes.get(index) else {
                 return Resolution::Unknown;
             };
-            if direct_tags(node)
-                .iter()
-                .any(|(established, _)| established == tag)
+            if tagbody_body_in_scope(&chain.nodes, index, dialect)
+                && direct_tags_for_dialect(node, dialect)
+                    .iter()
+                    .any(|(established, _)| established == tag)
             {
                 return Resolution::Established;
             }
             // Every implicit-tagbody form is a standard operator this table
             // knows, so an `Unknown` here is a macro whose expansion could
             // hold the tag.
-            if block_scope(&chain.nodes, index) == BlockScope::Unknown {
+            if block_scope_for_dialect(&chain.nodes, index, dialect) == BlockScope::Unknown {
                 return Resolution::Unknown;
             }
         }
@@ -115,11 +120,14 @@ fn resolve(tree: &SyntaxTree, span: ByteSpan, tag: &Tag) -> Resolution {
 
 pub fn examine_go(
     tree: &SyntaxTree,
+    dialect: Dialect,
     view: &ExpressionView,
     go_form_count: &mut usize,
     violations: &mut Vec<GoToUndefinedTagItem>,
 ) {
-    if !is_paren_list(view) || !list_head(view).is_some_and(|head| symbol_is(head, "go")) {
+    if !is_paren_list(view)
+        || !list_head(view).is_some_and(|head| operator_is(head, dialect, "go", "go"))
+    {
         return;
     }
     *go_form_count += 1;
@@ -130,11 +138,15 @@ pub fn examine_go(
     if view.children.len() != 2 {
         return;
     }
-    let Some(tag) = view.children.get(1).and_then(Tag::read) else {
+    let Some(tag) = view
+        .children
+        .get(1)
+        .and_then(|tag| Tag::read_for_dialect(tag, dialect))
+    else {
         return;
     };
 
-    if resolve(tree, view.span, &tag) == Resolution::Unestablished {
+    if resolve(tree, dialect, view.span, &tag) == Resolution::Unestablished {
         violations.push(GoToUndefinedTagItem {
             span: view.span,
             tag: tag.display(),
@@ -149,7 +161,7 @@ pub fn build_go_to_undefined_tag_report(
     dialect: Dialect,
     tree: &SyntaxTree,
 ) -> LintResult<FileFindings<GoToUndefinedTagItem>> {
-    if dialect != Dialect::CommonLisp {
+    if !matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
         return Ok(FileFindings::new(
             path.to_path_buf(),
             dialect,
@@ -165,7 +177,7 @@ pub fn build_go_to_undefined_tag_report(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_go(tree, subview, &mut go_form_count, &mut violations);
+            examine_go(tree, dialect, subview, &mut go_form_count, &mut violations);
         });
     }
 

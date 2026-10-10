@@ -114,12 +114,148 @@ fn multi_datum_reader_forms_are_single_siblings() {
 }
 
 #[test]
+fn emacs_lisp_special_reader_payloads_are_opaque() {
+    let char_table = format!("#^[nil nil sample {}]", vec!["nil"; 65].join(" "));
+    let sub_char_table = format!("#^^[3 65536 marked {}]", vec!["nil"; 127].join(" "));
+    let cases = [
+        "#s(sample 1)",
+        r##"#("foo" 0 3 (face bold))"##,
+        r##"#[0 "\300\207" [42] 1]"##,
+        char_table.as_str(),
+        sub_char_table.as_str(),
+    ];
+    let failures = cases
+        .iter()
+        .filter_map(|input| {
+            SyntaxTree::parse_with_dialect(input, Dialect::EmacsLisp)
+                .err()
+                .map(|error| (input, error))
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        failures.is_empty(),
+        "valid Emacs reader forms refused: {failures:?}"
+    );
+
+    for payload in cases {
+        let input = format!("{payload} tail");
+        let tree = SyntaxTree::parse_with_dialect(&input, Dialect::EmacsLisp)
+            .expect("valid Emacs reader form");
+        let root = tree.root_view();
+        assert_eq!(root.children.len(), 2, "{payload}");
+        assert_eq!(root.children[0].span.slice(&input), payload);
+        assert!(root.children[0].children.is_empty());
+        assert_eq!(tree.atom_occurrence_count(), 1);
+        let occurrences = tree.atom_occurrences();
+        assert_eq!(occurrences.len(), 1);
+        assert_eq!(occurrences[0].text, "tail");
+    }
+}
+
+#[test]
+fn emacs_lisp_special_reader_payloads_survive_formatting() {
+    let char_table = format!("#^[nil nil sample {}]", vec!["nil"; 65].join(" "));
+    let sub_char_table = format!("#^^[3 65536 marked {}]", vec!["nil"; 127].join(" "));
+    let nested = format!(
+        r##"#s(sample
+ ; retain payload trivia
+ #("foo" 0 3 (face bold)) #[0 "\300\207" [42] 1] {char_table} {sub_char_table})"##
+    );
+    let cases = [
+        "#s(sample 1)",
+        r##"#("foo" 0 3 (face bold))"##,
+        r##"#[0 "\300\207" [42] 1]"##,
+        char_table.as_str(),
+        sub_char_table.as_str(),
+        nested.as_str(),
+        r##"#s(sample ?\) ?\] "λ;#s(unread)")"##,
+    ];
+    let formatter = Formatter::with_dialect(2, Dialect::EmacsLisp).with_max_width(20);
+    for payload in cases {
+        for prefix in ["", "'", "#'"] {
+            let literal = format!("{prefix}{payload}");
+            let input = format!("(list {literal} tail)");
+            let tree = SyntaxTree::parse_with_dialect(&input, Dialect::EmacsLisp)
+                .expect("balanced opaque payload");
+            assert_eq!(tree.atom_occurrence_count(), 2);
+            let formatted = formatter.format(&tree);
+            assert!(
+                formatted.contains(&literal),
+                "payload changed: {formatted:?}"
+            );
+            let again = SyntaxTree::parse_with_dialect(&formatted, Dialect::EmacsLisp)
+                .expect("formatted opaque payload");
+            assert_eq!(formatter.format(&again), formatted);
+            let root = again.root_view();
+            let children = &root.children[0].children;
+            assert_eq!(children.len(), 3);
+            assert_eq!(children[1].span.slice(&formatted), literal);
+            assert_eq!(children[2].span.slice(&formatted), "tail");
+        }
+    }
+}
+
+#[test]
+fn emacs_lisp_special_reader_payloads_check_boundaries_not_object_types() {
+    for input in ["#s()", "#()", "#[]", "#^[]", "#^^[]"] {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::EmacsLisp)
+            .expect("opaque syntax does not evaluate or validate object slots");
+        assert_eq!(tree.root_view().children[0].span.slice(input), input);
+        assert_eq!(tree.atom_occurrence_count(), 0);
+    }
+    for input in [
+        "#s(", "#(", "#[", "#^[", "#^^[", "#s(a]", "#(a]", "#[a)", "#^[a)", "#^^[a)",
+    ] {
+        assert!(
+            SyntaxTree::parse_with_dialect(input, Dialect::EmacsLisp).is_err(),
+            "{input}"
+        );
+    }
+}
+
+#[test]
+fn emacs_lisp_special_reader_payloads_keep_unknown_dispatch_closed() {
+    for input in [
+        "#S(sample)",
+        "#s (sample)",
+        "#s[sample]",
+        "#^ [nil]",
+        "#^^ [nil]",
+        "#^^^[nil]",
+        "#&5\"x\"",
+        "#1=(a)",
+        "#1#",
+        "#@1x",
+        "#s(sample #&5\"x\")",
+        "#s(sample #1=(a))",
+    ] {
+        assert!(
+            matches!(
+                SyntaxTree::parse_with_dialect(input, Dialect::EmacsLisp),
+                Err(ParseError::UnsupportedReaderDispatch { .. })
+            ),
+            "{input}"
+        );
+    }
+    for dialect in [Dialect::CommonLisp, Dialect::Scheme, Dialect::Clojure] {
+        assert!(
+            matches!(
+                SyntaxTree::parse_with_dialect("#^[nil]", dialect),
+                Err(ParseError::UnsupportedReaderDispatch { .. })
+            ),
+            "{}",
+            dialect.label()
+        );
+    }
+}
+
+#[test]
 fn unsupported_dispatch_fails_closed_in_live_and_discarded_forms() {
     let cases = [
         (Dialect::CommonLisp, "#?value"),
         (Dialect::CommonLisp, "#12Q"),
         (Dialect::CommonLisp, "#12Qvalue"),
-        (Dialect::EmacsLisp, "#(value)"),
+        (Dialect::EmacsLisp, "#&5\"x\""),
         (Dialect::Scheme, "#_value"),
         (Dialect::Scheme, "#12Qvalue"),
         (Dialect::Clojure, "#;value"),
@@ -2759,20 +2895,24 @@ fn hy_string_and_unquote_rules_do_not_leak_to_other_dialects() {
             dialect.label()
         );
 
-        // `#[` stays whatever it already was: a hash-literal prefix on a
-        // bracket *list* in the dialects that have one, and a refusal in the
-        // rest. Comparing the sliced text would not discriminate -- Fennel's
-        // `#` prefix spans exactly the same bytes -- so this compares the
-        // node kind, which is the thing that actually changed for Hy.
+        // Emacs byte code is opaque, not a Hy raw string. Other readers
+        // keep their hash-prefixed bracket lists or reject this dispatch.
         let input = "(setv x #[[a]])";
         if let Ok(tree) = SyntaxTree::parse_with_dialect(input, dialect) {
             let third = &tree.root_view().children[0].children[2];
-            assert_eq!(
-                third.kind,
-                ExpressionKind::List,
-                "{}: `#[[a]]` must stay a list, not become one raw-string atom",
-                dialect.label()
-            );
+            if dialect == Dialect::EmacsLisp {
+                assert_eq!(third.kind, ExpressionKind::Atom);
+                assert!(third.children.is_empty());
+                assert_eq!(third.span.slice(input), "#[[a]]");
+                assert_eq!(tree.atom_occurrence_count(), 2);
+            } else {
+                assert_eq!(
+                    third.kind,
+                    ExpressionKind::List,
+                    "{}: `#[[a]]` must stay a list, not become one raw-string atom",
+                    dialect.label()
+                );
+            }
         }
     }
 
@@ -3073,28 +3213,28 @@ fn emacs_lisp_refuses_malformed_radix_integers() {
     }
 }
 
-/// The `#` forms Emacs Lisp has that are *not* radix integers stay exactly as
-/// they were.
-///
-/// `#s(...)` records, `#[...]` byte-code objects, `#(...)` propertized strings,
-/// `#^[...]` char-tables, `#&N"..."` bool-vectors, `##` (the empty symbol) and
-/// `#:foo` (uninterned) are all real Emacs Lisp reader syntax that this arm
-/// deliberately does not touch. They remain refused, as they were before, and
-/// they account for 33 of the 86 files still failing over Emacs's `lisp/` tree.
-/// Pinning them here records that the gap is known and scoped out rather than
-/// accidentally closed or accidentally widened.
+/// Supported printed objects stay opaque; other non-radix dispatch stays closed.
 #[test]
-fn emacs_lisp_radix_arm_leaves_the_other_sharp_forms_refused() {
-    for input in [
-        "(f #s(foo 1))",
-        "(f #[1 2 3])",
-        "(f #(\"ab\" 0 1 (face bold)))",
-        "(f #^[1 2])",
-        "(f #&5\"x\")",
-        "(f ##)",
-        "(f #:foo)",
-        "(f #1=(a))",
+fn emacs_lisp_non_radix_dispatch_has_explicit_boundaries() {
+    for literal in [
+        "#s(foo 1)",
+        "#[1 2 3]",
+        "#(\"ab\" 0 1 (face bold))",
+        "#^[1 2]",
+        "#^^[1 2]",
     ] {
+        let input = format!("(f {literal})");
+        let tree = SyntaxTree::parse_with_dialect(&input, Dialect::EmacsLisp)
+            .expect("balanced printed object");
+        let form = &tree.root_view().children[0];
+        assert_eq!(form.children.len(), 2);
+        let argument = &form.children[1];
+        assert_eq!(argument.kind, ExpressionKind::Atom);
+        assert!(argument.children.is_empty());
+        assert_eq!(argument.span.slice(&input), literal);
+        assert_eq!(tree.atom_occurrence_count(), 1);
+    }
+    for input in ["(f #&5\"x\")", "(f ##)", "(f #:foo)", "(f #1=(a))"] {
         assert!(
             SyntaxTree::parse_with_dialect(input, Dialect::EmacsLisp).is_err(),
             "{input} is outside this fix and must still be refused"

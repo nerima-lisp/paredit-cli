@@ -12,8 +12,8 @@ version: 1.6.0
 
 <overview>
   paredit detects the Lisp dialect (Common Lisp, Emacs Lisp, LFE, Scheme, Racket, Clojure, Hy, Carp, Janet, Fennel)
-  from file extension or an explicit --dialect flag, and exposes every read and write
-  operation under `paredit inspect ...`, `paredit edit ...`, `paredit refactor ...`,
+  from file extension or an explicit --dialect flag. The primary source workflows live
+  under `paredit inspect ...`, `paredit edit ...`, `paredit refactor ...`,
   `paredit query ...`, `paredit fix ...`, `paredit migrate ...`, or `paredit schema ...`.
 
   The core rule: never hand-edit balanced delimiters during a refactor. Validate the file,
@@ -21,22 +21,27 @@ version: 1.6.0
   validate again.
 
   Grouped entrypoints:
-  - `paredit inspect ...` — read-only validation, discovery, inventories, and analysis.
-  - `paredit edit ...` — low-level structural edits on one file.
-  - `paredit refactor ...` — plan, preview, verify, apply/diff flows for a rename or move.
-  - `paredit inspect workspace ...` — directory-root discovery and inventory across many files.
-  - `paredit query ...` — search, count, and rewrite by S-expression pattern across a workspace.
-  - `paredit fix ...` — apply the lint auto-fixes (the write side of `inspect lint`).
-  - `paredit migrate ...` — run a named, ordered, dialect-scoped codemod recipe.
-  - `paredit schema ...` — validate an S-expression data file against a `defschema` schema.
+  - `paredit inspect ...`: validation, discovery, inventories, and analysis; `lint --fix` can write.
+  - `paredit edit ...`: low-level structural edits on one file.
+  - `paredit refactor ...`: plan, preview, verify, apply/diff flows for a rename or move.
+  - `paredit inspect workspace ...`: directory-root discovery and inventory across many files.
+  - `paredit query ...`: search, count, and rewrite by S-expression pattern across a workspace.
+  - `paredit fix ...`: apply the lint auto-fixes (the write side of `inspect lint`).
+  - `paredit migrate ...`: run a named, ordered, dialect-scoped codemod recipe.
+  - `paredit schema ...`: validate an S-expression data file against a `defschema` schema.
+
+  A source preview is not a filesystem sandbox. Auxiliary options such as --to-ring,
+  --extract-to, --manifest-out, and --baseline-out can write without --write, including
+  through MCP --read-only. See the agent guide's MCP and run-wide controls for limits.
+  Replace example paths, offsets, and selector ids with values resolved from the current input.
 
   Discovery: `paredit inspect capabilities --output json` prints a machine-readable catalog of
-  every command, flag, default, and enum value in one call — use it instead of crawling --help.
+  every command, flag, default, and enum value in one call; use it instead of crawling --help.
 </overview>
 
 <command_groups>
   <group name="inspect">
-    <description>Read-only structural inspection; always safe, never writes.</description>
+    <description>The inspection examples below do not request writes. Other inspect options, including lint --fix and --baseline-out, can write.</description>
     <command>paredit inspect capabilities --output json</command>
     <command>paredit inspect check --file f.lisp</command>
     <command>paredit inspect dialect --file f.lisp</command>
@@ -98,7 +103,7 @@ version: 1.6.0
 
   <group name="data_validation">
     <description>Validate an S-expression data file (an alist or plist instance) against a `defschema`
-      schema — its own small, dependency-light schema language written as ordinary Lisp forms, never
+      schema: its own small, dependency-light schema language written as ordinary Lisp forms, never
       evaluated on either side of the check.</description>
     <command>paredit schema check instance.lisp --schema .paredit/schemas/config.lisp --output json</command>
     <command>paredit schema check instance.lisp --schema schemas.lisp --schema-name config --fail-on-violation</command>
@@ -200,9 +205,9 @@ version: 1.6.0
       Low-level paredit-style structural edits on one selected form (--path or --at).
       By default each prints the whole rewritten document to stdout and leaves the file
       untouched. Preview with --diff (unified diff on stdout), then re-run with --write to
-      update --file in place: the write is reparse-validated and staged with rollback, so a
-      failed write never leaves an unbalanced file. Do not use shell redirection into the
-      source file.
+      update --file in place. Writes are reparse-validated and staged with rollback, but
+      rollback itself can fail. After a failed write, inspect its diagnostics and re-read
+      and validate the affected files before continuing. Do not redirect stdout into the source file.
     </description>
     <command>paredit edit format --file f.lisp --diff</command>
     <command>paredit edit format --file f.lisp --write</command>
@@ -257,7 +262,8 @@ version: 1.6.0
       Move a form between files without reconstructing its text. The ring is a file:
       --ring, else $PAREDIT_KILL_RING, else .paredit/kill-ring.json. `copy --to-ring`
       stores the form with the comment block above it; `kill --to-ring` stores exactly
-      what it removed. `yank --index 0` is the most recent entry.
+      what it removed. Ring storage writes without --write and is not blocked by MCP
+      --read-only. `yank --index 0` is the most recent entry.
     </description>
     <command>paredit edit copy --file src.lisp --path 0.3 --to-ring</command>
     <command>paredit edit kill --file src.lisp --path 0.3 --to-ring --write</command>
@@ -267,7 +273,7 @@ version: 1.6.0
   <group name="structural_diff_and_patch">
     <description>
       Compare and carry changes by the parse rather than by lines. `inspect diff` reports which
-      forms were inserted, deleted, or replaced, ignoring whitespace and comments — so a
+      forms were inserted, deleted, or replaced, ignoring whitespace and comments, so a
       reformatting reports nothing and an edited argument reports as that argument rather than
       as the whole wrapped line. Use it to check that a rewrite changed only what you meant.
       `refactor patch` carries the difference between two versions of one file onto a third,
@@ -285,7 +291,7 @@ version: 1.6.0
     <description>
       `refactor apply` writes every edit in a manifest. `refactor step` numbers them and takes
       only the ones you accept, for reviewing a large rewrite without discarding it. Numbering is
-      by source position, so a step number means the same thing on every run. Both hash guards
+      by source position for a fixed manifest. Both hash guards
       still apply and a subset that would not parse is refused before any write.
     </description>
     <command>paredit refactor step --manifest rename.preview.json --output json</command>
@@ -308,9 +314,10 @@ paredit refactor verify --symbol old-name --new-symbol new-name --operation rena
   </pattern>
 
   <pattern name="manifest_based_apply">
-    <description>Hash-guarded apply flow when the preview is saved as a manifest file, for larger or riskier edits. --manifest-out writes the manifest and prints its hash in one call.</description>
+    <description>Hash-guarded apply flow when the preview is saved as a manifest file, for larger or riskier edits. --manifest-out writes the manifest without --write and prints its hash. This Bash example stops if preview or hash extraction fails.</description>
     <example>
-HASH=$(paredit refactor preview --from old-name --to new-name --mode function --fail-on-no-change --manifest-out rename.preview.json --output json src/*.lisp | jq -r '.manifest_hash')
+set -o pipefail
+HASH=$(paredit refactor preview --from old-name --to new-name --mode function --fail-on-no-change --manifest-out rename.preview.json --output json src/*.lisp | jq -er '.manifest_hash') || exit
 paredit refactor diff --manifest rename.preview.json --expect-manifest-hash "$HASH" --root . --output json
 paredit refactor apply --manifest rename.preview.json --expect-manifest-hash "$HASH" --root . --write --output json
 paredit refactor status --manifest rename.preview.json --root . --output json
@@ -329,7 +336,7 @@ paredit refactor workspace-execute --from old-name --to new-name --write --outpu
   </pattern>
 
   <pattern name="selector_first_edit">
-    <description>Resolve a selector before acting on it. Cheaper than a wrong edit, and it returns a stable id that survives the edits a --path would not.</description>
+    <description>Resolve a selector before acting on it. A stable id can survive unrelated insertions, but editing the form, renaming its enclosing definition, or inserting an earlier identical form changes the id. Re-resolve after those changes.</description>
     <example>
 paredit inspect resolve --file f.lisp --query '(defun ?name ...)' --output json
 paredit inspect resolve --file f.lisp --name parse-header --output json
@@ -340,7 +347,7 @@ paredit edit kill --file f.lisp --query '(cleanup ?x)' --all --diff
   </pattern>
 
   <pattern name="safe_removal">
-    <description>Only remove definitions after confirming they have no external references.</description>
+    <description>Only remove definitions after checking references across every relevant input file. These reports do not prove absence of references outside the inputs or of dynamic references; review those separately before writing.</description>
     <example>
 paredit inspect unused-definitions --fail-on-unused --output json system.asd src/*.lisp
 paredit refactor remove-unused-definitions --output json system.asd src/*.lisp
@@ -370,12 +377,12 @@ paredit refactor remove-unused-definitions --write system.asd src/*.lisp
 <best_practices>
   <practice priority="critical">Run a plan/preview command without --write first, inspect the JSON, then re-run with --write</practice>
   <practice priority="critical">For structural primitives (`paredit edit ...`), preview with --diff, then re-run with --write; never redirect stdout into the source file</practice>
-  <practice priority="critical">Prefer --output json for anything other than a single human-inspected file; it is the stable, parseable contract</practice>
+  <practice priority="critical">Prefer --output json for machine consumption. Parse stdout separately from stderr, match schemas to the producing release, and handle argument/configuration/global-budget errors that have no JSON envelope</practice>
   <practice priority="high">Use --path for deterministic scripted edits; use --at (byte offset) when a prior report or grep result already gives an offset</practice>
-  <practice priority="high">Prefer --name or --query over building a --path by hand: they skip the outline round trip. Run `inspect resolve` first when a pattern is new, and pass --all deliberately — an ambiguous selector is refused, not silently narrowed to the first match</practice>
-  <practice priority="medium">Across a multi-step refactor, carry the stable id from `inspect resolve` rather than a --path: an insertion above the form renumbers every path below it, and the id keeps naming the same form</practice>
+  <practice priority="high">Prefer --name or --query over building a --path by hand: they skip the outline round trip. Run `inspect resolve` first when a pattern is new, and pass --all deliberately; an ambiguous selector is refused, not silently narrowed to the first match</practice>
+  <practice priority="medium">Across a multi-step refactor, a stable id can avoid path renumbering from unrelated insertions. Re-resolve if the form, enclosing definition name, or ordinal among identical forms changes</practice>
   <practice priority="high">Use --fail-on-* and --require-* gates (e.g. --fail-on-blocking-gate, --require-definitions 1) so a plan command exits non-zero instead of silently under-matching</practice>
-  <practice priority="high">Branch on exit codes: 0 success, 1 hard failure (parse/IO/refused write), 2 usage error, 3 policy gate tripped after the report was printed — on 3, read the report and decide; on 1-2, fix the invocation</practice>
+  <practice priority="high">Branch on exit codes: 0 success, 1 operational failure (parse/IO/refused write), 2 usage error, 3 policy gate tripped after the report was printed. On 3, read the report and decide; on 1, diagnose the failure; on 2, correct the invocation</practice>
   <practice priority="high">Treat a refused transform as a safety result: planners conservatively reject capture, shadowing, target ambiguity, evaluation-order changes, and unsupported shapes</practice>
   <practice priority="medium">Run refactor verify with --phase pre before editing and --phase post after, to catch regressions the preview step could not predict</practice>
   <practice priority="medium">Wrap every invocation in a command timeout in automated pipelines; a hang should not block the surrounding agent loop</practice>
@@ -435,10 +442,10 @@ paredit refactor remove-unused-definitions --write system.asd src/*.lisp
 
 <error_escalation>
   <examples>
-    <example severity="low">A report command returns zero matches for a symbol expected to exist — check the dialect/extension and file list first</example>
-    <example severity="medium">Preview shows more or fewer edits than expected — narrow the command (specific rename-* variant) or the file list before writing</example>
-    <example severity="high">--fail-on-blocking-gate or --fail-on-target-conflict trips — stop and inspect the JSON gate reason instead of forcing --write</example>
-    <example severity="critical">`paredit inspect check` fails after a --write — the file is unbalanced; do not run further paredit commands against it until a human confirms recovery</example>
+    <example severity="low">A report command returns zero matches for a symbol expected to exist: check the dialect/extension and file list first</example>
+    <example severity="medium">Preview shows more or fewer edits than expected: narrow the command (specific rename-* variant) or the file list before writing</example>
+    <example severity="high">--fail-on-blocking-gate or --fail-on-target-conflict trips: stop and inspect the JSON gate reason instead of forcing --write</example>
+    <example severity="critical">`paredit inspect check` fails after a write: stop further edits and inspect the diagnostic. Failure alone does not prove unbalanced input. If parsing or rollback failed, require human-confirmed recovery before resuming writes</example>
   </examples>
 </error_escalation>
 

@@ -8237,34 +8237,34 @@
             },
             {
               "fullDescription": {
-                "text": "A file loads by evaluating its top-level forms in order. defun/defmacro/defclass and friends only install a definition, so a forward reference inside one is ordinary — by the time it runs, the file has finished loading. defvar/defparameter and every other top-level form run immediately, and a forward reference inside one depends on the file's current order to work at all."
+                "text": "This heuristic finds atom spellings matching later same-file definitions in top-level forms or value initializers. Review whether each match is actually evaluated and which binding it denotes before treating it as a load-order dependency."
               },
               "id": "execution-order-dependency",
               "properties": {
                 "category": "suspicious",
                 "fixable": false,
-                "rationale": "A file loads by evaluating its top-level forms in order. defun/defmacro/defclass and friends only install a definition, so a forward reference inside one is ordinary — by the time it runs, the file has finished loading. defvar/defparameter and every other top-level form run immediately, and a forward reference inside one depends on the file's current order to work at all.",
+                "rationale": "This heuristic finds atom spellings matching later same-file definitions in top-level forms or value initializers. Review whether each match is actually evaluated and which binding it denotes before treating it as a load-order dependency.",
                 "severity": "warning",
                 "tags": []
               },
               "shortDescription": {
-                "text": "a top-level form that runs at load time and references a name this file only defines later"
+                "text": "a top-level form contains a syntactic reference candidate to a later same-file definition"
               }
             },
             {
               "fullDescription": {
-                "text": "A file built only from definitions and value bindings can be reordered, split, or reloaded piecemeal without changing behaviour. A file with many top-level forms that run for effect — bare calls, setf, let used for a side effect — is a sequence: each form only means what it means in the order it was written."
+                "text": "The score counts top-level forms with recognized definition, declaration, or value-binding heads. A low score identifies files with more other top-level forms for style review."
               },
               "id": "declarative-style-score",
               "properties": {
                 "category": "suspicious",
                 "fixable": false,
-                "rationale": "A file built only from definitions and value bindings can be reordered, split, or reloaded piecemeal without changing behaviour. A file with many top-level forms that run for effect — bare calls, setf, let used for a side effect — is a sequence: each form only means what it means in the order it was written.",
+                "rationale": "The score counts top-level forms with recognized definition, declaration, or value-binding heads. A low score identifies files with more other top-level forms for style review.",
                 "severity": "warning",
                 "tags": []
               },
               "shortDescription": {
-                "text": "a file whose fraction of purely-declarative top-level forms falls below a threshold"
+                "text": "a file whose fraction of recognized declaration-style heads falls below a threshold"
               }
             },
             {

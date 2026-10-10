@@ -135,7 +135,7 @@ fn enclosing_string_span(tree: &SyntaxTree, offset: usize) -> Option<ByteSpan> {
 
 /// Whether `offset` falls immediately after an odd run of backslashes, i.e. in
 /// the middle of an escape sequence rather than between two characters.
-fn in_escape_sequence(input: &str, string_start: usize, offset: usize) -> bool {
+const fn in_escape_sequence(input: &str, string_start: usize, offset: usize) -> bool {
     let mut backslashes = 0usize;
     let mut cursor = offset;
     while cursor > string_start && input.as_bytes()[cursor - 1] == b'\\' {
@@ -191,7 +191,7 @@ pub(in crate::sexpr) fn escapes_next_character(
 
 /// Exposed for the cursor edits: whether the byte at `offset` is the escaped
 /// half of a `\x` pair.
-pub(in crate::sexpr) fn is_escaped_character(
+pub(in crate::sexpr) const fn is_escaped_character(
     input: &str,
     string_start: usize,
     offset: usize,

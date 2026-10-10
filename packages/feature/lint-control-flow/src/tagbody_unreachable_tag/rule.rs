@@ -11,7 +11,9 @@
 //! `Heads(["tagbody"])`, and everything it then reads is the matched form's
 //! own subtree, so a file of T tagbodies costs the file once — not T times.
 
+use crate::support::CONTROL_FLOW_DIALECTS;
 use paredit_core_lint_engine::LintResult;
+use paredit_core_lint_engine::policy::RuleDialectScope;
 
 use crate::tagbody_unreachable_tag::domain::{examine_tagbody, message_for};
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
@@ -30,7 +32,10 @@ pub const META: RuleMeta = RuleMeta::new(
 );
 
 /// `examine_tagbody` only ever matches a `tagbody` head.
-const HEADS: [NormalizedHead; 1] = [NormalizedHead::new("tagbody")];
+const HEADS: [NormalizedHead; 2] = [
+    NormalizedHead::new("tagbody"),
+    NormalizedHead::new("cl-tagbody"),
+];
 
 #[derive(Debug)]
 pub struct Rule;
@@ -38,6 +43,10 @@ pub struct Rule;
 pub const RULE: Rule = Rule;
 
 impl LintRule for Rule {
+    fn dialect_scope(&self) -> RuleDialectScope {
+        RuleDialectScope::new(&CONTROL_FLOW_DIALECTS)
+    }
+
     fn head_filter(&self) -> HeadFilter {
         HeadFilter::Heads(&HEADS)
     }
@@ -50,7 +59,13 @@ impl LintRule for Rule {
     ) -> LintResult<()> {
         let mut tagbody_form_count = 0;
         let mut items = Vec::new();
-        examine_tagbody(context.tree(), view, &mut tagbody_form_count, &mut items);
+        examine_tagbody(
+            context.tree(),
+            context.dialect(),
+            view,
+            &mut tagbody_form_count,
+            &mut items,
+        );
         for item in items {
             sink.report(item.span, message_for(&item.tag));
         }

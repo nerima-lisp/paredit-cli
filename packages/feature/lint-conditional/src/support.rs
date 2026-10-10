@@ -415,7 +415,7 @@ pub fn literal_kind_of_text(text: &str) -> LiteralKind {
 ///
 /// Anything with trailing characters the scan does not consume is a symbol.
 #[must_use]
-pub fn is_float_literal(text: &str) -> bool {
+pub const fn is_float_literal(text: &str) -> bool {
     let bytes = text.as_bytes();
     let len = bytes.len();
     let mut index = 0;

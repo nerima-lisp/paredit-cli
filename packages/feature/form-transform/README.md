@@ -4,28 +4,31 @@ Reshaping call forms: threading, replacement, unwrapping, ordering, and splittin
 
 ## Responsibilities
 
-Transformations that change the *shape* of code without changing what it
-computes, and without needing to know what any particular operator means:
+Transformations that change the *shape* of code. Structural validity does not
+prove equivalent evaluation or lexical scope; callers must review those effects.
 
-- **`refactor thread-expression` / `unthread-expression`** — converts between
+- **`refactor thread-expression` / `unthread-expression`** converts between
   nested calls and a threading pipeline, in both directions.
-- **`refactor replace-forms`** — replaces every form matching a pattern with a
+- **`refactor replace-forms`** replaces every form matching a pattern with a
   replacement template.
-- **`refactor unwrap-call`** — replaces a call with one of its arguments,
+- **`refactor unwrap-call`** replaces a call with one of its arguments,
   dropping the wrapper.
-- **`sort_definitions`** — reorders top-level definitions by name, keeping each
+- **`refactor unwrap-body`** removes a wrapper and its header arguments,
+  retaining the body from the required zero-based `--body-start` argument
+  index. Multiple body forms require a top-level or recognized sequence
+  position. This is structural only, not scope- or meaning-preserving.
+- **`sort_definitions`** reorders top-level definitions by name, keeping each
   definition's comments attached to it.
-- **`split_file`** — distributes a file's definitions across several files.
+- **`split_file`** distributes a file's definitions across several files.
 
-The last two have **no `cli` layer**: they own no subcommand and are driven by
-another command's workflow. A slice is not required to span all three layers,
-and inventing an empty one to make the shape uniform would be worse than the
-asymmetry.
+The last two have no `cli` layer here. The `sort-definitions` and `split-file`
+workflows in `paredit-feature-remove-unused` call their use cases.
 
 ### What this package does not own
 
-- **No semantics.** These transformations are about form shape. Anything
-  needing to know what a name refers to belongs elsewhere.
+- **No general semantic-equivalence proof.** These transformations reshape
+  forms and use bounded binding checks where needed. Broader name resolution
+  belongs to `core/semantics` and the feature that owns the analysis.
 - **No extraction or inlining.** Those give and remove names;
   `feature/extract` and `feature/inline` own them.
 - **No comment reflowing.** Keeping comments attached during a reorder uses
@@ -42,22 +45,22 @@ asymmetry.
 | `paredit-core-cli` | Input reading, atomic writes, shared argument types. |
 | `clap` | Argument parsing, confined to each slice's `cli`. |
 | `serde_json` | JSON output. |
-| `anyhow` | Fallible planning paths, pending §9.2. |
+| `anyhow` | Fallible planning paths. |
 | `thiserror` | Typed failures. |
 | `proptest` (dev) | Round-trip properties: threading then unthreading must reproduce the input. |
 
 ## Public API
 
-Two names for each of the four slices that own a subcommand
-(`thread_expression`, `unthread_expression`, `replace_forms`, `unwrap_call`),
-per §4.2. `sort_definitions` and `split_file` publish their domain and use case
+Each slice that owns a subcommand exposes its arguments and entry point
+(`thread_expression`, `unthread_expression`, `replace_forms`, `unwrap_call`,
+`unwrap_body`). `sort_definitions` and `split_file` publish their domain and use case
 for their driving command to call.
 
-`#[non_exhaustive]` is deliberately absent (§9.4).
+These workspace-only APIs do not use `#[non_exhaustive]`.
 
 ## Layout
 
-Slice-first, per §3.1:
+Slice-first:
 
 ```text
 src/
@@ -65,6 +68,7 @@ src/
 ├── unthread_expression/{domain.rs + domain/, usecase.rs, cli.rs}
 ├── replace_forms/{domain.rs + domain/, usecase.rs, cli.rs}
 ├── unwrap_call/{domain.rs, usecase.rs, cli.rs}
+├── unwrap_body/{domain.rs + domain/, usecase.rs, cli.rs}
 ├── sort_definitions/{domain.rs + domain/, usecase.rs}     no cli
 └── split_file/{domain.rs + domain/, usecase.rs}           no cli
 ```

@@ -1,6 +1,6 @@
 use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan};
 
-pub fn expand_definition_removal(input: &str, span: ByteSpan) -> ByteSpan {
+pub const fn expand_definition_removal(input: &str, span: ByteSpan) -> ByteSpan {
     let bytes = input.as_bytes();
     let mut start = span.start().get();
     let mut end = span.end().get();

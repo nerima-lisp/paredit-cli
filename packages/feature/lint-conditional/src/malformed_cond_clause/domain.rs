@@ -25,7 +25,7 @@ use paredit_core_syntax::expression_equality::render_expression;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
 };
-use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use paredit_core_syntax::view_query::{atom_text, is_paren_list, list_head};
 use serde_json::{Value, json};
 
 /// Whether a clause's structure is not statically visible: it is guarded by a
@@ -75,17 +75,41 @@ impl Finding for MalformedCondClauseItem {
     }
 }
 
+fn is_defstruct_slot_declaration(tree: &SyntaxTree, span: ByteSpan) -> LintResult<bool> {
+    let indexes = tree.select_at(span.start().get())?.path().to_raw_indexes();
+    for depth in 1..indexes.len() {
+        let ancestor = tree.select_path(&SexprPath::from_indexes(indexes[..depth].to_vec()))?;
+        if !ancestor
+            .head()
+            .is_some_and(|head| head.eq_ignore_ascii_case("defstruct"))
+            || indexes[depth] < 2
+        {
+            continue;
+        }
+        // A slot specification names a slot, not a function call. Only its
+        // second child is evaluated; slot options such as :type are data.
+        if indexes.len() == depth + 1 || indexes[depth + 1] != 1 {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
 pub fn examine_cond(
+    tree: &SyntaxTree,
     view: &ExpressionView,
     cond_form_count: &mut usize,
     violations: &mut Vec<MalformedCondClauseItem>,
-) {
+) -> LintResult<()> {
     if !list_head(view).is_some_and(|head| head.eq_ignore_ascii_case("cond")) {
-        return;
+        return Ok(());
     }
     // A quoted/quasiquoted/unquoted `cond` is data or a template, not a call.
     if !view.reader_prefixes.is_empty() {
-        return;
+        return Ok(());
+    }
+    if is_defstruct_slot_declaration(tree, view.span)? {
+        return Ok(());
     }
     *cond_form_count += 1;
 
@@ -101,6 +125,7 @@ pub fn examine_cond(
             });
         }
     }
+    Ok(())
 }
 
 /// Collects every malformed `cond` clause in one file, with the number of
@@ -127,9 +152,11 @@ pub fn build_malformed_cond_clause_report(
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
-        for_each_subview(&view, |subview| {
-            examine_cond(subview, &mut cond_form_count, &mut violations);
-        });
+        let mut pending = vec![&view];
+        while let Some(subview) = pending.pop() {
+            examine_cond(tree, subview, &mut cond_form_count, &mut violations)?;
+            pending.extend(subview.children.iter().rev());
+        }
     }
 
     Ok(FileFindings::new(
@@ -215,6 +242,40 @@ mod tests {
         let (cond_form_count, violations) = clauses("(list '(cond foo bar))");
         assert_eq!(cond_form_count, 0);
         assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn defstruct_slot_name_and_options_are_not_cond_calls() {
+        let (count, violations) =
+            clauses("(defstruct ast-if (cond nil) (value nil :type (cond nil)))");
+        assert_eq!(count, 0);
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn defstruct_slot_initform_still_checks_real_cond_calls() {
+        let (count, violations) = clauses("(defstruct ast-if (cond (cond nil) :type (cond nil)))");
+        assert_eq!(count, 1);
+        assert_eq!(violations.len(), 1);
+        assert_eq!(violations[0].clause, "nil");
+    }
+
+    #[test]
+    fn defstruct_nested_initforms_are_checked_case_insensitively() {
+        let (count, violations) =
+            clauses("(DEFSTRUCT outer (value (list (defstruct inner (cond (COND nil))))))");
+        assert_eq!(count, 1);
+        assert_eq!(violations.len(), 1);
+        assert_eq!(violations[0].clause, "nil");
+    }
+
+    #[test]
+    fn defstruct_header_initforms_are_not_blanket_suppressed() {
+        let (count, violations) = clauses(
+            "(defstruct (ast-if (:constructor make-if (&aux (value (cond nil)))) (:include base (value (cond nil)))) value)",
+        );
+        assert_eq!(count, 2);
+        assert_eq!(violations.len(), 2);
     }
 
     #[test]

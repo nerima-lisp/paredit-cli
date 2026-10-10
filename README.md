@@ -9,8 +9,8 @@ S-expressions, designed for both people and AI coding agents. It supports
 Common Lisp, Emacs Lisp, LFE, Scheme, Racket, Clojure, Hy, Carp, Janet, and
 Fennel.
 
-Full documentation — command reference, safe editing workflows, the agent
-interface, and integration guides — is published at
+Full documentation, including the command reference, safe editing workflows,
+the agent interface, and integration guides, is published at
 <https://nerima-lisp.github.io/paredit-cli/>. The source for that site lives in
 [docs/src/](docs/src/index.md).
 
@@ -44,6 +44,7 @@ command list. For machine-readable discovery, run
 paredit inspect check --file src/example.lisp
 paredit edit wrap --file src/example.lisp --path 0.2 --diff
 paredit refactor plan --symbol old-name src/example.lisp
+paredit inspect test-risk --top 10 src/ tests/
 
 # Name a form without counting parentheses: by definition name, by editor
 # coordinate, or by shape. `inspect resolve` shows what a selector matches.
@@ -73,9 +74,9 @@ for the Cachix binary cache, flake overlay, and commit-pinning for automation.
 ## Stability
 
 `paredit-cli` follows Semantic Versioning. From `1.0.0` onward, command paths,
-flags, exit codes, documented JSON fields, the `paredit_cli` crate-root API,
-and the Nix outputs are stable within the `1.x` series; human-readable text
-output is not a machine contract. The
+flags, exit codes, documented JSON fields, and the Nix outputs are stable
+within the `1.x` series; the unpublished Rust API and human-readable text
+output are not machine contracts. The
 [compatibility guide](https://nerima-lisp.github.io/paredit-cli/reference/compatibility/) lists
 exactly what an upgrade may and may not change.
 
@@ -89,7 +90,7 @@ nix flake check
 
 Pull requests run a fast-path subset of `nix flake check`'s outputs, one CI job
 per check, so the gate costs the slowest check rather than the sum of all of
-them — the fat-LTO release build is deferred to `main` and pushes to `main`
+them. The fat-LTO release build is deferred to `main` and pushes to `main`
 run every output. A typed Rust library API behind the CLI
 is documented in [`src/lib.rs`](src/lib.rs); build it locally with
 `cargo doc --no-deps --open`. The rendered command reference and guides live

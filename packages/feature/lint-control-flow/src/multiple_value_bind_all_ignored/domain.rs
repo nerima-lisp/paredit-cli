@@ -34,7 +34,7 @@
 //! ignores that variable earns both findings, which are two true statements
 //! about it.
 //!
-//! Scope: Common Lisp only.
+//! Scope: Common Lisp and Emacs Lisp cl-lib forms.
 
 use std::path::Path;
 
@@ -43,10 +43,13 @@ use paredit_core_lint_engine::LintResult;
 use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head, symbol_is};
+use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
 use serde_json::{Value, json};
 
-use crate::support::{is_unevaluated_at, normalized_symbol, plain_name};
+use crate::support::{
+    contains_unknown_el_operator, is_unevaluated_at, operator_is, plain_name_for_dialect,
+    symbol_name_for_dialect,
+};
 
 #[derive(Debug, Clone)]
 pub struct MultipleValueBindAllIgnoredItem {
@@ -99,15 +102,14 @@ pub fn message_for(variables: &[String]) -> String {
 ///
 /// Reads every `(declare …)` in the body rather than only the leading run:
 /// which position a declaration is legal in is a different rule's subject.
-fn declaration_names_any(body: &[ExpressionView], variables: &[String]) -> bool {
+fn declaration_names_any(body: &[ExpressionView], variables: &[String], dialect: Dialect) -> bool {
     let mut named = false;
-    for declare in body
-        .iter()
-        .filter(|form| list_head(form).is_some_and(|head| symbol_is(head, "declare")))
-    {
+    for declare in body.iter().filter(|form| {
+        list_head(form).is_some_and(|head| operator_is(head, dialect, "declare", "declare"))
+    }) {
         for_each_subview(declare, |subview| {
             if !named
-                && normalized_symbol(subview)
+                && symbol_name_for_dialect(subview, dialect)
                     .as_deref()
                     .is_some_and(|name| variables.iter().any(|variable| variable == name))
             {
@@ -128,18 +130,18 @@ fn declaration_names_any(body: &[ExpressionView], variables: &[String]) -> bool 
 /// `(declare (ignore q))` does contain the token `q` — and would silently
 /// stop protecting the `ignore` idiom the day someone decided, quite
 /// reasonably, that a declaration is not a reference.
-fn is_declaration(form: &ExpressionView) -> bool {
-    list_head(form).is_some_and(|head| symbol_is(head, "declare"))
+fn is_declaration(form: &ExpressionView, dialect: Dialect) -> bool {
+    list_head(form).is_some_and(|head| operator_is(head, dialect, "declare", "declare"))
 }
 
-fn mentions_any(body: &[ExpressionView], variables: &[String]) -> bool {
+fn mentions_any(body: &[ExpressionView], variables: &[String], dialect: Dialect) -> bool {
     let mut mentioned = false;
-    for form in body.iter().filter(|form| !is_declaration(form)) {
+    for form in body.iter().filter(|form| !is_declaration(form, dialect)) {
         for_each_subview(form, |subview| {
             if mentioned {
                 return;
             }
-            if let Some(name) = normalized_symbol(subview) {
+            if let Some(name) = symbol_name_for_dialect(subview, dialect) {
                 mentioned = variables.contains(&name);
             }
         });
@@ -154,12 +156,20 @@ fn mentions_any(body: &[ExpressionView], variables: &[String]) -> bool {
 /// Reads only the matched form's own subtree.
 pub fn examine_multiple_value_bind(
     tree: &SyntaxTree,
+    dialect: Dialect,
     view: &ExpressionView,
     multiple_value_bind_form_count: &mut usize,
     violations: &mut Vec<MultipleValueBindAllIgnoredItem>,
 ) {
     if !is_paren_list(view)
-        || !list_head(view).is_some_and(|head| symbol_is(head, "multiple-value-bind"))
+        || !list_head(view).is_some_and(|head| {
+            operator_is(
+                head,
+                dialect,
+                "multiple-value-bind",
+                "cl-multiple-value-bind",
+            )
+        })
     {
         return;
     }
@@ -183,13 +193,19 @@ pub fn examine_multiple_value_bind(
     // shape being read, and guessing at it would put a wrong name in a report.
     let mut variables = Vec::with_capacity(variable_list.children.len());
     for entry in &variable_list.children {
-        let Some(name) = plain_name(entry) else {
+        let Some(name) = plain_name_for_dialect(entry, dialect) else {
             return;
         };
         variables.push(name);
     }
 
-    if declaration_names_any(body, &variables) || mentions_any(body, &variables) {
+    if body
+        .iter()
+        .any(|form| contains_unknown_el_operator(form, dialect))
+    {
+        return;
+    }
+    if declaration_names_any(body, &variables, dialect) || mentions_any(body, &variables, dialect) {
         return;
     }
     if is_unevaluated_at(tree, view.span) {
@@ -209,7 +225,7 @@ pub fn build_multiple_value_bind_all_ignored_report(
     dialect: Dialect,
     tree: &SyntaxTree,
 ) -> LintResult<FileFindings<MultipleValueBindAllIgnoredItem>> {
-    if dialect != Dialect::CommonLisp {
+    if !matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
         return Ok(FileFindings::new(
             path.to_path_buf(),
             dialect,
@@ -227,6 +243,7 @@ pub fn build_multiple_value_bind_all_ignored_report(
         for_each_subview(&view, |subview| {
             examine_multiple_value_bind(
                 tree,
+                dialect,
                 subview,
                 &mut multiple_value_bind_form_count,
                 &mut violations,
@@ -364,7 +381,8 @@ mod tests {
                     .children
                     .remove(0)
             ],
-            &["q".to_owned()]
+            &["q".to_owned()],
+            Dialect::CommonLisp
         ));
     }
 

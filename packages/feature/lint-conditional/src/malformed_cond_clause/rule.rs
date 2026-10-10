@@ -33,13 +33,13 @@ impl LintRule for Rule {
 
     fn check(
         &self,
-        _context: &RuleContext<'_>,
+        context: &RuleContext<'_>,
         view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
     ) -> LintResult<()> {
         let mut cond_form_count = 0;
         let mut items = Vec::new();
-        examine_cond(view, &mut cond_form_count, &mut items);
+        examine_cond(context.tree(), view, &mut cond_form_count, &mut items)?;
         for item in items {
             let span = item.span;
 
@@ -49,5 +49,52 @@ impl LintRule for Rule {
             );
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    use paredit_core_lint_engine::engine::{build_head_index, collect_lint_outcomes};
+    use paredit_core_lint_engine::policy::RuleSelection;
+    use paredit_core_lint_engine::rule::{RuleCatalog, RuleEntry};
+    use paredit_core_syntax::dialect::Dialect;
+    use paredit_core_syntax::sexpr::SyntaxTree;
+
+    static ENTRIES: [RuleEntry; 1] = [RuleEntry::new(&META, &RULE)];
+
+    fn findings(input: &str) -> usize {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse");
+        let catalog = RuleCatalog::new(&ENTRIES);
+        let index = build_head_index(catalog);
+        collect_lint_outcomes(
+            catalog,
+            &index,
+            Path::new("test.lisp"),
+            Dialect::CommonLisp,
+            &tree,
+            input,
+            RuleSelection::All,
+        )
+        .expect("lint pass")
+        .len()
+    }
+
+    #[test]
+    fn dispatch_ignores_defstruct_slot_name_and_options() {
+        assert_eq!(
+            findings("(defstruct ast-if (cond nil) (value nil :type (cond nil)))"),
+            0,
+        );
+    }
+
+    #[test]
+    fn dispatch_checks_defstruct_slot_initform() {
+        assert_eq!(
+            findings("(defstruct ast-if (cond (cond nil) :type (cond nil)))"),
+            1,
+        );
     }
 }

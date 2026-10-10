@@ -413,26 +413,35 @@ fn run_verification_or_restore(
     journal: &UndoJournal,
     root_guard: Option<&RefactorRootGuard>,
 ) -> CliResult<()> {
-    let outcome = verification
-        .run()
-        .map_err(crate::error::RefactorContext::new(
-            "failed to run --verify-command after writing",
-        ))?;
-    if outcome.passed() {
-        return Ok(());
-    }
-
-    report_verification_transcript(&outcome);
+    let (failure_reason, execution_error) = match verification.run() {
+        Ok(outcome) if outcome.passed() => return Ok(()),
+        Ok(outcome) => {
+            report_verification_transcript(&outcome);
+            (outcome.failure_reason(), None)
+        }
+        Err(error) => {
+            let error: paredit_core_cli::CliError = crate::error::RefactorContext::new(
+                "failed to run --verify-command after writing",
+            )(error)
+            .into();
+            (paredit_core_cli::error::error_chain(&error), Some(error))
+        }
+    };
 
     match restore_from_journal(journal, root_guard) {
-        Ok(restored) => Err(paredit_core_cli::error::FeatureRefusal::message(
-            paredit_core_cli::diagnosis::ErrorCode::GateFailed,
-            format!(
-                "{}; restored {restored} file(s) to their pre-refactor content",
-                outcome.failure_reason()
-            ),
-        )
-        .into()),
+        Ok(restored) => match execution_error {
+            Some(error) => Err(crate::error::RefactorContext::new(format!(
+                "restored {restored} file(s) to their pre-refactor content"
+            ))(error)
+            .into()),
+            None => Err(paredit_core_cli::error::FeatureRefusal::message(
+                paredit_core_cli::diagnosis::ErrorCode::GateFailed,
+                format!(
+                    "{failure_reason}; restored {restored} file(s) to their pre-refactor content"
+                ),
+            )
+            .into()),
+        },
         // Not a gate: the writes landed and undoing them did not, so the
         // working tree is in a state the caller has to look at. That is
         // `environment.rollback-failed`, and reporting it as a tripped gate
@@ -442,7 +451,7 @@ fn run_verification_or_restore(
             format!(
                 "{}; restoring the written files ALSO failed, so the working tree is \
                  partially refactored: {}",
-                outcome.failure_reason(),
+                failure_reason,
                 paredit_core_cli::error::error_chain(&error),
             ),
         )
@@ -681,6 +690,105 @@ mod tests {
     fn fresh_temp_dir(label: &str) -> PathBuf {
         let id = NEXT_TEMP_ID.fetch_add(1, Ordering::Relaxed);
         std::env::temp_dir().join(format!("paredit-{label}-{}-{id}", std::process::id()))
+    }
+
+    fn written_verification_journal(base: &std::path::Path) -> UndoJournal {
+        use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan};
+
+        fs::create_dir_all(base).expect("create verification workspace");
+        let entries = ["first.lisp", "second.lisp"]
+            .into_iter()
+            .map(|name| {
+                let path = base.join(name);
+                let entry = UndoJournalFile::record(
+                    path.clone(),
+                    "(old)\n",
+                    &[(
+                        ByteSpan::new(ByteOffset::new(1), ByteOffset::new(4)),
+                        "new".into(),
+                    )],
+                )
+                .expect("record actual rewrite");
+                fs::write(path, "(new)\n").expect("commit rewritten source");
+                entry
+            })
+            .collect();
+        UndoJournal::new("refactor apply", entries)
+    }
+
+    #[test]
+    fn verification_spawn_error_restores_every_written_file() {
+        let base = fresh_temp_dir("verify-spawn-restore");
+        let journal = written_verification_journal(&base);
+        let verification = VerificationCommand::new("exit 0")
+            .expect("valid command")
+            .in_directory(base.join("missing-working-directory"));
+
+        let error = run_verification_or_restore(&verification, &journal, None)
+            .expect_err("spawning with a missing working directory must fail");
+
+        assert_eq!(
+            paredit_core_cli::diagnosis::code_for_cli_error(&error),
+            paredit_core_cli::diagnosis::ErrorCode::EnvironmentUnavailable
+        );
+        assert!(
+            error
+                .chain()
+                .contains("failed to spawn verification command"),
+            "{}",
+            error.chain()
+        );
+        for entry in &journal.files {
+            assert_eq!(
+                fs::read(&entry.path).expect("read restored source"),
+                b"(old)\n"
+            );
+        }
+        assert!(
+            error.chain().contains("restored 2 file(s)"),
+            "{}",
+            error.chain()
+        );
+        fs::remove_dir_all(base).expect("remove verification workspace");
+    }
+
+    #[test]
+    fn verification_spawn_error_reports_failed_restore_without_overwriting_drift() {
+        let base = fresh_temp_dir("verify-spawn-rollback-fail");
+        let journal = written_verification_journal(&base);
+        fs::write(&journal.files[1].path, "(later-edit)\n").expect("simulate later edit");
+        let verification = VerificationCommand::new("exit 0")
+            .expect("valid command")
+            .in_directory(base.join("missing-working-directory"));
+
+        let error = run_verification_or_restore(&verification, &journal, None)
+            .expect_err("failed restore must be reported");
+
+        assert_eq!(
+            paredit_core_cli::diagnosis::code_for_cli_error(&error),
+            paredit_core_cli::diagnosis::ErrorCode::EnvironmentRollbackFailed
+        );
+        assert!(
+            error
+                .chain()
+                .contains("failed to spawn verification command"),
+            "{}",
+            error.chain()
+        );
+        assert!(
+            error.chain().contains("cannot restore"),
+            "{}",
+            error.chain()
+        );
+        assert_eq!(
+            fs::read(&journal.files[0].path).expect("read unchanged post-image"),
+            b"(new)\n"
+        );
+        assert_eq!(
+            fs::read(&journal.files[1].path).expect("read retained later edit"),
+            b"(later-edit)\n"
+        );
+        fs::remove_dir_all(base).expect("remove verification workspace");
     }
 
     #[test]

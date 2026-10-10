@@ -2774,6 +2774,94 @@ fn cli_lint_custom_rule_fix_applies_like_a_shipped_one() {
 }
 
 #[test]
+fn cli_lint_fix_reparses_every_file_before_writing_any_file() {
+    let rules = rule_dir(
+        "lint-custom-fix-reparse",
+        r#"(defrule complex-replacement
+             :pattern (needs-fix)
+             :message "m"
+             :fix #C(1 2))"#,
+    );
+    let dir = fresh_temp_dir("lint-custom-fix-reparse-src");
+    let first = dir.join("a.lisp");
+    let second = dir.join("b.el");
+    let original = "(needs-fix)\n";
+    fs::write(&first, original).expect("write a.lisp");
+    fs::write(&second, original).expect("write b.el");
+
+    // The template is a valid Common Lisp fix, but not an Emacs Lisp form.
+    let control = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--custom-rules"])
+            .arg(&rules)
+            .args(["--fix", "--output", "json"])
+            .arg(&first)
+            .assert()
+            .success(),
+    );
+    assert_eq!(control["fixes_applied"], 1);
+    assert_eq!(
+        fs::read_to_string(&first).expect("read control"),
+        "#C(1 2)\n"
+    );
+    fs::write(&first, original).expect("restore control fixture");
+
+    for mode in ["--group-by-impact-area", "--diff", "--check"] {
+        paredit()
+            .args(["inspect", "lint", "--custom-rules"])
+            .arg(&rules)
+            .args(["--fix", "--output", "json", mode])
+            .arg(&first)
+            .arg(&second)
+            .assert()
+            .failure()
+            .stderr(predicate::str::contains(
+                "rewritten source does not reparse",
+            ));
+        assert_eq!(fs::read_to_string(&first).expect("read a.lisp"), original);
+        assert_eq!(fs::read_to_string(&second).expect("read b.el"), original);
+    }
+
+    paredit()
+        .args(["inspect", "lint", "--custom-rules"])
+        .arg(&rules)
+        .args(["--fix", "--output", "json"])
+        .arg(&first)
+        .arg(&second)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "rewritten source does not reparse",
+        ));
+
+    assert_eq!(fs::read_to_string(&first).expect("read a.lisp"), original);
+    assert_eq!(fs::read_to_string(&second).expect("read b.el"), original);
+
+    let valid_second = dir.join("c.lisp");
+    fs::write(&valid_second, original).expect("write c.lisp");
+    let control = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--custom-rules"])
+            .arg(&rules)
+            .args(["--fix", "--output", "json"])
+            .arg(&first)
+            .arg(&valid_second)
+            .assert()
+            .success(),
+    );
+    assert_eq!(control["fixes_applied"], 2);
+    assert_eq!(control["files_changed"], 2);
+    assert_eq!(
+        fs::read_to_string(&first).expect("read a.lisp"),
+        "#C(1 2)\n"
+    );
+    assert_eq!(
+        fs::read_to_string(&valid_second).expect("read c.lisp"),
+        "#C(1 2)\n"
+    );
+}
+
+#[test]
 fn cli_lint_a_custom_finding_obeys_a_suppression_comment() {
     let rules = rule_dir(
         "lint-custom-suppress",

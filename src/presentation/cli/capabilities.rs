@@ -134,6 +134,13 @@ fn subcommand_reports(
                 report["gates"] = gates;
             }
             if nested.is_empty() {
+                if let Some(help) = unconditional_gate_help(path) {
+                    report["unconditional_gates"] = json!([{
+                        "kind": "presence",
+                        "help": help,
+                        "exit_code": paredit_core_cli::gate::GATE_FAILURE_EXIT_CODE,
+                    }]);
+                }
                 // A leaf: the classification below only means something for
                 // an invocable command. A namespace node (`inspect`, `edit`)
                 // gets neither field, the same way it gets no `gates` —
@@ -187,16 +194,17 @@ fn argument_reports(
 
 /// How a gate flag decides to fail.
 ///
-/// Derived from the flag's name rather than declared, because with ninety-odd
-/// gate flags across 275 commands a hand-kept table would be wrong within a
-/// release. The naming convention *is* the unification — a flag that follows
-/// it is discoverable, and a contract test refuses one that does not.
-/// The convention, stated once:
+/// Derived from the flag's name rather than a per-command table. The existing
+/// API-diff impact threshold has a distinct spelling but the same severity
+/// policy role; contract tests cover that exception alongside the convention.
 ///
 /// | Spelling | Kind | Fails when |
 /// | --- | --- | --- |
 /// | `--fail-on <severity>` | `severity` | a finding at or above the level |
-/// | `--fail-on-<thing>` | `presence` | any `<thing>` was found |
+/// | `--intended-bump <bump>` | `severity` | API impact exceeds the intended bump |
+/// | `--fail-on-<condition>` | `presence` | the named failure condition holds |
+/// | `--fail-on-risk-level <level>` | `presence` | risk is at or above the level |
+/// | `--fail-on-max-depth <N>` | `presence` | depth exceeds `N` |
 /// | `--require-<thing> <N>` | `minimum` | fewer than `N` were found |
 ///
 /// A `--require-*` that takes no value is deliberately *not* a gate:
@@ -206,7 +214,7 @@ fn argument_reports(
 fn gate_kind(arg: &Arg) -> Option<&'static str> {
     let long = arg.get_long()?;
     // Order matters: the prefix test would swallow the exact match.
-    if long == "fail-on" {
+    if matches!(long, "fail-on" | "intended-bump") {
         return Some("severity");
     }
     if long.starts_with("fail-on-") {
@@ -218,10 +226,7 @@ fn gate_kind(arg: &Arg) -> Option<&'static str> {
     None
 }
 
-/// The gates one command offers, or `None` when it has none.
-///
-/// Absent rather than empty so "this command cannot fail on a policy" and
-/// "we did not look" stay distinguishable.
+/// The flag-controlled gates one command offers, or `None` when it has none.
 fn gate_reports(command: &ClapCommand) -> Option<Value> {
     let gates: Vec<Value> = command
         .get_arguments()
@@ -236,6 +241,13 @@ fn gate_reports(command: &ClapCommand) -> Option<Value> {
         })
         .collect();
     (!gates.is_empty()).then_some(Value::Array(gates))
+}
+
+fn unconditional_gate_help(path: &[String]) -> Option<&'static str> {
+    path.iter()
+        .map(String::as_str)
+        .eq(["inspect", "dotfiles"])
+        .then_some("Inventory is incomplete; see diagnostics.")
 }
 
 fn argument_kind(arg: &Arg) -> &'static str {

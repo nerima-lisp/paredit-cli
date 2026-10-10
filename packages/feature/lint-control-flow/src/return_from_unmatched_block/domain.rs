@@ -29,8 +29,8 @@
 //!   `return-outside-implicit-nil-block`, which owns the `(return …)`
 //!   spelling; the two are disjoint by head.
 //!
-//! Scope: Common Lisp only. `return-from` is not an operator in the other nine
-//! dialects.
+//! Scope: Common Lisp and Emacs Lisp cl-lib forms. Emacs Lisp local-function
+//! blocks are restricted to each binding's own body.
 
 use std::path::Path;
 
@@ -39,16 +39,18 @@ use paredit_core_lint_engine::LintResult;
 use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head, symbol_is};
+use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
 use serde_json::{Value, json};
 
-use crate::support::{BlockScope, block_scope, plain_name, with_lexical_chain};
+use crate::support::{
+    BlockScope, block_scope_for_dialect, operator_is, plain_name_for_dialect, with_lexical_chain,
+};
 
 #[derive(Debug, Clone)]
 pub struct ReturnFromUnmatchedBlockItem {
     /// The span of the whole `(return-from …)` form.
     pub span: ByteSpan,
-    /// The block name it names, normalized (lowercased, package-unqualified).
+    /// The block name, CL-normalized or preserving Emacs Lisp symbol identity.
     pub block_name: String,
 }
 
@@ -97,13 +99,13 @@ enum Resolution {
 }
 
 /// Whether the block named by a `return-from` at `span` is established.
-fn resolve(tree: &SyntaxTree, span: ByteSpan, name: &str) -> Resolution {
+fn resolve(tree: &SyntaxTree, dialect: Dialect, span: ByteSpan, name: &str) -> Resolution {
     with_lexical_chain(tree, span, |chain| {
         if chain.unevaluated {
             return Resolution::Unknown;
         }
         for index in chain.ancestors_inward() {
-            match block_scope(&chain.nodes, index) {
+            match block_scope_for_dialect(&chain.nodes, index, dialect) {
                 BlockScope::Named(established) if established == name => {
                     return Resolution::Established;
                 }
@@ -125,11 +127,15 @@ fn resolve(tree: &SyntaxTree, span: ByteSpan, name: &str) -> Resolution {
 /// form is ever materialized — see `crate::support::with_lexical_chain`.
 pub fn examine_return_from(
     tree: &SyntaxTree,
+    dialect: Dialect,
     view: &ExpressionView,
     return_from_form_count: &mut usize,
     violations: &mut Vec<ReturnFromUnmatchedBlockItem>,
 ) {
-    if !is_paren_list(view) || !list_head(view).is_some_and(|head| symbol_is(head, "return-from")) {
+    if !is_paren_list(view)
+        || !list_head(view)
+            .is_some_and(|head| operator_is(head, dialect, "return-from", "cl-return-from"))
+    {
         return;
     }
     *return_from_form_count += 1;
@@ -140,11 +146,15 @@ pub fn examine_return_from(
     if view.children.len() < 2 || view.children.len() > 3 {
         return;
     }
-    let Some(name) = view.children.get(1).and_then(plain_name) else {
+    let Some(name) = view
+        .children
+        .get(1)
+        .and_then(|name| plain_name_for_dialect(name, dialect))
+    else {
         return;
     };
 
-    if resolve(tree, view.span, &name) == Resolution::Unestablished {
+    if resolve(tree, dialect, view.span, &name) == Resolution::Unestablished {
         violations.push(ReturnFromUnmatchedBlockItem {
             span: view.span,
             block_name: name,
@@ -161,7 +171,7 @@ pub fn build_return_from_unmatched_block_report(
     dialect: Dialect,
     tree: &SyntaxTree,
 ) -> LintResult<FileFindings<ReturnFromUnmatchedBlockItem>> {
-    if dialect != Dialect::CommonLisp {
+    if !matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
         return Ok(FileFindings::new(
             path.to_path_buf(),
             dialect,
@@ -177,7 +187,13 @@ pub fn build_return_from_unmatched_block_report(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_return_from(tree, subview, &mut return_from_form_count, &mut violations);
+            examine_return_from(
+                tree,
+                dialect,
+                subview,
+                &mut return_from_form_count,
+                &mut violations,
+            );
         });
     }
 

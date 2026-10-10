@@ -27,6 +27,9 @@ pub mod unwind_protect_no_cleanup;
 // The root's REGISTRY names each rule's META and RULE across this crate
 // boundary (section 4.2), and each slice's cli owns its own subcommand.
 
+#[cfg(test)]
+mod cl_lib_tests;
+
 /// The seven non-local-exit rules driven through the *engine*, rather than
 /// through their own `build_*_report`.
 ///

@@ -160,6 +160,25 @@ pub enum TransformTargetError {
 
     #[error("--argument-index is too large to address any call argument")]
     UnwrapArgumentIndexTooLarge,
+
+    #[error("unwrap-body target must be a parenthesized wrapper with an atom head")]
+    UnwrapBodyNotAWrapper,
+
+    #[error("unwrap-body expected function {expected}, found {found}")]
+    UnwrapBodyFunctionMismatch { expected: String, found: String },
+
+    #[error(
+        "unwrap-body requires a body argument at --body-start {index}; found {count} argument(s)"
+    )]
+    UnwrapBodyMissing { index: usize, count: usize },
+
+    #[error(
+        "unwrap-body can expand multiple forms only at top level or in a supported sequence body"
+    )]
+    UnwrapBodyNotASequence,
+
+    #[error("unwrap-body replacement would change surrounding syntax at its boundaries")]
+    UnwrapBodyBoundaryChanged,
 }
 
 /// The transformation rebuilds the form from parsed parts, so a comment

@@ -508,7 +508,7 @@ fn join_strings(input: &str, node: &Node, sibling: &Node) -> SexprResult<String>
 }
 
 /// Reports whether `text` is a double-quoted string literal (`"..."`).
-pub(in crate::sexpr) fn is_string_literal(text: &str) -> bool {
+pub(in crate::sexpr) const fn is_string_literal(text: &str) -> bool {
     let bytes = text.as_bytes();
     bytes.len() >= 2 && bytes[0] == b'"' && bytes[bytes.len() - 1] == b'"'
 }

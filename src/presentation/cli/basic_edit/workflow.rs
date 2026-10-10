@@ -21,7 +21,7 @@ use crate::presentation::cli::shared::{
     read_input_and_dialect, read_input_dialect_and_tree, resolve_compact, resolve_one,
     resolve_targets, total_file_failure, unified_diff,
 };
-use paredit_core_cli::error::ArgumentError;
+use paredit_core_cli::error::{ArgumentError, IoRefusal};
 use paredit_core_cli::kill_ring::{KillRingEntry, read_ring, ring_path, write_ring};
 use paredit_core_syntax::selector::target_text;
 
@@ -463,45 +463,93 @@ pub(in crate::presentation::cli) fn replace(args: ReplaceArgs) -> CliResult<()> 
 
 /// Removes the selected forms, optionally keeping what it removed.
 ///
-/// Routed through [`edit_target_with`] rather than resolving the selector here,
-/// so `--to-ring` costs the command neither `--all` nor the range refusal. The
-/// ring is written only after every edit has succeeded: a kill that refused
-/// halfway should not leave half its forms on the clipboard.
+/// Legacy selectors retain their shared edit workflow; explicit paths are
+/// resolved together before any edit. Ring read failures are preflighted, but
+/// the source and ring writes are not a joint transaction.
 pub(in crate::presentation::cli) fn kill(args: KillArgs) -> CliResult<()> {
     let KillArgs {
         target,
+        paths,
         write,
         diff,
         to_ring,
         kill_ring,
     } = args;
     let origin = target.file.clone();
+    let mut ring = if to_ring {
+        let path = ring_path(kill_ring.ring.clone());
+        Some((path.clone(), read_ring(&path)?))
+    } else {
+        None
+    };
 
     let mut killed = Vec::new();
-    edit_target_with(
-        EditTargetArgs {
-            target,
-            write,
-            diff,
-        },
-        |source, tree, selection, _| Edit::kill(source, tree, selection),
-        |selection| {
+    if paths.is_empty() {
+        edit_target_with(
+            EditTargetArgs {
+                target,
+                write,
+                diff,
+            },
+            |source, tree, selection, _| Edit::kill(source, tree, selection),
+            |selection| {
+                if to_ring {
+                    // Exactly what `kill` removes, which is the form and not the
+                    // comment block above it. `copy --to-ring` is the one that
+                    // takes the comments, because that is what `copy` prints.
+                    killed.push(selection.text().to_owned());
+                }
+                Ok(())
+            },
+        )?;
+    } else {
+        let (input, dialect, tree) = read_input_dialect_and_tree(target.file, target.dialect)?;
+        let mut selections = paths
+            .iter()
+            .map(|path| tree.select_path(path))
+            .collect::<Result<Vec<_>, _>>()?;
+        selections.sort_by_key(|selection| selection.span().start());
+        if selections.windows(2).any(|pair| {
+            pair[1].span().start() < pair[0].span().end() || pair[1].path() == pair[0].path()
+        }) {
+            return Err(IoRefusal::OverlappingRewriteSpans.into());
+        }
+        let mut current = input.text.clone();
+        for selection in selections.into_iter().rev() {
             if to_ring {
-                // Exactly what `kill` removes, which is the form and not the
-                // comment block above it. `copy --to-ring` is the one that
-                // takes the comments, because that is what `copy` prints.
                 killed.push(selection.text().to_owned());
             }
-            Ok(())
-        },
-    )?;
+            let current_tree = SyntaxTree::parse_with_dialect(&current, dialect)
+                .map_err(|_| IoRefusal::RewriteDoesNotReparse)?;
+            let current_selection = current_tree.select_at(selection.span().start().get())?;
+            if current_selection.span() != selection.span() {
+                return Err(ArgumentError::AllMatchShifted {
+                    start: selection.span().start().get(),
+                }
+                .into());
+            }
+            current = Edit::kill(&current, &current_tree, current_selection)?;
+        }
+        // Normalizing the entire batch would also trim untouched lines between
+        // distant targets. Keep this path limited to the requested deletions.
+        SyntaxTree::parse_with_dialect(&current, dialect)
+            .map_err(|_| IoRefusal::RewriteDoesNotReparse)?;
+        emit_document(&input, dialect, write, diff, current)?;
+    }
 
-    if to_ring {
+    if let Some((path, ref mut ring)) = ring {
         // The hook ran in reverse source order; pushing back to front leaves
         // the ring's newest entry as the last form in the file.
         for text in killed.into_iter().rev() {
-            push_to_ring(&kill_ring, origin.as_deref(), &text)?;
+            ring.push(
+                KillRingEntry {
+                    text,
+                    origin: origin.as_deref().map(|path| path.display().to_string()),
+                },
+                kill_ring.ring_size,
+            );
         }
+        write_ring(&path, ring)?;
     }
     Ok(())
 }

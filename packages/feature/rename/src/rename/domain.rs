@@ -195,6 +195,18 @@ pub fn plan_rename_local_function(
     })
 }
 
+pub fn rename_in_form_occurrences(
+    tree: &SyntaxTree,
+    target: &RenameTarget,
+    from: &paredit_core_syntax::sexpr::SymbolName,
+) -> RenameResult<Vec<paredit_core_syntax::sexpr::ByteSpan>> {
+    let view = select_rename_target(tree, target)?.view();
+    let mut occurrences = Vec::new();
+    collect_symbol_atom_spans(&view, from, &mut occurrences);
+    occurrences.sort_by_key(|span| span.start());
+    Ok(occurrences)
+}
+
 pub fn plan_rename_in_form(request: RenameInFormRequest<'_>) -> RenameResult<RenameInFormPlan> {
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
         .map_err(|source| DocumentRefusal::InputParseFailed { source })?;
@@ -203,9 +215,7 @@ pub fn plan_rename_in_form(request: RenameInFormRequest<'_>) -> RenameResult<Ren
         RenameTarget::Offset(_) => None,
     };
     let view = select_rename_target(&tree, &request.target)?.view();
-    let mut occurrences = Vec::new();
-    collect_symbol_atom_spans(&view, &request.from, &mut occurrences);
-    occurrences.sort_by_key(|span| span.start());
+    let occurrences = rename_in_form_occurrences(&tree, &request.target, &request.from)?;
 
     let edits = occurrences
         .iter()

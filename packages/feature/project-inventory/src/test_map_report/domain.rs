@@ -12,10 +12,12 @@
 //! silently dropped, because that is a real finding: a test nobody can tell
 //! what it covers.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use paredit_core_cli::report::{FileFindings, Finding};
+use paredit_core_semantics::semantics::project::service::{resolve_file_packages, resolve_symbol};
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_needle;
 use paredit_core_syntax::definition::{DefinitionCategory, definition_shape};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, SyntaxTree};
@@ -85,9 +87,31 @@ pub fn build_test_map_report(
     dialect: Dialect,
     tree: &SyntaxTree,
 ) -> FileFindings<CoverageEntry> {
-    let mut subjects: Vec<(String, ByteSpan)> = Vec::new();
-    let mut tests: Vec<(String, ByteSpan)> = Vec::new();
+    build_test_map_reports(&[(path, dialect, tree)]).remove(0)
+}
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct SubjectIdentity {
+    emacs_lisp: bool,
+    package: Option<String>,
+    local_file: Option<usize>,
+    name: String,
+}
+
+struct NamedForm {
+    name: String,
+    identity: SubjectIdentity,
+    span: ByteSpan,
+}
+
+fn collect_forms(
+    file_index: usize,
+    dialect: Dialect,
+    tree: &SyntaxTree,
+) -> (Vec<NamedForm>, Vec<NamedForm>) {
+    let packages = resolve_file_packages(dialect, tree);
+    let mut subjects = Vec::new();
+    let mut tests = Vec::new();
     for form in &tree.root_view().children {
         let Some(head) = list_head(form) else {
             continue;
@@ -98,74 +122,136 @@ pub fn build_test_map_report(
         let Some(name) = shape.name(form) else {
             continue;
         };
+        if shape.category != DefinitionCategory::Test && !is_testable(shape.category) {
+            continue;
+        }
+        let symbol = (dialect == Dialect::CommonLisp)
+            .then(|| resolve_symbol(&packages, name, form.span.start().get()))
+            .flatten();
+        let identity = SubjectIdentity {
+            emacs_lisp: dialect == Dialect::EmacsLisp,
+            package: symbol
+                .as_ref()
+                .map(|symbol| symbol.package().as_str().to_owned()),
+            // An unknown reader package is comparable only within one file.
+            local_file: (dialect == Dialect::CommonLisp && symbol.is_none()).then_some(file_index),
+            name: symbol.as_ref().map_or_else(
+                || fold(name, dialect),
+                |symbol| symbol.name().as_str().to_owned(),
+            ),
+        };
+        let named = NamedForm {
+            name: fold(name, dialect),
+            identity,
+            span: form.span,
+        };
         if shape.category == DefinitionCategory::Test {
-            tests.push((fold(name), form.span));
-        } else if is_testable(shape.category) {
-            subjects.push((fold(name), form.span));
+            tests.push(named);
+        } else {
+            subjects.push(named);
         }
     }
+    (subjects, tests)
+}
 
-    let subject_names: BTreeSet<&String> = subjects.iter().map(|(name, _)| name).collect();
-    let mut by_subject: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    let mut unattributed = Vec::new();
-    for (test, span) in &tests {
-        match candidates(test)
-            .into_iter()
-            .find(|candidate| subject_names.contains(candidate))
-        {
-            Some(subject) => by_subject.entry(subject).or_default().push(test.clone()),
-            None => unattributed.push((test.clone(), *span)),
-        }
-    }
-
-    let mut findings = subjects
+#[must_use]
+pub fn build_test_map_reports(
+    files: &[(&Path, Dialect, &SyntaxTree)],
+) -> Vec<FileFindings<CoverageEntry>> {
+    let forms = files
         .iter()
-        .map(|(name, span)| {
-            let tests = by_subject.get(name).cloned().unwrap_or_default();
-            CoverageEntry {
-                coverage: if tests.is_empty() {
-                    Coverage::Untested
-                } else {
-                    Coverage::Tested
-                },
-                name: name.clone(),
-                tests,
-                span: *span,
-            }
-        })
+        .enumerate()
+        .map(|(index, (_, dialect, tree))| collect_forms(index, *dialect, tree))
         .collect::<Vec<_>>();
-    findings.extend(unattributed.into_iter().map(|(name, span)| CoverageEntry {
-        coverage: Coverage::Unattributed,
-        name,
-        tests: Vec::new(),
-        span,
-    }));
-
-    let tested = findings
+    let mut subjects_by_identity: BTreeMap<SubjectIdentity, Vec<(usize, usize)>> = BTreeMap::new();
+    for (file, (subjects, _)) in forms.iter().enumerate() {
+        for (subject, form) in subjects.iter().enumerate() {
+            subjects_by_identity
+                .entry(form.identity.clone())
+                .or_default()
+                .push((file, subject));
+        }
+    }
+    let mut by_subject: BTreeMap<(usize, usize), Vec<String>> = BTreeMap::new();
+    let mut unattributed = vec![Vec::new(); files.len()];
+    for (file, (_, tests)) in forms.iter().enumerate() {
+        for test in tests {
+            let matched = candidates(&test.identity.name, files[file].1)
+                .into_iter()
+                .find_map(|name| {
+                    let identity = SubjectIdentity {
+                        name,
+                        ..test.identity.clone()
+                    };
+                    subjects_by_identity.get(&identity)
+                });
+            // Duplicate subjects are not evidence of coverage for either definition.
+            if let Some(subjects) = matched.filter(|subjects| subjects.len() == 1) {
+                by_subject
+                    .entry(subjects[0])
+                    .or_default()
+                    .push(test.name.clone());
+            } else {
+                unattributed[file].push((test.name.clone(), test.span));
+            }
+        }
+    }
+    files
         .iter()
-        .filter(|entry| entry.coverage == Coverage::Tested)
-        .count();
-    let testable = subjects.len();
-    // Per mille, so a CI gate compares integers rather than float formatting.
-    // A file with nothing testable is fully covered rather than a total miss.
-    let coverage_per_mille = tested
-        .saturating_mul(1000)
-        .checked_div(testable)
-        .unwrap_or(1000);
+        .enumerate()
+        .map(|(file, (path, dialect, tree))| {
+            let (subjects, tests) = &forms[file];
+            let mut findings = subjects
+                .iter()
+                .enumerate()
+                .map(|(index, form)| {
+                    let tests = by_subject.get(&(file, index)).cloned().unwrap_or_default();
+                    CoverageEntry {
+                        coverage: if tests.is_empty() {
+                            Coverage::Untested
+                        } else {
+                            Coverage::Tested
+                        },
+                        name: form.name.clone(),
+                        tests,
+                        span: form.span,
+                    }
+                })
+                .collect::<Vec<_>>();
+            findings.extend(unattributed[file].iter().map(|(name, span)| CoverageEntry {
+                coverage: Coverage::Unattributed,
+                name: name.clone(),
+                tests: Vec::new(),
+                span: *span,
+            }));
 
-    FileFindings::new(
-        path.to_path_buf(),
-        dialect,
-        // Definition shapes and naming conventions are dialect-neutral.
-        true,
-        tree.source(),
-        findings,
-        vec![
-            ("testable_count", json!(testable)),
-            ("test_count", json!(tests.len())),
-            ("coverage_per_mille", json!(coverage_per_mille)),
-        ],
-    )
+            let tested = findings
+                .iter()
+                .filter(|entry| entry.coverage == Coverage::Tested)
+                .count();
+            let testable = subjects.len();
+            // Per mille, so a CI gate compares integers rather than float formatting.
+            // A file with nothing testable is fully covered rather than a total miss.
+            let coverage_per_mille = tested
+                .saturating_mul(1000)
+                .checked_div(testable)
+                .unwrap_or(1000);
+
+            FileFindings::new(
+                path.to_path_buf(),
+                *dialect,
+                // Definition shapes and naming conventions are dialect-neutral.
+                true,
+                tree.source(),
+                findings,
+                vec![
+                    ("testable_count", json!(testable)),
+                    ("test_count", json!(tests.len())),
+                    ("coverage_per_mille", json!(coverage_per_mille)),
+                ],
+            )
+        })
+        .collect()
 }
 
 /// The definition names a test name could plausibly be about.
@@ -173,9 +259,14 @@ pub fn build_test_map_report(
 /// Ordered most specific first, so `test-render-pane` attributes to
 /// `render-pane` rather than to a definition that happens to be called
 /// `test-render-pane`.
-fn candidates(test: &str) -> Vec<String> {
+fn candidates(test: &str, dialect: Dialect) -> Vec<String> {
     let mut found = Vec::new();
-    for prefix in ["TEST-", "%"] {
+    let prefixes = if dialect == Dialect::EmacsLisp {
+        ["test-", "%"]
+    } else {
+        ["TEST-", "%"]
+    };
+    for prefix in prefixes {
         if let Some(rest) = test.strip_prefix(prefix) {
             if !rest.is_empty() {
                 found.push(rest.to_owned());
@@ -184,7 +275,12 @@ fn candidates(test: &str) -> Vec<String> {
     }
     // `-TESTS` before `-TEST`, so `render-tests` strips the whole suffix
     // rather than leaving a trailing `S`.
-    for suffix in ["-TESTS", "-TEST"] {
+    let suffixes = if dialect == Dialect::EmacsLisp {
+        ["-tests", "-test"]
+    } else {
+        ["-TESTS", "-TEST"]
+    };
+    for suffix in suffixes {
         if let Some(rest) = test.strip_suffix(suffix) {
             if !rest.is_empty() {
                 found.push(rest.to_owned());
@@ -212,8 +308,12 @@ const fn is_testable(category: DefinitionCategory) -> bool {
     )
 }
 
-fn fold(name: &str) -> String {
-    name.to_ascii_uppercase()
+fn fold(name: &str, dialect: Dialect) -> String {
+    if dialect == Dialect::CommonLisp {
+        common_lisp_symbol_reference_needle(name)
+    } else {
+        name.to_owned()
+    }
 }
 
 #[cfg(test)]
@@ -299,5 +399,113 @@ mod tests {
         let mut sorted = starts.clone();
         sorted.sort_unstable();
         assert_eq!(starts, sorted);
+    }
+
+    fn reports(sources: &[(&str, Dialect)]) -> Vec<FileFindings<CoverageEntry>> {
+        let trees = sources
+            .iter()
+            .map(|(source, dialect)| {
+                SyntaxTree::parse_with_dialect(source, *dialect).expect("parse")
+            })
+            .collect::<Vec<_>>();
+        let files = trees
+            .iter()
+            .zip(sources)
+            .map(|(tree, (_, dialect))| (Path::new("test.lisp"), *dialect, tree))
+            .collect::<Vec<_>>();
+        build_test_map_reports(&files)
+    }
+
+    #[test]
+    fn separate_test_file_covers_a_definition_in_the_same_package() {
+        let reports = reports(&[
+            ("(in-package :app) (defun render () 1)", Dialect::CommonLisp),
+            (
+                "(in-package #:app) (deftest test-render () 1)",
+                Dialect::CommonLisp,
+            ),
+        ]);
+        assert_eq!(entry(&reports[0], "render").coverage, Coverage::Tested);
+        assert_eq!(entry(&reports[0], "render").tests, ["TEST-RENDER"]);
+        assert!(reports[1].findings.is_empty());
+        assert_eq!(reports[1].summary[1], ("test_count", json!(1)));
+    }
+
+    #[test]
+    fn another_package_and_an_unknown_reader_package_do_not_claim_coverage() {
+        for test_source in [
+            "(in-package :other) (deftest test-render () 1)",
+            "(deftest test-render () 1)",
+        ] {
+            let reports = reports(&[
+                ("(in-package :app) (defun render () 1)", Dialect::CommonLisp),
+                (test_source, Dialect::CommonLisp),
+            ]);
+            assert_eq!(entry(&reports[0], "render").coverage, Coverage::Untested);
+            assert_eq!(
+                entry(&reports[1], "test-render").coverage,
+                Coverage::Unattributed
+            );
+        }
+    }
+
+    #[test]
+    fn explicit_package_qualified_test_name_attributes_to_that_package() {
+        let reports = reports(&[
+            ("(in-package :app) (defun render () 1)", Dialect::CommonLisp),
+            (
+                "(in-package :other) (deftest app::test-render () 1)",
+                Dialect::CommonLisp,
+            ),
+        ]);
+        assert_eq!(entry(&reports[0], "render").coverage, Coverage::Tested);
+        assert!(reports[1].findings.is_empty());
+    }
+
+    #[test]
+    fn duplicate_subjects_leave_the_test_unattributed() {
+        let reports = reports(&[
+            ("(in-package :app) (defun render () 1)", Dialect::CommonLisp),
+            ("(in-package :app) (defun render () 2)", Dialect::CommonLisp),
+            (
+                "(in-package :app) (deftest test-render () 1)",
+                Dialect::CommonLisp,
+            ),
+        ]);
+        assert_eq!(entry(&reports[0], "render").coverage, Coverage::Untested);
+        assert_eq!(entry(&reports[1], "render").coverage, Coverage::Untested);
+        assert_eq!(
+            entry(&reports[2], "test-render").coverage,
+            Coverage::Unattributed
+        );
+    }
+
+    #[test]
+    fn emacs_lisp_cross_file_names_are_case_sensitive() {
+        let reports = reports(&[
+            (
+                "(defun render () 1) (defun Render () 2)",
+                Dialect::EmacsLisp,
+            ),
+            ("(ert-deftest test-render () t)", Dialect::EmacsLisp),
+        ]);
+        assert_eq!(reports[0].findings[0].name, "render");
+        assert_eq!(reports[0].findings[0].coverage, Coverage::Tested);
+        assert_eq!(reports[0].findings[1].name, "Render");
+        assert_eq!(reports[0].findings[1].coverage, Coverage::Untested);
+        assert!(reports[1].findings.is_empty());
+    }
+
+    #[test]
+    fn a_test_in_another_dialect_does_not_cover_a_definition() {
+        let reports = reports(&[
+            ("(defun render () 1)", Dialect::CommonLisp),
+            ("(ert-deftest test-render () t)", Dialect::EmacsLisp),
+        ]);
+        assert_eq!(entry(&reports[0], "render").coverage, Coverage::Untested);
+        assert_eq!(
+            entry(&reports[1], "test-render").coverage,
+            Coverage::Unattributed
+        );
     }
 }

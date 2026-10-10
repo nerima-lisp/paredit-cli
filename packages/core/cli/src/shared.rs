@@ -5,7 +5,9 @@ use std::num::NonZeroUsize;
 use std::path::{Path as FsPath, PathBuf};
 
 use crate::args::{CompactSelectorArgs, DialectArg, EditTargetArgs, SelectorArgs, SourceInput};
-use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::common_lisp::{
+    common_lisp_operator_head_eq, common_lisp_symbol_reference_eq,
+};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::selector::{
     SelectorError, SelectorTarget, ambiguous_candidates, resolve as resolve_selector,
@@ -180,10 +182,26 @@ pub fn package_context_before_top_level(
     for index in 0..target_index {
         let path = Path::from_indexes(vec![index]);
         let view = tree.select_path(&path)?.view();
-        if list_head(&view).is_some_and(|head| head.eq_ignore_ascii_case("in-package")) {
-            if let Some(package_name) = atom_child(&view, 1) {
-                current_package = Some(package_name.to_owned());
-            }
+        if view.reader_prefixes.is_empty()
+            && view
+                .children
+                .first()
+                .is_some_and(|head| head.reader_prefixes.is_empty())
+            && list_head(&view).is_some_and(|head| common_lisp_operator_head_eq(head, "in-package"))
+        {
+            let package = view.children.get(1).filter(|package| {
+                package.reader_prefixes.is_empty()
+                    && package.kind == ExpressionKind::Atom
+                    && view.children.len() == 2
+            });
+            let Some(package_name) = package.and_then(atom_text) else {
+                return Err(crate::error::FeatureRefusal::message(
+                    crate::diagnosis::ErrorCode::ArgumentFlagCombination,
+                    "cannot determine package context from an invalid in-package designator",
+                )
+                .into());
+            };
+            current_package = Some(package_name.to_owned());
         }
     }
     Ok(current_package)
@@ -1016,6 +1034,76 @@ mod tests {
 
     fn restore(original: &str, rewritten: &str) -> String {
         restore_line_ending(original, rewritten.to_owned(), Dialect::CommonLisp)
+    }
+
+    #[test]
+    fn package_context_preserves_qualified_declaration_designators() {
+        for input in [
+            "(in-package :app)",
+            "(CL:IN-PACKAGE #:app)",
+            "(common-lisp:in-package \"App\")",
+            "(in-package |App|)",
+        ] {
+            let tree = paredit_core_syntax::sexpr::SyntaxTree::parse_with_dialect(
+                input,
+                Dialect::CommonLisp,
+            )
+            .expect("parse declaration");
+            let root = tree.root_view();
+            let expected = super::atom_child(&root.children[0], 1);
+            assert_eq!(
+                super::package_context_before_top_level(&tree, Dialect::CommonLisp, 1)
+                    .expect("package context")
+                    .as_deref(),
+                expected,
+                "{input}",
+            );
+        }
+    }
+
+    #[test]
+    fn package_context_ignores_quoted_forms_and_nonstandard_operators() {
+        for ignored in [
+            "'(in-package :other)",
+            "`(in-package :other)",
+            "('in-package :other)",
+            "(app:in-package :other)",
+        ] {
+            let input = format!("(in-package :app) {ignored}");
+            let tree = paredit_core_syntax::sexpr::SyntaxTree::parse_with_dialect(
+                &input,
+                Dialect::CommonLisp,
+            )
+            .expect("parse forms");
+            assert_eq!(
+                super::package_context_before_top_level(&tree, Dialect::CommonLisp, 2)
+                    .expect("package context")
+                    .as_deref(),
+                Some(":app"),
+                "{input}",
+            );
+        }
+    }
+
+    #[test]
+    fn package_context_refuses_invalid_declarations_instead_of_reusing_an_old_package() {
+        for invalid in [
+            "(in-package)",
+            "(in-package (find-package :other))",
+            "(in-package 'other)",
+            "(in-package :other :extra)",
+        ] {
+            let input = format!("(in-package :app) {invalid}");
+            let tree = paredit_core_syntax::sexpr::SyntaxTree::parse_with_dialect(
+                &input,
+                Dialect::CommonLisp,
+            )
+            .expect("parse forms");
+            assert!(
+                super::package_context_before_top_level(&tree, Dialect::CommonLisp, 2).is_err(),
+                "{input}",
+            );
+        }
     }
 
     static TEST_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);

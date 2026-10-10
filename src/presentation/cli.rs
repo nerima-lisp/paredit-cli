@@ -40,6 +40,7 @@ use paredit_feature_extract::extract_local_function::cli as extract_local_functi
 use paredit_feature_form_transform::replace_forms::cli as replace_forms;
 use paredit_feature_form_transform::thread_expression::cli as thread_expression;
 use paredit_feature_form_transform::unthread_expression::cli as unthread_expression;
+use paredit_feature_form_transform::unwrap_body::cli as unwrap_body;
 use paredit_feature_form_transform::unwrap_call::cli as unwrap_call;
 use paredit_feature_generate::generate_accessors::cli as generate_accessors;
 use paredit_feature_generate::generate_defgeneric::cli as generate_defgeneric;

@@ -47,9 +47,11 @@ release.
    and `docs/src/reference/compatibility.md`.
 5. Commit as `chore(release): vX.Y.Z`.
 
-`nix flake check` verifies steps 1, 2 and 4: `compatibility_contract` asserts
-that `release.yml` still creates an empty draft rather than publishing a
-machine-written body, and that this page still explains how to publish it.
+`nix flake check` checks version consistency and builds the documentation.
+Its `compatibility_contract` asserts that `release.yml` still creates an empty
+draft rather than publishing a machine-written body, and that this page still
+explains how to publish it. Check the install examples' tags against the release
+version manually; these checks do not verify their synchronization.
 
 ## Verify the release candidate
 

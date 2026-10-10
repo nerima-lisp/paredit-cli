@@ -11,7 +11,9 @@
 //! list node — what the `clean/forms/*` benchmarks measure. The ancestor walk
 //! materializes only the enclosing top-level form.
 
+use crate::support::CONTROL_FLOW_DIALECTS;
 use paredit_core_lint_engine::LintResult;
+use paredit_core_lint_engine::policy::RuleDialectScope;
 
 use crate::return_outside_implicit_nil_block::domain::{MESSAGE, examine_return};
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
@@ -30,7 +32,10 @@ pub const META: RuleMeta = RuleMeta::new(
 );
 
 /// `examine_return` only ever matches a `return` head.
-const HEADS: [NormalizedHead; 1] = [NormalizedHead::new("return")];
+const HEADS: [NormalizedHead; 2] = [
+    NormalizedHead::new("return"),
+    NormalizedHead::new("cl-return"),
+];
 
 #[derive(Debug)]
 pub struct Rule;
@@ -38,6 +43,10 @@ pub struct Rule;
 pub const RULE: Rule = Rule;
 
 impl LintRule for Rule {
+    fn dialect_scope(&self) -> RuleDialectScope {
+        RuleDialectScope::new(&CONTROL_FLOW_DIALECTS)
+    }
+
     fn head_filter(&self) -> HeadFilter {
         HeadFilter::Heads(&HEADS)
     }
@@ -50,7 +59,13 @@ impl LintRule for Rule {
     ) -> LintResult<()> {
         let mut return_form_count = 0;
         let mut items = Vec::new();
-        examine_return(context.tree(), view, &mut return_form_count, &mut items);
+        examine_return(
+            context.tree(),
+            context.dialect(),
+            view,
+            &mut return_form_count,
+            &mut items,
+        );
         for item in items {
             sink.report(item.span, MESSAGE.to_owned());
         }

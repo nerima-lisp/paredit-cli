@@ -1,6 +1,8 @@
 //! inspect test-map reporting across a set of files.
 
-pub use crate::test_map_report::domain::{Coverage, CoverageEntry, build_test_map_report};
+pub use crate::test_map_report::domain::{
+    Coverage, CoverageEntry, build_test_map_report, build_test_map_reports,
+};
 
 use paredit_core_cli::report::{FileFindings, ReportPolicy};
 

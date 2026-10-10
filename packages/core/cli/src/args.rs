@@ -727,17 +727,73 @@ pub struct KillRingArgs {
 pub struct KillArgs {
     #[command(flatten)]
     pub target: TargetArgs,
+    /// Kill these paths from one input snapshot. Repeat for each target.
+    #[arg(
+        long,
+        value_name = "PATH",
+        conflicts_with_all = ["selector-base", "capture", "to", "parent", "child", "sibling", "all"]
+    )]
+    pub paths: Vec<Path>,
     /// Write the rewritten document back to --file instead of stdout.
     #[arg(long)]
     pub write: bool,
     /// Print a unified diff against the input instead of the rewritten document.
     #[arg(long)]
     pub diff: bool,
-    /// Push the removed form onto the kill ring before removing it.
+    /// Push the removed forms onto the kill ring after a successful edit.
     #[arg(long)]
     pub to_ring: bool,
     #[command(flatten)]
     pub kill_ring: KillRingArgs,
+}
+
+#[cfg(test)]
+mod kill_args_tests {
+    use super::*;
+    use clap::Parser;
+
+    #[derive(Parser)]
+    struct KillCommand {
+        #[command(flatten)]
+        args: KillArgs,
+    }
+
+    #[test]
+    fn repeated_paths_are_kill_specific() {
+        let command = KillCommand::try_parse_from(["kill", "--paths", "0.1", "--paths", "0.3"])
+            .expect("parse paths");
+        assert_eq!(command.args.paths.len(), 2);
+        assert!(command.args.target.selector.path.is_none());
+    }
+
+    #[test]
+    fn paths_conflict_with_every_selector_and_modifier() {
+        for selector in [
+            vec!["--path", "0"],
+            vec!["--at", "1"],
+            vec!["--line-column", "1"],
+            vec!["--name", "foo"],
+            vec!["--select", "0"],
+            vec!["--query", "foo"],
+            vec!["--id", "id"],
+            vec!["--from", "0", "--to", "1"],
+            vec!["--parent"],
+            vec!["--child", "0"],
+            vec!["--sibling", "1"],
+            vec!["--all"],
+            vec!["--query", "?x", "--capture", "x"],
+        ] {
+            let mut argv = vec!["kill", "--paths", "0"];
+            argv.extend(selector);
+            assert!(KillCommand::try_parse_from(argv).is_err());
+        }
+    }
+
+    #[test]
+    fn legacy_path_and_all_query_remain_available() {
+        assert!(KillCommand::try_parse_from(["kill", "--path", "0"]).is_ok());
+        assert!(KillCommand::try_parse_from(["kill", "--query", "?x", "--all"]).is_ok());
+    }
 }
 
 /// Target selection for a read-only copy, with the same optional ring push.

@@ -168,6 +168,81 @@ fn cli_step_diff_previews_the_selection_without_writing() {
     );
 }
 
+#[test]
+fn cli_step_reparses_every_selected_file_before_writing_any_file() {
+    let prepared = prepare("step-multi-file-parse-refusal");
+    let later = prepared.file.with_file_name("later.lisp");
+    let later_source = "(defun helper (x) (helper x))\n";
+    fs::write(&later, later_source).expect("write later fixture");
+    paredit()
+        .args(["refactor", "preview", "--from", "helper", "--to", "helper2"])
+        .arg("--manifest-out")
+        .arg(&prepared.manifest)
+        .arg(&prepared.file)
+        .arg(&later)
+        .assert()
+        .success();
+
+    let mut manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(&prepared.manifest).expect("read manifest"))
+            .expect("preview manifest");
+    assert_eq!(manifest["files"].as_array().expect("files").len(), 2);
+    assert_eq!(
+        manifest["files"][0]["path"],
+        prepared.file.to_string_lossy().as_ref()
+    );
+    assert_eq!(
+        manifest["files"][0]["edits"]
+            .as_array()
+            .expect("first edits")
+            .len(),
+        4
+    );
+    assert_eq!(
+        manifest["files"][1]["path"],
+        later.to_string_lossy().as_ref()
+    );
+    assert_eq!(
+        manifest["files"][1]["edits"]
+            .as_array()
+            .expect("later edits")
+            .len(),
+        2
+    );
+    // The complete change balances, but taking only its opening edit does not.
+    manifest["files"][1]["edits"][0]["replacement"] = serde_json::json!("(helper2");
+    manifest["files"][1]["edits"][1]["replacement"] = serde_json::json!("helper2)");
+    fs::write(
+        &prepared.manifest,
+        serde_json::to_vec(&manifest).expect("encode manifest"),
+    )
+    .expect("write manifest fixture");
+
+    step(&prepared, &["--accept", "1-5", "--write"])
+        .failure()
+        .stderr(predicate::str::contains(
+            "selected steps do not leave a parseable document",
+        ));
+    assert_eq!(
+        fs::read(&prepared.file).expect("read first fixture"),
+        SOURCE.as_bytes()
+    );
+    assert_eq!(
+        fs::read(&later).expect("read later fixture"),
+        later_source.as_bytes()
+    );
+
+    step(&prepared, &["--accept", "all", "--write"]).success();
+    assert_eq!(
+        fs::read_to_string(&prepared.file).expect("read first result"),
+        SOURCE.replace("helper", "helper2")
+    );
+    assert_eq!(
+        fs::read_to_string(&later).expect("read later result"),
+        "(defun (helper2 (x) (helper2) x))\n"
+    );
+}
+
 /// The `git add -p` vocabulary, because a reviewer stepping a refactor already
 /// knows it: `y` takes, `n` leaves, `a` takes the rest, `q` stops.
 #[test]

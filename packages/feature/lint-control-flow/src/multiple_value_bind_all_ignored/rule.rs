@@ -12,7 +12,9 @@
 //! `Heads(["multiple-value-bind"])`, and everything it reads is the matched
 //! form's own subtree.
 
+use crate::support::CONTROL_FLOW_DIALECTS;
 use paredit_core_lint_engine::LintResult;
+use paredit_core_lint_engine::policy::RuleDialectScope;
 
 use crate::multiple_value_bind_all_ignored::domain::{examine_multiple_value_bind, message_for};
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
@@ -32,7 +34,10 @@ pub const META: RuleMeta = RuleMeta::new(
 
 /// `examine_multiple_value_bind` only ever matches a `multiple-value-bind`
 /// head.
-const HEADS: [NormalizedHead; 1] = [NormalizedHead::new("multiple-value-bind")];
+const HEADS: [NormalizedHead; 2] = [
+    NormalizedHead::new("multiple-value-bind"),
+    NormalizedHead::new("cl-multiple-value-bind"),
+];
 
 #[derive(Debug)]
 pub struct Rule;
@@ -40,6 +45,10 @@ pub struct Rule;
 pub const RULE: Rule = Rule;
 
 impl LintRule for Rule {
+    fn dialect_scope(&self) -> RuleDialectScope {
+        RuleDialectScope::new(&CONTROL_FLOW_DIALECTS)
+    }
+
     fn head_filter(&self) -> HeadFilter {
         HeadFilter::Heads(&HEADS)
     }
@@ -54,6 +63,7 @@ impl LintRule for Rule {
         let mut items = Vec::new();
         examine_multiple_value_bind(
             context.tree(),
+            context.dialect(),
             view,
             &mut multiple_value_bind_form_count,
             &mut items,

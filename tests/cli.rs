@@ -447,6 +447,8 @@ mod redundant_quote_report;
 mod redundant_start_zero_report;
 #[path = "cli/redundant_the_report.rs"]
 mod redundant_the_report;
+#[path = "cli/refactor_bulk.rs"]
+mod refactor_bulk;
 #[path = "cli/refactor_checkpoint.rs"]
 mod refactor_checkpoint;
 #[path = "cli/refactor_entrypoint_contract.rs"]
@@ -561,6 +563,8 @@ mod system_cycle_report;
 mod t_comparison_report;
 #[path = "cli/terminal_output_safety.rs"]
 mod terminal_output_safety;
+#[path = "cli/test_risk_report.rs"]
+mod test_risk_report;
 #[path = "cli/the_arity_report.rs"]
 mod the_arity_report;
 #[path = "cli/thread_expression/mod.rs"]
@@ -587,6 +591,8 @@ mod unused_package_report;
 mod unused_parameter_report;
 #[path = "cli/unwind_protect_no_cleanup_report.rs"]
 mod unwind_protect_no_cleanup_report;
+#[path = "cli/unwrap_body.rs"]
+mod unwrap_body;
 #[path = "cli/unwrap_call.rs"]
 mod unwrap_call;
 #[path = "cli/use_widening_report.rs"]

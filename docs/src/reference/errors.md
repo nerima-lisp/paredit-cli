@@ -1,21 +1,22 @@
 # Error Codes
 
 Every failure this tool can produce is classified into a stable, namespaced
-error code — `<category>.<name>`, always lowercase kebab-case. A code is a
-compatible-forever contract: a new one may be added, but an existing one is
-never renamed or reused for a different meaning. Match on the code, not on
+error code, `<category>.<name>`, always lowercase kebab-case. Codes follow the
+[compatibility policy](compatibility.md): existing codes keep their meaning
+within the stable 1.x interface. Match on the code, not on
 the message text next to it; the message is prose and may be reworded.
 
 A code always carries:
 
-- **category** — one of `argument`, `selection`, `input`, `refusal`,
+- **category**: one of `argument`, `selection`, `input`, `refusal`,
   `environment`, `gate`, `internal`. Coarser than the code itself, so a
   consumer can decide "is this worth retrying" without enumerating every code
   a given build happens to ship.
-- **retryable** — whether re-running the identical command line could
-  plausibly succeed. Only `environment` failures are; a `selection` failure
-  will not resolve differently on a second attempt with the same arguments.
-- **exit code** — `3` for `gate.failed`, `1` for everything else. `2` is
+- **retryable**: a category-level hint, true for `environment` failures and
+  false for other categories. It is not permission to repeat a write.
+  Inspect the specific code and repairs first, especially after a failed
+  rollback or cleanup of a committed write.
+- **exit code**: `3` for `gate.failed`, `1` for everything else. `2` is
   reserved for a command line `clap` itself rejected, before this
   classification ever runs.
 
@@ -42,12 +43,13 @@ stderr:
       }
     ],
     "offset": null,
-    "doc_url": "https://nerima-lisp.github.io/paredit-cli/errors/#argument.target-required"
+    "doc_url": "https://nerima-lisp.github.io/paredit-cli/errors/#argument.target-required",
+    "candidates": []
   }
 }
 ```
 
-`repairs` is what the classification believes would get past the failure —
+`repairs` suggests how to address the failure:
 each entry a plain-language `detail` and, when the failure carried enough
 context, a `command` that can be run exactly as written. `offset` is the byte
 position the failure named, when it named one (a parse failure always does; a
@@ -55,14 +57,13 @@ shape refusal like "cannot raise a top-level expression" does not, because
 it is not about one place in the source). The human-readable rendering shows
 the same offset as a caret under the source line, the way `rustc` does.
 
-`candidates` is `selection.ambiguous`'s own matches — path, line/column
-extent, and a short preview each — so a selector that matched more than one
+`candidates` contains `selection.ambiguous`'s matches, each with a path,
+start/end position, and a short preview, so a selector that matched more than one
 form does not need a follow-up `inspect resolve` just to see what it found.
-Every other code reports it as an empty array; it is capped, with `count`
-still carrying the true total when there were more.
+Every other code reports it as an empty array. The array is capped; the
+message reports the total match count. There is no separate `count` field.
 
-Passing `--explain-error` prints this page's own section for the code —
-everything below this paragraph, one heading at a time — inline with the
+Passing `--explain-error` prints this page's section for the code inline with the
 failure, in both `--output json` (as an `explanation` field alongside
 `doc_url`) and the default text rendering. It reads the same markdown
 `doc_url` links to, embedded in the binary at compile time, so it needs
@@ -75,7 +76,7 @@ invocation cannot help; the arguments have to change.
 
 ### `argument.no-input` { #argument.no-input }
 
-No source was named. Pass `--file <path>`, or pipe source into stdin —
+No source was named. Pass `--file <path>`, or pipe source into stdin;
 this tool refuses to wait on an interactive terminal.
 
 ### `argument.target-required` { #argument.target-required }
@@ -109,7 +110,7 @@ roots.
 
 ### `argument.no-inputs-produced` { #argument.no-inputs-produced }
 
-The input selector — `--from-manifest`, `--paths-from`, or `--from-archive` —
+The input selector (`--from-manifest`, `--paths-from`, or `--from-archive`)
 resolved to no file inside the scanned roots.
 
 ### `argument.archive-destination` { #argument.archive-destination }
@@ -119,7 +120,7 @@ resolved to no file inside the scanned roots.
 ### `argument.flag-combination` { #argument.flag-combination }
 
 Two flags that do not combine were given together, or one that needs a
-companion was given alone — `--insert before` without `--anchor-path`,
+companion was given alone: `--insert before` without `--anchor-path`,
 `--name` together with `--all-bindings`, `--from-file` equal to `--to-file`.
 
 The message names the flags involved. Nothing about the file is at fault, and
@@ -131,14 +132,9 @@ re-running the same command line cannot help.
 
 ### `argument.unknown-name` { #argument.unknown-name }
 
-An argument named something this build does not have — a migration recipe that
+An argument named something this build does not have, such as a migration recipe that
 is not in the catalogue, for instance. The message lists what does exist, so
 the fix is usually visible in the error itself.
-
-This exists so a typo is an *argument* error. Left unclassified it reported as
-`internal.unclassified`, which asks the caller to file a bug against this tool
-for mistyping a name.
-
 
 ## Selection
 
@@ -152,7 +148,7 @@ child) does not exist in this document's tree.
 
 ### `selection.path-invalid` { #selection.path-invalid }
 
-The path string itself is not shaped like a path — it is not
+The path string itself is not shaped like a path: it is not
 dot-separated non-negative integers.
 
 ### `selection.offset-not-found` { #selection.offset-not-found }
@@ -161,8 +157,8 @@ No expression in the document contains the byte offset `--at` named.
 
 ### `selection.stale` { #selection.stale }
 
-The selection was built from source text that does not match — or a tree
-that is not — the one the operation is now being applied to.
+The selection was built from source text or a tree that does not match
+the one the operation is now being applied to.
 
 ### `selection.span-invalid` { #selection.span-invalid }
 
@@ -181,7 +177,7 @@ Pass `--all` to act on every match, or narrow the selector.
 
 ### `selection.pattern-invalid` { #selection.pattern-invalid }
 
-The `--query` pattern language itself does not parse — a malformed capture,
+The `--query` pattern language itself does not parse: a malformed capture,
 an unbalanced `...`, and the like.
 
 ### `selection.malformed` { #selection.malformed }
@@ -191,22 +187,26 @@ position, a malformed stable ID.
 
 ## Input
 
-The input is not what the operation needs. The source itself has to change.
+The input is not what the operation needs. Change the source, selection,
+symbol argument, decoding, or command as indicated by the specific code.
 
 ### `input.unparsable` { #input.unparsable }
 
-The source failed to parse. The failure names the byte position — see the
+The source failed to parse. The failure names the byte position; see the
 `offset` field, or the caret excerpt in the human-readable rendering.
 `paredit inspect check` reports every syntax problem it can find in one
-pass, not only this first one — see its `errors` array.
+pass, not only this first one; see its `errors` array.
 
 ### `input.not-utf8` { #input.not-utf8 }
 
-The input bytes are not valid UTF-8. This tool reads UTF-8 only.
+The input bytes are not valid UTF-8 under the default decoding. Source files
+can be read in a supported legacy encoding with global `--encoding`; decoding
+is strict and never replaces invalid bytes. Writes support UTF-8 only; see
+[`refusal.encoding-write`](#refusal.encoding-write).
 
 ### `input.shape-refused` { #input.shape-refused }
 
-The selected form is not the shape this operation works on — for example,
+The selected form is not the shape this operation works on, for example,
 splitting something that is not inside a list, or joining two lists that use
 different delimiters. Every structural refusal in `paredit_core_syntax`
 answers this way: try a different selection, a parent, or a sibling.
@@ -217,7 +217,7 @@ A symbol argument was empty, or contained whitespace or a reader delimiter.
 
 ### `input.dialect-unsupported` { #input.dialect-unsupported }
 
-The command is not defined for this file's dialect — `refactor
+The command is not defined for this file's dialect: `refactor
 merge-package-options` is Common Lisp only, several `refactor` edits are
 Common Lisp and Emacs Lisp only.
 
@@ -229,7 +229,7 @@ the file needs fixing.
 
 ## Refusal
 
-The tool declined for safety. The state — the file, the flags — has to
+The tool declined for safety. The file or flags have to
 change before retrying helps.
 
 ### `refusal.input-too-large` { #refusal.input-too-large }
@@ -245,7 +245,7 @@ directory this tool refuses to trust.
 
 ### `refusal.target-changed` { #refusal.target-changed }
 
-The file changed since it was read — replaced, hard-linked, or removed —
+The file changed since it was read, for example by replacement, hard-linking, or removal,
 between parsing and writing. One code covers all six variants of this
 time-of-check-to-time-of-use guard, because the response is the same: re-read
 and retry.
@@ -266,7 +266,7 @@ boundary.
 
 ### `refusal.workspace` { #refusal.workspace }
 
-A workspace-discovery safety check declined — for example, a path outside
+A workspace-discovery safety check declined, for example, a path outside
 the scanned roots that a symlink would otherwise have reached.
 
 ### `refusal.dry-run` { #refusal.dry-run }
@@ -277,7 +277,7 @@ for.
 ### `refusal.match-shifted` { #refusal.match-shifted }
 
 `--all` reached a match whose position an earlier edit in the same run had
-already moved — slurp and barf can move a sibling across a form boundary.
+already moved. Slurp and barf can move a sibling across a form boundary.
 Re-run without `--all`, or narrow the selector so the matches do not collide.
 
 ### `refusal.encoding-write` { #refusal.encoding-write }
@@ -290,8 +290,9 @@ to UTF-8 first.
 
 ## Environment
 
-The filesystem or the environment failed. This is the one category worth
-retrying: nothing about the input caused it.
+The filesystem or environment prevented completion. Inspect the code and
+current file state before retrying. Some failures require changing limits or
+repairing resources; a cleanup failure can occur after writes have landed.
 
 ### `environment.io` { #environment.io }
 
@@ -304,8 +305,9 @@ or `--max-depth`.
 
 ### `environment.unavailable` { #environment.unavailable }
 
-A resource the operation needed — for example, a git repository for
-`--since` — is not available in this environment.
+A resource needed for scanning or external verification is unavailable.
+This can include an executable or workspace resource. Using `--since`
+outside a repository instead reports `argument.needs-repository`.
 
 ### `environment.rollback-failed` { #environment.rollback-failed }
 
@@ -315,32 +317,34 @@ partially written; check it before retrying.
 ### `environment.cleanup-after-commit` { #environment.cleanup-after-commit }
 
 The writes landed successfully; only removing a backup file afterward
-failed. Do not redo the operation — remove the leftover backup by hand.
+failed. Do not redo the operation. Inspect and remove the leftover backup.
 
 ### `environment.timeout` { #environment.timeout }
 
-The wall-clock `--timeout-ms` budget ran out before the work did. Nothing is
-wrong with the input: the same command with a larger budget, or none, would
-succeed.
+The wall-clock `--timeout-ms` budget ran out before completion. A larger
+budget may let the operation finish, but does not guarantee success. Inspect
+any reported file state before repeating a write.
 
 ## Gate
 
-A requested policy gate tripped after the report was printed. This is the
-gate doing its job, not a malfunction — see the report above this message
-for what tripped it.
+A requested policy gate or post-write verification check failed. Report gates
+print their findings before returning this error. An `apply --verify-command`
+failure instead returns before the normal apply report is printed; inspect
+the verification error and restoration outcome.
 
 ### `gate.failed` { #gate.failed }
 
-A `--fail-on-*` / `--require-*` flag's condition was met. Exit code `3`,
+A `--fail-on-*` / `--require-*` flag's condition was met, or an apply
+verification command returned an unsuccessful result. Exit code `3`,
 distinct from every other failure's `1`, so automation can tell "the report
 found what it was told to fail on" apart from "the tool itself broke".
 
 ## Internal
 
-Not classified. This is a defect in this tool's classification table, not
-in the command line or the input — please report it with the command that
-produced it.
+An internal operation failed or the failure could not be classified.
+Please report the command and error, without credentials or private source.
 
 ### `internal.unclassified` { #internal.unclassified }
 
-The failure did not match any known variant.
+The failure did not match a known classification, or an internal operation
+such as JSON serialization failed.

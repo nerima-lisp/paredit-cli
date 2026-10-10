@@ -431,6 +431,167 @@ fn cli_writes_top_level_form_move_before_anchor() {
         .find("(defun boot () :boot)")
         .expect("anchor form should exist");
     assert!(moved_index < anchor_index);
+    assert_eq!(
+        destination,
+        "(in-package #:demo.system)\n(in-package #:demo)\n\n(defparameter *feature* t)\n\n(in-package #:demo.system)\n\n(defun boot () :boot)\n"
+    );
+}
+
+#[test]
+fn cli_move_form_preserves_package_in_dry_run_and_append_write() {
+    let dir = fresh_temp_dir("move-form-package");
+    let from_file = dir.join("source.lisp");
+    let to_file = dir.join("destination.lisp");
+    let source = "(in-package #:demo)\n(defparameter *value* 1)\n";
+    let destination = "(in-package #:other)\n(defun existing () :ok)\n";
+    let rewritten = "(in-package #:other)\n(defun existing () :ok)\n\n(in-package #:demo)\n\n(defparameter *value* 1)\n";
+    fs::write(&from_file, source).unwrap();
+    fs::write(&to_file, destination).unwrap();
+    for write in [false, true] {
+        let mut cmd = paredit();
+        cmd.args(["refactor", "move-form", "--from-file"])
+            .arg(&from_file)
+            .arg("--to-file")
+            .arg(&to_file)
+            .args(["--path", "1", "--output", "json"]);
+        if write {
+            cmd.arg("--write");
+        }
+        let output = cmd.assert().success().get_output().stdout.clone();
+        let plan: serde_json::Value = serde_json::from_slice(&output).unwrap();
+        assert_eq!(plan["written"], write);
+        assert_eq!(plan["to_rewritten"], rewritten);
+        assert_eq!(
+            fs::read_to_string(&to_file).unwrap(),
+            if write { rewritten } else { destination }
+        );
+        if !write {
+            assert_eq!(fs::read_to_string(&from_file).unwrap(), source);
+        }
+    }
+    assert_eq!(
+        fs::read_to_string(&from_file).unwrap(),
+        "(in-package #:demo)\n"
+    );
+}
+
+#[test]
+fn cli_move_form_restores_package_after_anchor_in_dry_run_and_write() {
+    let dir = fresh_temp_dir("move-form-package-after");
+    let from_file = dir.join("source.lisp");
+    let to_file = dir.join("destination.lisp");
+    let source = "(in-package #:demo)\n(defparameter *value* 1)\n";
+    let destination = "(in-package #:other)\n(defun existing () :ok)\n(defun following () :next)\n";
+    let rewritten = "(in-package #:other)\n(defun existing () :ok)\n\n(in-package #:demo)\n\n(defparameter *value* 1)\n\n(in-package #:other)\n(defun following () :next)\n";
+    fs::write(&from_file, source).unwrap();
+    fs::write(&to_file, destination).unwrap();
+    for write in [false, true] {
+        let mut cmd = paredit();
+        cmd.args(["refactor", "move-form", "--from-file"])
+            .arg(&from_file)
+            .arg("--to-file")
+            .arg(&to_file)
+            .args([
+                "--path",
+                "1",
+                "--insert",
+                "after",
+                "--anchor-path",
+                "1",
+                "--output",
+                "json",
+            ]);
+        if write {
+            cmd.arg("--write");
+        }
+        let output = cmd.assert().success().get_output().stdout.clone();
+        let plan: serde_json::Value = serde_json::from_slice(&output).unwrap();
+        assert_eq!(plan["written"], write);
+        assert_eq!(plan["to_rewritten"], rewritten);
+        assert_eq!(
+            fs::read_to_string(&to_file).unwrap(),
+            if write { rewritten } else { destination }
+        );
+        assert_eq!(
+            fs::read_to_string(&from_file).unwrap(),
+            if write {
+                "(in-package #:demo)\n"
+            } else {
+                source
+            }
+        );
+    }
+}
+
+#[test]
+fn cli_move_form_refuses_unknown_package_restore_and_cross_dialect_without_writing() {
+    for (destination_name, destination, insert, refusal) in [
+        (
+            "destination.lisp",
+            "(defun existing () :ok)\n",
+            "before",
+            "cannot restore an unknown destination package",
+        ),
+        (
+            "destination.el",
+            "(defvar existing nil)\n",
+            "append",
+            "source and destination to use the same dialect",
+        ),
+    ] {
+        let dir = fresh_temp_dir("move-form-unsafe-package");
+        let from_file = dir.join("source.lisp");
+        let to_file = dir.join(destination_name);
+        let source = "(in-package #:demo)\n(defparameter *value* 1)\n";
+        fs::write(&from_file, source).unwrap();
+        fs::write(&to_file, destination).unwrap();
+        for write in [false, true] {
+            let mut cmd = paredit();
+            cmd.args(["refactor", "move-form", "--from-file"])
+                .arg(&from_file)
+                .arg("--to-file")
+                .arg(&to_file)
+                .args(["--path", "1", "--insert", insert]);
+            if insert == "before" {
+                cmd.args(["--anchor-path", "0"]);
+            }
+            if write {
+                cmd.arg("--write");
+            }
+            cmd.assert()
+                .failure()
+                .stderr(predicate::str::contains(refusal));
+            assert_eq!(fs::read_to_string(&from_file).unwrap(), source);
+            assert_eq!(fs::read_to_string(&to_file).unwrap(), destination);
+        }
+    }
+}
+
+#[test]
+fn cli_move_form_refuses_package_declaration_without_writing() {
+    let dir = fresh_temp_dir("move-form-package-declaration");
+    let from_file = dir.join("source.lisp");
+    let to_file = dir.join("destination.lisp");
+    let source = "(cl:in-package #:demo)\n(defparameter *value* 1)\n";
+    let destination = "(in-package #:other)\n(defun existing () :ok)\n";
+    fs::write(&from_file, source).unwrap();
+    fs::write(&to_file, destination).unwrap();
+    for write in [false, true] {
+        let mut cmd = paredit();
+        cmd.args(["refactor", "move-form", "--from-file"])
+            .arg(&from_file)
+            .arg("--to-file")
+            .arg(&to_file)
+            .args(["--path", "0"]);
+        if write {
+            cmd.arg("--write");
+        }
+        cmd.assert().failure().stderr(predicate::str::contains(
+            "cannot move a package declaration",
+        ));
+        assert_eq!(fs::read_to_string(&from_file).unwrap(), source);
+        assert_eq!(fs::read_to_string(&to_file).unwrap(), destination);
+    }
 }
 
 #[test]

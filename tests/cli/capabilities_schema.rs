@@ -287,3 +287,41 @@ fn cli_capabilities_defaults_to_the_catalog() {
     assert!(default["commands"].is_array(), "{default}");
     assert!(default["$schema"].is_null(), "{default}");
 }
+
+#[test]
+fn cli_capabilities_schema_describes_unconditional_gates_in_every_version() {
+    for version in ["1", "2", "3"] {
+        let document = catalog(version);
+        let schema = schema(version);
+        let dotfiles = document["commands"]
+            .as_array()
+            .expect("commands")
+            .iter()
+            .find(|command| command["name"] == "inspect")
+            .and_then(|inspect| inspect["commands"].as_array())
+            .and_then(|commands| {
+                commands
+                    .iter()
+                    .find(|command| command["name"] == "dotfiles")
+            })
+            .expect("inspect dotfiles");
+        let gate = &dotfiles["unconditional_gates"][0];
+        assert_eq!(gate["exit_code"], 3, "v{version}: {dotfiles}");
+        let gate_schema = &schema["$defs"]["unconditionalGate"];
+        let mut errors = Vec::new();
+        validate(gate, gate_schema, &schema, "$gate", &mut errors);
+        assert!(errors.is_empty(), "v{version}: {errors:?}");
+        for field in ["kind", "help", "exit_code"] {
+            let mut invalid = gate.clone();
+            invalid.as_object_mut().expect("gate object").remove(field);
+            errors.clear();
+            validate(&invalid, gate_schema, &schema, "$gate", &mut errors);
+            assert!(!errors.is_empty(), "v{version}: missing {field} accepted");
+        }
+        let mut invalid = gate.clone();
+        invalid["flag"] = serde_json::json!("--not-a-real-flag");
+        errors.clear();
+        validate(&invalid, gate_schema, &schema, "$gate", &mut errors);
+        assert!(!errors.is_empty(), "v{version}: invented flag accepted");
+    }
+}

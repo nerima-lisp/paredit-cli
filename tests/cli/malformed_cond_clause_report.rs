@@ -129,3 +129,67 @@ fn cli_malformed_cond_clause_expands_directory_inputs() {
         .success()
         .stdout(predicate::str::contains("\"finding_count\": 1"));
 }
+
+#[test]
+fn cli_malformed_cond_clause_distinguishes_slot_data_from_initforms() {
+    let dir = fresh_temp_dir("malformed-cond-clause-report-defstruct");
+    let file = dir.join("a.lisp");
+    fs::write(
+        &file,
+        "(defstruct ast-if (cond nil :type (cond invalid)))\n\
+         (defstruct evaluated (value (cond ((ready) 1) invalid)))\n",
+    )
+    .expect("write a.lisp");
+
+    let output = paredit()
+        .args(["inspect", "malformed-cond-clause", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let report: serde_json::Value = serde_json::from_slice(&output).expect("JSON report");
+    assert_eq!(report["finding_count"], 1);
+    assert_eq!(report["cond_form_count"], 1);
+    assert_eq!(report["files"][0]["findings"][0]["line"], 2);
+    assert_eq!(report["files"][0]["findings"][0]["clause"], "invalid");
+}
+
+#[test]
+fn cli_lint_malformed_cond_clause_ignores_slot_data_but_keeps_initform_findings() {
+    let dir = fresh_temp_dir("lint-malformed-cond-clause-defstruct");
+    let file = dir.join("a.lisp");
+    fs::write(
+        &file,
+        "(defstruct ast-if (cond nil :type (cond invalid)))\n\
+         (defstruct evaluated (value (cond ((ready) 1) invalid)))\n",
+    )
+    .expect("write a.lisp");
+
+    let output = paredit()
+        .args([
+            "inspect",
+            "lint",
+            "--rule",
+            "malformed-cond-clause",
+            "--output",
+            "json",
+        ])
+        .arg(&file)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let report: serde_json::Value = serde_json::from_slice(&output).expect("JSON report");
+    assert_eq!(report["finding_count"], 1);
+    let findings = report["findings"].as_array().expect("findings array");
+    assert_eq!(findings.len(), 1);
+    assert_eq!(findings[0]["rule"], "malformed-cond-clause");
+    assert_eq!(findings[0]["path"], file.to_str().expect("fixture path"));
+    let source = fs::read_to_string(&file).expect("read a.lisp");
+    let start = source.rfind("invalid").expect("evaluated invalid clause");
+    assert_eq!(findings[0]["span"]["start"], start);
+    assert_eq!(findings[0]["span"]["end"], start + "invalid".len());
+}

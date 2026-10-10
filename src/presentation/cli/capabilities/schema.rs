@@ -34,6 +34,10 @@
 //! `cli_capabilities_schema_pins_writes_and_error_codes_as_intentionally_unversioned`
 //! in `tests/cli/capabilities_schema.rs` pins this as a tested contract
 //! rather than a comment that can go stale.
+//!
+//! `command.unconditional_gates` is also an additive leaf property in every
+//! version. It describes gates on commands that do not require an enabling
+//! flag, without changing the existing flag-based `gate` object's shape.
 
 use serde_json::{Value, json};
 
@@ -104,10 +108,18 @@ fn definitions(version: u8) -> Value {
                 "gates": {
                     "type": "array",
                     "description":
-                        "The policy gates this command offers. Absent, not empty, on a \
-                         command that has none, so \"cannot fail on a policy\" and \"we \
-                         did not look\" stay distinguishable.",
+                        "The flag-controlled policy gates this command offers. Absent, \
+                         not empty, on a command that has none. See also \
+                         `unconditional_gates` for gates that need no enabling flag.",
                     "items": { "$ref": "#/$defs/gate" },
+                },
+                "unconditional_gates": {
+                    "type": "array",
+                    "description":
+                        "Policy gates applied without an enabling flag. Absent, not \
+                         empty, on a command that has none. Each gate describes the \
+                         condition that makes the command fail after printing its report.",
+                    "items": { "$ref": "#/$defs/unconditionalGate" },
                 },
                 "writes": {
                     "type": "boolean",
@@ -139,7 +151,7 @@ fn definitions(version: u8) -> Value {
             "type": "object",
             "description":
                 "One flag that makes the command exit non-zero after its report is \
-                 printed. The spelling determines the kind.",
+                 printed. The spelling identifies its policy kind.",
             "required": ["flag", "kind", "exit_code"],
             "additionalProperties": false,
             "properties": {
@@ -150,9 +162,10 @@ fn definitions(version: u8) -> Value {
                 "kind": {
                     "enum": ["severity", "presence", "minimum"],
                     "description":
-                        "`severity` fails on a finding at or above a level \
-                         (`--fail-on <severity>`); `presence` fails when any of the \
-                         named thing was found (`--fail-on-<thing>`); `minimum` fails \
+                        "`severity` applies a severity threshold (`--fail-on <severity>`) \
+                         or an API impact limit (`--intended-bump <bump>`); `presence` fails when the \
+                         named condition holds (`--fail-on-<condition>`), including absence \
+                         conditions and value-controlled risk or depth thresholds; `minimum` fails \
                          when fewer than N were (`--require-<thing> <N>`).",
                 },
                 "help": { "type": ["string", "null"] },
@@ -160,6 +173,16 @@ fn definitions(version: u8) -> Value {
                     "type": "integer",
                     "description": "The process exit status this gate produces.",
                 },
+            },
+        },
+        "unconditionalGate": {
+            "type": "object",
+            "required": ["kind", "help", "exit_code"],
+            "additionalProperties": false,
+            "properties": {
+                "kind": { "const": "presence" },
+                "help": { "type": "string" },
+                "exit_code": { "const": paredit_core_cli::gate::GATE_FAILURE_EXIT_CODE },
             },
         },
         "argument": {

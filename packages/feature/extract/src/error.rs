@@ -40,6 +40,11 @@ pub enum ExtractionScopeError {
 
     #[error("extract-local-function cannot move {head} across a function boundary")]
     CrossesFunctionBoundary { head: String },
+
+    #[error(
+        "extract-local-function cannot move assignment to free variable '{name}' into a local function"
+    )]
+    MutatesFreeVariable { name: String },
 }
 
 /// The path or selection does not identify something extractable.

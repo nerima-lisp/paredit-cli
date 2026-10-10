@@ -1,6 +1,6 @@
 //! docs/src/project/feature-candidates.md section P4: `docs/src/reference/api.md` drifts from the
 //! actual command surface silently, because nothing reads both. This asserts
-//! every leaf command under `inspect`/`edit`/`refactor`/`config` — as
+//! every leaf command in the documented namespaces below, as
 //! `paredit inspect capabilities` reports them, the same source of truth
 //! `tests/cli/dialect_contract.rs` uses — has a row in that namespace's table
 //! in `docs/src/reference/api.md`.
@@ -59,7 +59,7 @@ fn doc_sections() -> BTreeMap<String, String> {
 }
 
 #[test]
-fn every_inspect_edit_refactor_config_leaf_has_a_commands_md_row() {
+fn every_documented_namespace_leaf_has_an_api_reference_row() {
     let capabilities = capabilities_json();
     let sections = doc_sections();
 

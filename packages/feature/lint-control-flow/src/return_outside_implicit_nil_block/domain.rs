@@ -37,7 +37,7 @@
 //! is two true statements about it. `return-from-unmatched-block` owns the
 //! `(return-from nil …)` spelling; this rule owns `(return …)`.
 //!
-//! Scope: Common Lisp only.
+//! Scope: Common Lisp and Emacs Lisp cl-lib forms.
 
 use std::path::Path;
 
@@ -46,10 +46,10 @@ use paredit_core_lint_engine::LintResult;
 use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head, symbol_is};
+use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
 use serde_json::{Value, json};
 
-use crate::support::{BlockScope, block_scope, with_lexical_chain};
+use crate::support::{BlockScope, block_scope_for_dialect, operator_is, with_lexical_chain};
 
 #[derive(Debug, Clone)]
 pub struct ReturnOutsideImplicitNilBlockItem {
@@ -94,13 +94,13 @@ enum Resolution {
     Unknown,
 }
 
-fn resolve(tree: &SyntaxTree, span: ByteSpan) -> Resolution {
+fn resolve(tree: &SyntaxTree, dialect: Dialect, span: ByteSpan) -> Resolution {
     with_lexical_chain(tree, span, |chain| {
         if chain.unevaluated {
             return Resolution::Unknown;
         }
         for index in chain.ancestors_inward() {
-            match block_scope(&chain.nodes, index) {
+            match block_scope_for_dialect(&chain.nodes, index, dialect) {
                 BlockScope::Named(established) if established == IMPLICIT_BLOCK => {
                     return Resolution::Established;
                 }
@@ -115,11 +115,14 @@ fn resolve(tree: &SyntaxTree, span: ByteSpan) -> Resolution {
 
 pub fn examine_return(
     tree: &SyntaxTree,
+    dialect: Dialect,
     view: &ExpressionView,
     return_form_count: &mut usize,
     violations: &mut Vec<ReturnOutsideImplicitNilBlockItem>,
 ) {
-    if !is_paren_list(view) || !list_head(view).is_some_and(|head| symbol_is(head, "return")) {
+    if !is_paren_list(view)
+        || !list_head(view).is_some_and(|head| operator_is(head, dialect, "return", "cl-return"))
+    {
         return;
     }
     *return_form_count += 1;
@@ -129,7 +132,7 @@ pub fn examine_return(
         return;
     }
 
-    if resolve(tree, view.span) == Resolution::Unestablished {
+    if resolve(tree, dialect, view.span) == Resolution::Unestablished {
         violations.push(ReturnOutsideImplicitNilBlockItem { span: view.span });
     }
 }
@@ -141,7 +144,7 @@ pub fn build_return_outside_implicit_nil_block_report(
     dialect: Dialect,
     tree: &SyntaxTree,
 ) -> LintResult<FileFindings<ReturnOutsideImplicitNilBlockItem>> {
-    if dialect != Dialect::CommonLisp {
+    if !matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
         return Ok(FileFindings::new(
             path.to_path_buf(),
             dialect,
@@ -157,7 +160,13 @@ pub fn build_return_outside_implicit_nil_block_report(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_return(tree, subview, &mut return_form_count, &mut violations);
+            examine_return(
+                tree,
+                dialect,
+                subview,
+                &mut return_form_count,
+                &mut violations,
+            );
         });
     }
 

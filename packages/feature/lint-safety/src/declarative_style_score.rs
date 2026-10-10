@@ -1,25 +1,10 @@
-//! `declarative-style-score`: what fraction of a file's top-level forms are
-//! purely declarative, versus forms that run for effect at load time.
+//! `declarative-style-score`: the fraction of top-level forms whose heads
+//! are recognized definitions, declarations, or value bindings.
 //!
-//! The positive-framing companion to `execution-order-dependency`: that rule
-//! flags a *specific* forward-reference bug; this one scores the file's
-//! overall shape, whether or not any specific bug is present yet. A file
-//! built entirely from `defun`/`defclass`/`defgeneric`/`defmethod`/
-//! `define-condition`/`defstruct`/`deftype`/`defpackage`/`in-package`/
-//! `declaim`/`declare` (which install a definition and run nothing at load
-//! time) and `defvar`/`defparameter`/`defconstant` (which bind a value but do
-//! not, by themselves, depend on *other* code having already run) can be
-//! reordered, split across files, or reloaded piecemeal from the REPL without
-//! changing behaviour. A file peppered with bare top-level calls, `setf`s, and
-//! `let`s run for effect cannot: each one is a step in a sequence that only
-//! means what it means in the order it was written.
-//!
-//! The score is a percentage of top-level forms, not a percentage of the
-//! file's behaviour — a single top-level `(run-application)` at the end of an
-//! otherwise all-`defun` file scores no worse than a file half full of
-//! sequential `setf`s, even though the two carry very different risk. Reading
-//! the file alongside the score is still required; the score narrows down
-//! where to look.
+//! This is a syntactic style metric, not an effect or load-order analysis.
+//! Initializers are counted even when they call effectful code. Definition
+//! forms can also depend on the environment or change it. A high score does
+//! not prove that reordering, splitting, or reloading preserves behavior.
 //!
 //! Scope: Common Lisp only.
 
@@ -32,8 +17,7 @@ use paredit_core_lint_engine::rule::LintRule;
 use paredit_core_syntax::sexpr::ExpressionView;
 use paredit_core_syntax::view_query::{list_head, symbol_in};
 
-/// Heads that never run a body at load time: they only install a definition.
-const NON_EXECUTING_HEADS: [&str; 12] = [
+const DEFINITION_HEADS: [&str; 12] = [
     "defun",
     "defmacro",
     "defgeneric",
@@ -48,18 +32,14 @@ const NON_EXECUTING_HEADS: [&str; 12] = [
     "declare",
 ];
 
-/// Heads that bind a value at load time, but not to *other code's* prior
-/// execution — `execution-order-dependency` is the rule that catches one of
-/// these when its value form specifically forward-references a same-file
-/// definition.
+/// Initializer effects do not change this head-based classification.
 const VALUE_BINDING_HEADS: [&str; 3] = ["defvar", "defparameter", "defconstant"];
 
-/// The minimum acceptable percentage (0-100) of purely-declarative top-level
-/// forms before this rule speaks.
+/// The minimum percentage (0-100) of recognized declaration-style heads.
 pub const MIN_SCORE: RuleSetting = RuleSetting::new(
     "min-score",
     80,
-    "the minimum percentage of purely-declarative top-level forms a file must have",
+    "the minimum percentage of top-level forms with recognized declaration-style heads",
 );
 
 /// How many top-level forms a file needs before a score means anything. A
@@ -72,30 +52,28 @@ pub const META: RuleMeta = RuleMeta::new(
     "declarative-style-score",
     RuleCategory::Suspicious,
     Severity::Warning,
-    "a file whose fraction of purely-declarative top-level forms falls below a threshold",
+    "a file whose fraction of recognized declaration-style heads falls below a threshold",
     Fixability::ReportOnly,
 )
 .with_settings(&[MIN_SCORE])
 .with_explanation(
     RuleExplanation::new(
-        "A file built only from definitions and value bindings can be reordered, split, or \
-         reloaded piecemeal without changing behaviour. A file with many top-level forms that run \
-         for effect — bare calls, setf, let used for a side effect — is a sequence: each form only \
-         means what it means in the order it was written.",
+        "The score counts top-level forms with recognized definition, declaration, or value-binding \
+         heads. A low score identifies files with more other top-level forms for style review.",
     )
     .with_example(
         "(defun a () ...)\n(a)\n(defun b () ...)\n(b)\n(setf *ready* t)",
         "(defun a () ...)\n(defun b () ...)\n(defun main () (a) (b) (setf *ready* t))",
     )
     .with_caveat(
-        "The score counts top-level *forms*, not behaviour: one risky top-level call in an \
-         otherwise all-declarative file scores the same as several. It narrows down where to look, \
-         it does not replace reading the file.",
+        "The score does not inspect initializer effects, macro expansion, or environment dependencies. \
+         Even a score of 100% does not prove purity or safe reordering, splitting, or reloading. \
+         Moving calls into a function also changes when they run and requires manual review.",
     ),
 );
 
-/// The percentage (0-100) of `root`'s top-level forms that are purely
-/// declarative, and how many forms that count was taken over. `None` when the
+/// The percentage (0-100) of recognized declaration-style heads, and the
+/// number of top-level forms counted. `None` when the
 /// file has fewer than [`MIN_JUDGED_FORMS`] top-level forms — too few for a
 /// percentage to mean anything.
 #[must_use]
@@ -109,7 +87,7 @@ pub fn declarative_score(root: &ExpressionView) -> Option<(u32, usize)> {
         .iter()
         .filter(|form| {
             list_head(form).is_some_and(|head| {
-                symbol_in(head, &NON_EXECUTING_HEADS) || symbol_in(head, &VALUE_BINDING_HEADS)
+                symbol_in(head, &DEFINITION_HEADS) || symbol_in(head, &VALUE_BINDING_HEADS)
             })
         })
         .count();
@@ -207,6 +185,20 @@ mod tests {
         assert_eq!(
             score("(defparameter *x* (+ 1 2))\n(a)\n(b)\n(c)\n(d)"),
             Some((20, 5))
+        );
+    }
+
+    #[test]
+    fn effectful_initializers_can_score_100_without_proving_purity() {
+        assert_eq!(
+            score(
+                "(defparameter *a* (write-line \"a\"))\n\
+                   (defvar *b* (read))\n\
+                   (defconstant +c+ (random 10))\n\
+                   (defclass d (external-base) ())\n\
+                   (in-package :external)"
+            ),
+            Some((100, 5))
         );
     }
 }

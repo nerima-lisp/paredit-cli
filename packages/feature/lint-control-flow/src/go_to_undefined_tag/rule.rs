@@ -10,7 +10,9 @@
 //! `Heads(["go"])`, so a file with no `go` pays one hash lookup per list node.
 //! The ancestor walk materializes only the enclosing top-level form.
 
+use crate::support::CONTROL_FLOW_DIALECTS;
 use paredit_core_lint_engine::LintResult;
+use paredit_core_lint_engine::policy::RuleDialectScope;
 
 use crate::go_to_undefined_tag::domain::{examine_go, message_for};
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
@@ -37,6 +39,10 @@ pub struct Rule;
 pub const RULE: Rule = Rule;
 
 impl LintRule for Rule {
+    fn dialect_scope(&self) -> RuleDialectScope {
+        RuleDialectScope::new(&CONTROL_FLOW_DIALECTS)
+    }
+
     fn head_filter(&self) -> HeadFilter {
         HeadFilter::Heads(&HEADS)
     }
@@ -49,7 +55,13 @@ impl LintRule for Rule {
     ) -> LintResult<()> {
         let mut go_form_count = 0;
         let mut items = Vec::new();
-        examine_go(context.tree(), view, &mut go_form_count, &mut items);
+        examine_go(
+            context.tree(),
+            context.dialect(),
+            view,
+            &mut go_form_count,
+            &mut items,
+        );
         for item in items {
             sink.report(item.span, message_for(&item.tag));
         }

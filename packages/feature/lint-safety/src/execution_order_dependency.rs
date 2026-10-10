@@ -1,28 +1,12 @@
-//! `execution-order-dependency`: a top-level form that runs at load time and
-//! names something this file does not define until later.
+//! `execution-order-dependency`: syntactic candidates for same-file forward
+//! references in top-level forms and value initializers.
 //!
-//! Common Lisp loads a file by evaluating its top-level forms in order.
-//! `defun`/`defmacro`/`defclass`/`defgeneric`/`defmethod`/`define-condition`/
-//! `defstruct`/`deftype`/`defpackage` do not *run* anything when loaded — they
-//! install a definition for later use, so a forward reference inside one
-//! (`(defun a () (b))` before `b` is defined) is completely ordinary: by the
-//! time `a` is ever *called*, the whole file has loaded. `defvar` and
-//! `defparameter` are different: they evaluate their value form immediately,
-//! and so does every other top-level form — a bare call, a `setf`, a `let`
-//! run for effect. When one of those references a name this file only defines
-//! *later*, its result depends on load order in a way that will not survive
-//! the file being reordered, split, or partially reloaded from the REPL.
-//!
-//! Judging "later" needs to see the whole file's definitions at once, which
-//! is why this is a whole-document rule.
-//!
-//! Scope, by design: only forward references to a *same-file* definition are
-//! read. A name this file never defines is out of scope — it might come from
-//! a library loaded earlier, which this rule cannot see and must not guess
-//! about.
-//!
-//! Report-only: whether to move the definition earlier or the use later is a
-//! judgement this tool does not make.
+//! This whole-document heuristic compares atom spellings with later definition
+//! names. It skips definition heads, but does not prove they are effect-free.
+//! It does not resolve packages, distinguish function and value namespaces,
+//! expand macros, or model lexical scope, quotation, or delayed evaluation.
+//! A finding is not proof that loading fails or that reordering is safe;
+//! definitions may already exist in the environment. Report-only.
 //!
 //! Scope: Common Lisp only.
 
@@ -43,30 +27,28 @@ pub const META: RuleMeta = RuleMeta::new(
     "execution-order-dependency",
     RuleCategory::Suspicious,
     Severity::Warning,
-    "a top-level form that runs at load time and references a name this file only defines later",
+    "a top-level form contains a syntactic reference candidate to a later same-file definition",
     Fixability::ReportOnly,
 )
 .with_explanation(
     RuleExplanation::new(
-        "A file loads by evaluating its top-level forms in order. defun/defmacro/defclass and \
-         friends only install a definition, so a forward reference inside one is ordinary — by \
-         the time it runs, the file has finished loading. defvar/defparameter and every other \
-         top-level form run immediately, and a forward reference inside one depends on the file's \
-         current order to work at all.",
+        "This heuristic finds atom spellings matching later same-file definitions in top-level \
+         forms or value initializers. Review whether each match is actually evaluated and which \
+         binding it denotes before treating it as a load-order dependency.",
     )
     .with_example(
         "(defparameter *config* (build-config))\n(defun build-config () ...)",
         "(defun build-config () ...)\n(defparameter *config* (build-config))",
     )
     .with_caveat(
-        "Only forward references to a definition this same file provides are read. A name from a \
-         library loaded earlier is out of scope — this rule cannot see it and does not guess.",
+        "Matching ignores packages, namespaces, lexical bindings, quotation, and delayed \
+         evaluation. Definition heads are skipped without proving they are effect-free. \
+         Existing environment definitions are unknown; no safe reordering or load failure is proved.",
     ),
 );
 
-/// Heads that only install a definition and evaluate no body at load time:
-/// a forward reference inside one is not an order dependency.
-const NON_EXECUTING_HEADS: [&str; 12] = [
+/// Definition and declaration heads excluded from this syntactic scan.
+const DEFINITION_HEADS: [&str; 12] = [
     "defun",
     "defmacro",
     "defgeneric",
@@ -81,12 +63,10 @@ const NON_EXECUTING_HEADS: [&str; 12] = [
     "declare",
 ];
 
-/// Heads that evaluate exactly their value form (`children[2]`) at load time,
-/// nothing else about the form.
+/// Heads for which only the initializer is scanned. `defvar` may skip it.
 const VALUE_EXECUTING_HEADS: [&str; 3] = ["defvar", "defparameter", "defconstant"];
 
-/// One top-level form that runs at load time and forward-references a
-/// same-file definition.
+/// One top-level form containing a same-file forward-reference candidate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExecutionOrderItem {
     pub span: ByteSpan,
@@ -145,7 +125,7 @@ fn defined_at(root: &ExpressionView) -> Vec<(String, usize)> {
     found
 }
 
-/// Every load-order dependency in `root`.
+/// Every syntactic forward-reference candidate in `root`.
 #[must_use]
 pub fn collect(root: &ExpressionView) -> Vec<ExecutionOrderItem> {
     let defined = defined_at(root);
@@ -154,12 +134,11 @@ pub fn collect(root: &ExpressionView) -> Vec<ExecutionOrderItem> {
     for (index, form) in root.children.iter().enumerate() {
         let head = list_head(form);
 
-        // A form that only installs a definition evaluates no body now.
-        if head.is_some_and(|head| symbol_in(head, &NON_EXECUTING_HEADS)) {
+        if head.is_some_and(|head| symbol_in(head, &DEFINITION_HEADS)) {
             continue;
         }
 
-        // defvar/defparameter/defconstant evaluate exactly their value form.
+        // Definition names and docstrings are not initializer candidates.
         let scanned = if head.is_some_and(|head| symbol_in(head, &VALUE_EXECUTING_HEADS)) {
             form.children.get(2)
         } else {
@@ -204,8 +183,8 @@ impl LintRule for Rule {
             sink.report(
                 item.span,
                 format!(
-                    "this form runs at load time and references {}, which this file only defines \
-                     later; its result depends on the file's current order",
+                    "this form contains a syntactic reference candidate to {}, defined later \
+                     in this file; verify binding and evaluation context before changing load order",
                     item.name
                 ),
             );
@@ -259,8 +238,7 @@ mod tests {
 
     #[test]
     fn does_not_flag_a_forward_reference_inside_a_defun_body() {
-        // `a`'s body does not run until `a` is called, by which time the
-        // whole file has loaded.
+        // Definition bodies are outside this heuristic's scanned forms.
         assert!(names("(defun a () (b))\n(defun b () t)").is_empty());
     }
 
@@ -274,5 +252,30 @@ mod tests {
     #[test]
     fn does_not_flag_a_defvar_with_no_value_form() {
         assert!(names("(defvar *x*)\n(defun f () t)").is_empty());
+    }
+
+    #[test]
+    fn quoted_atom_is_not_an_atom_reference_candidate() {
+        assert!(names("(defparameter *data* 'later)\n(defun later () t)").is_empty());
+    }
+
+    #[test]
+    fn quoted_forms_and_delayed_names_are_candidates_not_proven_dependencies() {
+        assert_eq!(
+            names("(defparameter *data* (quote (later)))\n(defun later () t)"),
+            vec!["later"]
+        );
+        assert_eq!(
+            names("(defparameter *callback* (lambda () (later)))\n(defun later () t)"),
+            vec!["later"]
+        );
+    }
+
+    #[test]
+    fn package_matching_is_explicitly_a_spelling_heuristic() {
+        assert_eq!(
+            names("(other:later)\n(defun app:later () t)"),
+            vec!["later"]
+        );
     }
 }

@@ -49,7 +49,7 @@ pub fn ensure_non_overlapping_spans(spans: impl IntoIterator<Item = ByteSpan>) -
     Ok(())
 }
 
-pub fn expand_definition_removal(input: &str, span: ByteSpan) -> ByteSpan {
+pub const fn expand_definition_removal(input: &str, span: ByteSpan) -> ByteSpan {
     let bytes = input.as_bytes();
     let mut start = span.start().get();
     let mut end = span.end().get();

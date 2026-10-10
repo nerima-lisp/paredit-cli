@@ -14,7 +14,9 @@
 //! *one* enclosing top-level form (`crate::support::with_lexical_chain`), so N
 //! exits in a file cost N × their own definitions, never N × the file.
 
+use crate::support::CONTROL_FLOW_DIALECTS;
 use paredit_core_lint_engine::LintResult;
+use paredit_core_lint_engine::policy::RuleDialectScope;
 
 use crate::return_from_unmatched_block::domain::{examine_return_from, message_for};
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
@@ -33,7 +35,10 @@ pub const META: RuleMeta = RuleMeta::new(
 );
 
 /// `examine_return_from` only ever matches a `return-from` head.
-const HEADS: [NormalizedHead; 1] = [NormalizedHead::new("return-from")];
+const HEADS: [NormalizedHead; 2] = [
+    NormalizedHead::new("return-from"),
+    NormalizedHead::new("cl-return-from"),
+];
 
 #[derive(Debug)]
 pub struct Rule;
@@ -41,6 +46,10 @@ pub struct Rule;
 pub const RULE: Rule = Rule;
 
 impl LintRule for Rule {
+    fn dialect_scope(&self) -> RuleDialectScope {
+        RuleDialectScope::new(&CONTROL_FLOW_DIALECTS)
+    }
+
     fn head_filter(&self) -> HeadFilter {
         HeadFilter::Heads(&HEADS)
     }
@@ -55,6 +64,7 @@ impl LintRule for Rule {
         let mut items = Vec::new();
         examine_return_from(
             context.tree(),
+            context.dialect(),
             view,
             &mut return_from_form_count,
             &mut items,

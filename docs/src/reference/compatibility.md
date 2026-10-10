@@ -54,17 +54,26 @@ Not stable — may change in any release, including a patch:
 
 ## Machine-readable output
 
-Use `--output json` wherever a command offers it. JSON reports carry a
-top-level `schema_version` (currently `1`): fields may be added within a
-version, while field removals, renames, or semantic changes require a version
-bump. Consumers should reject unsupported schema versions and tolerate unknown
-fields in supported versions.
+Use `--output json` wherever a command offers it. Most object-shaped reports
+carry a top-level `schema_version` (currently `1`). The capabilities catalog
+defaults to that version and also supports versions 2 and 3.
+Fields may be added within a version, while field removals, renames,
+or semantic changes require a version bump. Consumers should reject unsupported
+schema versions and tolerate unknown fields in supported versions.
+If a report omits `schema_version`, use that command's documented contract;
+do not infer a version from the field's absence.
 
-A `schema_version` bump is additive at the command level — a command keeps
-emitting the previous version by default, and opt-in flags such as
-`--schema-version` select a newer shape — so raising it is a minor release,
-not a major one. Dropping support for a previously emitted `schema_version`
-is a major release.
+For the capabilities catalog, obtain its JSON Schema with
+`inspect capabilities --emit schema` from the same release or binary that
+produced the report, selecting its matching `--schema-version`.
+Capabilities schema IDs remain unchanged when optional fields are added.
+An older cached strict schema may reject those fields even when
+`schema_version` matches.
+
+Adding a `schema_version` is additive at the command level when the existing
+default version remains unchanged and opt-in flags such as `--schema-version`
+select the newer shape. That is a minor release. Dropping support for a
+previously emitted `schema_version` is a major release.
 
 `inspect outline` returns a bare JSON array and is the documented exception to
 the top-level-object convention.
@@ -93,9 +102,9 @@ The crate is not published to a package registry, so pin the tag — or a
 reviewed commit — in whichever channel you use:
 
 ```sh
-nix run github:nerima-lisp/paredit-cli/v1.6.3 -- --help
-nix profile install github:nerima-lisp/paredit-cli/v1.6.3
-cargo install --git https://github.com/nerima-lisp/paredit-cli --tag v1.6.3 --locked
+nix run github:nerima-lisp/paredit-cli/v1.7.0 -- --help
+nix profile install github:nerima-lisp/paredit-cli/v1.7.0
+cargo install --git https://github.com/nerima-lisp/paredit-cli --tag v1.7.0 --locked
 ```
 
 Release notes must call out anything that affects automation: new or

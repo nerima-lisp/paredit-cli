@@ -1298,13 +1298,13 @@
     {
       "category": "suspicious",
       "count": 0,
-      "description": "a top-level form that runs at load time and references a name this file only defines later",
+      "description": "a top-level form contains a syntactic reference candidate to a later same-file definition",
       "rule": "execution-order-dependency"
     },
     {
       "category": "suspicious",
       "count": 0,
-      "description": "a file whose fraction of purely-declarative top-level forms falls below a threshold",
+      "description": "a file whose fraction of recognized declaration-style heads falls below a threshold",
       "rule": "declarative-style-score"
     },
     {

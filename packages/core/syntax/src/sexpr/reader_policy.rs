@@ -1226,6 +1226,28 @@ impl DialectReaderPolicy {
         }
         match next {
             Some(b'\'') => prefix(ReaderPrefix::Function, 2),
+            // Printed reader objects must retain their payload bytes, not
+            // expose byte code, text properties, or record slots as code.
+            Some(b'(' | b'[') => Some(ReaderMacro::MultiDatum {
+                width: 1,
+                payload_forms: 1,
+            }),
+            Some(b's') if bytes.get(pos + 2) == Some(&b'(') => Some(ReaderMacro::MultiDatum {
+                width: 2,
+                payload_forms: 1,
+            }),
+            Some(b'^') if bytes.get(pos + 2) == Some(&b'[') => Some(ReaderMacro::MultiDatum {
+                width: 2,
+                payload_forms: 1,
+            }),
+            Some(b'^')
+                if bytes.get(pos + 2) == Some(&b'^') && bytes.get(pos + 3) == Some(&b'[') =>
+            {
+                Some(ReaderMacro::MultiDatum {
+                    width: 3,
+                    payload_forms: 1,
+                })
+            }
             _ => Some(ReaderMacro::UnsupportedDispatch { width: 1 }),
         }
     }

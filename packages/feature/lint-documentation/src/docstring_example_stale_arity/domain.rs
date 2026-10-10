@@ -359,7 +359,7 @@ fn mentions(text: &str, needle: &str) -> bool {
 
 /// The index just past the closing `"` of the string literal starting at
 /// `start`, honouring `\"` escapes. `None` when it does not close.
-fn scan_string(characters: &[char], start: usize) -> Option<usize> {
+const fn scan_string(characters: &[char], start: usize) -> Option<usize> {
     let mut index = start + 1;
     while index < characters.len() {
         match characters[index] {

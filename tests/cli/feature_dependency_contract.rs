@@ -26,6 +26,7 @@ const ALLOWED_FEATURE_DEPENDENCIES: &[(&str, &[&str])] = &[
     ("inline", &["rename"]),
     ("lint-form-shape", &["function-parameter"]),
     ("project-analysis", &["package", "remove-unused"]),
+    ("project-inventory", &["project-analysis"]),
     (
         "refactor-workflow",
         &["change-summary", "project-analysis", "rename"],

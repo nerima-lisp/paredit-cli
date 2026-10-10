@@ -13,6 +13,9 @@ repository.workspace = true
 paredit-core-syntax = { path = "../../core/syntax" }
 paredit-core-lint-engine = { path = "../../core/lint-engine" }
 
+[dev-dependencies]
+libc.workspace = true
+
 # Mandatory: without it this package silently opts out of the workspace lint
 # table, including `unsafe_code = "deny"`, with no error at all.
 [lints]

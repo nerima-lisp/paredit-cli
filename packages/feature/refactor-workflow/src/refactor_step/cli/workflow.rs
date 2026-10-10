@@ -93,17 +93,15 @@ pub fn refactor_step(args: RefactorStepArgs) -> CommandResult {
 
     let mut written = Vec::new();
     if args.write {
+        let mut pending = Vec::new();
         for (index, file) in changed.iter().enumerate() {
             let rewritten = rewrite(&sources[index], &steps, &selection, index)?;
             if rewritten == sources[index] {
                 continue;
             }
-            // A subset of a rewrite is not guaranteed to be balanced source —
-            // that is precisely what taking part of a change risks — so the
-            // result is parsed before it is written, not after.
-            // The write guard: this tool does not leave behind a file it
-            // cannot read back, and that is the same refusal the CLI's own
-            // write path makes.
+            // Partial selections can be unbalanced. Validate every selected
+            // rewrite before writing any file so a later refusal preserves
+            // earlier files too.
             SyntaxTree::parse_with_dialect(&rewritten, file.dialect).map_err(|_| {
                 paredit_core_cli::error::FeatureRefusal::message(
                     paredit_core_cli::diagnosis::ErrorCode::RefusalRewriteDoesNotReparse,
@@ -113,6 +111,9 @@ pub fn refactor_step(args: RefactorStepArgs) -> CommandResult {
                     ),
                 )
             })?;
+            pending.push((file, rewritten));
+        }
+        for (file, rewritten) in pending {
             write_file_with_rollback(file.path.clone(), rewritten)?;
             written.push(file.path.display().to_string());
         }

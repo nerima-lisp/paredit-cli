@@ -33,7 +33,7 @@
 //! feature package depending on another feature package would be a new
 //! feature→feature edge in the dependency contract.
 //!
-//! Scope: Common Lisp only.
+//! Scope: Common Lisp and Emacs Lisp cl-lib forms.
 
 use std::path::Path;
 
@@ -42,10 +42,13 @@ use paredit_core_lint_engine::LintResult;
 use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head, symbol_is};
+use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
 use serde_json::{Value, json};
 
-use crate::support::{Tag, direct_tags, is_unevaluated_at, tagbody_body_start};
+use crate::support::{
+    Tag, contains_unknown_el_operator, direct_tags_for_dialect, is_unevaluated_at, operator_is,
+    tagbody_body_start_for_dialect,
+};
 
 #[derive(Debug, Clone)]
 pub struct TagbodyUnreachableTagItem {
@@ -91,11 +94,17 @@ pub fn message_for(tag: &str) -> String {
 ///
 /// These are the occurrences that are *definitions*. Everything else the name
 /// appears in is a use.
-fn definition_spans(view: &ExpressionView) -> Vec<ByteSpan> {
+fn definition_spans(view: &ExpressionView, dialect: Dialect) -> Vec<ByteSpan> {
     let mut spans = Vec::new();
     for_each_subview(view, |subview| {
-        if list_head(subview).is_some_and(|head| tagbody_body_start(head).is_some()) {
-            spans.extend(direct_tags(subview).into_iter().map(|(_, span)| span));
+        if list_head(subview)
+            .is_some_and(|head| tagbody_body_start_for_dialect(head, dialect).is_some())
+        {
+            spans.extend(
+                direct_tags_for_dialect(subview, dialect)
+                    .into_iter()
+                    .map(|(_, span)| span),
+            );
         }
     });
     spans
@@ -106,21 +115,27 @@ fn definition_spans(view: &ExpressionView) -> Vec<ByteSpan> {
 /// the file once and not T times.
 pub fn examine_tagbody(
     tree: &SyntaxTree,
+    dialect: Dialect,
     view: &ExpressionView,
     tagbody_form_count: &mut usize,
     violations: &mut Vec<TagbodyUnreachableTagItem>,
 ) {
-    if !is_paren_list(view) || !list_head(view).is_some_and(|head| symbol_is(head, "tagbody")) {
+    if !is_paren_list(view)
+        || !list_head(view).is_some_and(|head| operator_is(head, dialect, "tagbody", "cl-tagbody"))
+    {
         return;
     }
     *tagbody_form_count += 1;
+    if contains_unknown_el_operator(view, dialect) {
+        return;
+    }
 
-    let tags = direct_tags(view);
+    let tags = direct_tags_for_dialect(view, dialect);
     if tags.is_empty() {
         return;
     }
 
-    let definitions = definition_spans(view);
+    let definitions = definition_spans(view, dialect);
     // Every atom in the subtree that reads as a tag, definitions included;
     // quoted data deliberately included, since `(jump-to 'retry)` names the
     // tag as far as this rule is concerned.
@@ -130,7 +145,7 @@ pub fn examine_tagbody(
     // It also answers `None` for anything with children, so this visits every
     // atom and nothing else.
     for_each_subview(view, |subview| {
-        if let Some(tag) = Tag::mention(subview) {
+        if let Some(tag) = Tag::mention_for_dialect(subview, dialect) {
             mentions.push((tag, subview.span));
         }
     });
@@ -169,7 +184,7 @@ pub fn build_tagbody_unreachable_tag_report(
     dialect: Dialect,
     tree: &SyntaxTree,
 ) -> LintResult<FileFindings<TagbodyUnreachableTagItem>> {
-    if dialect != Dialect::CommonLisp {
+    if !matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
         return Ok(FileFindings::new(
             path.to_path_buf(),
             dialect,
@@ -185,7 +200,13 @@ pub fn build_tagbody_unreachable_tag_report(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_tagbody(tree, subview, &mut tagbody_form_count, &mut violations);
+            examine_tagbody(
+                tree,
+                dialect,
+                subview,
+                &mut tagbody_form_count,
+                &mut violations,
+            );
         });
     }
 

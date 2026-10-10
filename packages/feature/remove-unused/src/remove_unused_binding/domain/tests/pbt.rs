@@ -3,6 +3,74 @@ use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::SymbolName;
 use paredit_core_syntax::sexpr::SyntaxTree;
 
+fn same_structure(actual: &ExpressionView, expected: &ExpressionView) -> bool {
+    let mut pending = vec![(actual, expected)];
+    while let Some((actual, expected)) = pending.pop() {
+        if actual.kind != expected.kind
+            || actual.delimiter != expected.delimiter
+            || actual.reader_prefixes != expected.reader_prefixes
+            || actual.text != expected.text
+            || actual.children.len() != expected.children.len()
+        {
+            return false;
+        }
+        pending.extend(actual.children.iter().zip(&expected.children));
+    }
+    true
+}
+
+#[test]
+fn shadowed_do_parameter_regression() {
+    let input = "(let ((do 0) (a 2)) (list a (lambda (do) do)))";
+    let plan =
+        plan_remove_unused_binding_for(input, Dialect::CommonLisp, None, Some("do"), false, true);
+    assert_eq!(plan.reference_count, Some(0));
+    assert!(plan.changed);
+    let actual = SyntaxTree::parse_with_dialect(&plan.rewritten, Dialect::CommonLisp)
+        .expect("parse rewritten binding");
+    let expected = SyntaxTree::parse_with_dialect(
+        "(let ((a 2)) (list a (lambda (do) do)))",
+        Dialect::CommonLisp,
+    )
+    .expect("parse expected binding");
+    assert!(same_structure(&actual.root_view(), &expected.root_view()));
+}
+
+#[test]
+fn shadowed_binding_oracle_ignores_layout_but_rejects_semantic_changes() {
+    let expected = SyntaxTree::parse_with_dialect(
+        "(let ((a 2)) (list a (lambda (do) do)))",
+        Dialect::CommonLisp,
+    )
+    .expect("parse expected binding");
+    let reformatted = SyntaxTree::parse_with_dialect(
+        "(let\n ((a 2))\n (list a\n (lambda (do)\n do)))",
+        Dialect::CommonLisp,
+    )
+    .expect("parse reformatted binding");
+    assert!(same_structure(
+        &reformatted.root_view(),
+        &expected.root_view()
+    ));
+
+    for mutated in [
+        "(let ((do 0) (a 2)) (list a (lambda (do) do)))",
+        "(let ((a 3)) (list a (lambda (do) do)))",
+        "(let ((a 2)) (list a (lambda (other) do)))",
+        "(let ((a 2)) (list a (lambda (do) a)))",
+        "(let ((a 2)) (list a '(lambda (do) do)))",
+        "(let ((a 2)) (list a (lambda (do) 'do)))",
+        "(let ((a 2)) (list a (lambda (do) do))) extra",
+    ] {
+        let actual = SyntaxTree::parse_with_dialect(mutated, Dialect::CommonLisp)
+            .expect("parse mutated binding");
+        assert!(
+            !same_structure(&actual.root_view(), &expected.root_view()),
+            "{mutated}"
+        );
+    }
+}
+
 proptest! {
     #[test]
     fn pbt_unused_single_binding_output_remains_parseable(
@@ -76,9 +144,13 @@ proptest! {
 
         prop_assert_eq!(plan.reference_count, Some(0));
         prop_assert!(plan.changed);
-        let expected_lambda = format!("(lambda ({name})\n          {name})");
-        prop_assert!(plan.rewritten.contains(&expected_lambda));
-        SyntaxTree::parse(&plan.rewritten)
+        let actual = SyntaxTree::parse_with_dialect(&plan.rewritten, Dialect::CommonLisp)
             .map_err(|error| TestCaseError::fail(error.to_string()))?;
+        let expected = SyntaxTree::parse_with_dialect(
+            &format!("(let (({other} 2)) (list {other} (lambda ({name}) {name})))"),
+            Dialect::CommonLisp,
+        )
+        .map_err(|error| TestCaseError::fail(error.to_string()))?;
+        prop_assert!(same_structure(&actual.root_view(), &expected.root_view()));
     }
 }

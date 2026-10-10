@@ -260,6 +260,28 @@ fn a_failing_verification_restores_every_written_file() {
     assert_eq!(read(&dir.join("core.lisp")), ORIGINAL);
 }
 
+#[test]
+fn a_missing_verification_executable_restores_the_write() {
+    let dir = workspace_with_manifest("verify-missing-exe", ORIGINAL, "old-name", "new-name");
+    let missing_executable = dir.join("missing-verification-executable");
+    assert!(!missing_executable.exists());
+
+    paredit()
+        .current_dir(&dir)
+        .args(["refactor", "apply", "--manifest", "preview.json", "--write"])
+        .arg("--verify-command")
+        .arg(format!("'{}'", missing_executable.display()))
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("exited with status 127"))
+        .stderr(predicate::str::contains("restored 1 file(s)"));
+
+    assert_eq!(
+        fs::read(dir.join("core.lisp")).expect("read restored bytes"),
+        ORIGINAL.as_bytes()
+    );
+}
+
 /// A failure the operator cannot diagnose is a failure they will disable. The
 /// command's own output has to reach them.
 #[test]
