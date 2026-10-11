@@ -36,18 +36,18 @@
 //!    enclosing form's size, never the file's. `SyntaxTree::root_view` is never
 //!    called: it deep-materializes the whole document, uncached, on every call,
 //!    and calling it here would make a file of T switches cost T×T.
-//! 4. **Only then the top-level scan.** `top_level_in_package_chain` walks the
-//!    document's root children through `select_path`, which resolves node ids
-//!    and reads spans without allocating; it materializes an `ExpressionView`
-//!    for no form at all, and slices heads and designators straight out of the
-//!    source.
+//! 4. **Only then the top-level scan.** `top_level_in_package_chain_through`
+//!    stops at the current switch. Each root uses a single-index path and
+//!    `select_path`; heads and spans borrow from the source. Ordinary
+//!    definitions need no `ExpressionView`. Only candidate switches need
+//!    quote checking and an owned package designator.
 //!
 //! Step 4 is linear in the number of top-level forms and is paid once per
-//! `in-package` node. A file has a handful of top-level `in-package` forms — one
-//! is the norm, and one alone can never produce a finding — so the total is a
-//! small constant number of linear passes, which is linear in the file. The
-//! `measurement` tests in `crate` pin that: the cost doubles when the file
-//! doubles.
+//! `in-package` node. With a fixed number of switches, total scan work is
+//! linear in file size. This does not promise linear total work when the
+//! number of switches also grows. The `measurement` tests retain CPU-time
+//! bounds and count actual root visits for a fixed three-switch fixture;
+//! a quadratic control must violate both work-growth bounds.
 //!
 //! No `RuleContext::binding_table`/`value_table`/`type_table` is consulted; this
 //! rule needs no semantic pass. `RuleContext::scratch_cache` is not touched

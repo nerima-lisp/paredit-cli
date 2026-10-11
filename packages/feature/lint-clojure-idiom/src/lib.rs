@@ -506,14 +506,8 @@ mod engine_pass_tests {
         );
     }
 
-    /// A timed pass over a generated file, at two sizes.
-    ///
-    /// Not a benchmark — the machine this runs on is shared, so an absolute
-    /// number means nothing. What it pins is the **ratio**: doubling the file
-    /// must roughly double the time, because every rule here is linear in the
-    /// document. A quadratic rule (the classic being a per-candidate
-    /// `tree.root_view()`) shows up as a ratio near four, and the budget below
-    /// is loose enough that only an asymptotic regression can trip it.
+    // This is a finite-input cost budget, not proof of asymptotic complexity:
+    // quadratic work can grow fourfold and still fit the unchanged 6x bound.
     #[test]
     fn doubling_the_file_does_not_more_than_triple_the_cost() {
         fn elapsed_nanos(forms: usize) -> u128 {
@@ -530,6 +524,9 @@ mod engine_pass_tests {
             let index = build_head_index(catalog);
             let tree =
                 SyntaxTree::parse_with_dialect(&source, Dialect::Clojure).expect("parse generated");
+            #[cfg(any(target_os = "linux", target_os = "macos"))]
+            let started = thread_cpu_time();
+            #[cfg(not(any(target_os = "linux", target_os = "macos")))]
             let started = std::time::Instant::now();
             let outcome = collect_lint_pass(
                 catalog,
@@ -545,7 +542,13 @@ mod engine_pass_tests {
                 },
             )
             .expect("lint pass");
-            let total = started.elapsed().as_nanos().max(1);
+            #[cfg(any(target_os = "linux", target_os = "macos"))]
+            let elapsed = thread_cpu_time()
+                .checked_sub(started)
+                .expect("thread CPU clock is monotonic");
+            #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+            let elapsed = started.elapsed();
+            let total = elapsed.as_nanos().max(1);
             assert!(outcome.outcomes.is_empty(), "the generated file is clean");
             assert!(outcome.timings.is_some(), "measure: true records timings");
             total
@@ -553,13 +556,26 @@ mod engine_pass_tests {
 
         let small = elapsed_nanos(500);
         let large = elapsed_nanos(1000);
-        // 6x rather than 2x: this runs under a loaded shared sandbox alongside
-        // other test binaries, and the point is to catch T×T, which is 4x on a
-        // quiet machine and far more on a busy one.
         assert!(
             large < small.saturating_mul(6),
             "doubling the file cost {large}ns against {small}ns for half of it; \
-             a rule has gone superlinear"
+             the pass exceeded its 6x cost budget"
         );
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[allow(unsafe_code)]
+    fn thread_cpu_time() -> std::time::Duration {
+        let mut time = std::mem::MaybeUninit::<libc::timespec>::uninit();
+        // SAFETY: the live timespec is initialized on success and read only then.
+        let result =
+            unsafe { libc::clock_gettime(libc::CLOCK_THREAD_CPUTIME_ID, time.as_mut_ptr()) };
+        assert_eq!(result, 0, "clock_gettime(CLOCK_THREAD_CPUTIME_ID) failed");
+        // SAFETY: clock_gettime returned zero, so time is initialized.
+        let time = unsafe { time.assume_init() };
+        let seconds = u64::try_from(time.tv_sec).expect("CPU time seconds are nonnegative");
+        let nanos = u32::try_from(time.tv_nsec).expect("CPU time nanoseconds are nonnegative");
+        assert!(nanos < 1_000_000_000, "normalized timespec nanoseconds");
+        std::time::Duration::new(seconds, nanos)
     }
 }

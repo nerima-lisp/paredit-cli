@@ -354,6 +354,11 @@ pub fn top_level_in_package_chain(tree: &SyntaxTree) -> Vec<InPackageEntry> {
     top_level_in_package_chain_through(tree, tree.root_children().len().saturating_sub(1))
 }
 
+#[cfg(test)]
+thread_local! {
+    pub(crate) static CHAIN_ROOT_VISITS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
 /// [`top_level_in_package_chain`], stopping after the top-level form at
 /// `last_index`.
 ///
@@ -393,6 +398,8 @@ pub fn top_level_in_package_chain_through(
     let mut chain = Vec::new();
     let limit = last_index.min(tree.root_children().len().saturating_sub(1));
     for root_index in 0..tree.root_children().len().min(limit + 1) {
+        #[cfg(test)]
+        CHAIN_ROOT_VISITS.with(|visits| visits.set(visits.get() + 1));
         let form = Path::root_child(root_index);
         let Ok(selection) = tree.select_path(&form) else {
             continue;

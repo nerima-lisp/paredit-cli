@@ -162,10 +162,13 @@ three-byte pre-filter ahead of four `symbol_in` calls per node, is what brought
 it to 6.6×. `with-open-returns-lazy-seq` is the most expensive per invocation
 and the cheapest in practice: `with-open` occurred 162 times in 1690 real files.
 
-Doubling the file doubles the work — total ×1.85–2.48, per-invocation
-×0.80–1.24 across all five runs and every rule. Nothing here is superlinear,
-which is the property `doubling_the_file_does_not_more_than_triple_the_cost`
-guards in CI.
+The observed total cost ratios were ×1.85–2.48, with per-invocation ratios
+of ×0.80–1.24 across the five runs. These finite samples do not establish
+asymptotic complexity. The CI cost test retains a 6× budget when doubling
+from 500 to 1000 forms; despite its historical name, it is not a 3× gate
+and does not reject every quadratic implementation. On Linux and macOS it
+measures the calling thread's CPU time, excluding scheduler waits. Other
+platforms use elapsed time.
 
 ## Mutation testing
 

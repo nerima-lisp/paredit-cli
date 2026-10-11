@@ -810,6 +810,7 @@ mod measurement {
     struct Measured {
         subject: Duration,
         subject_invocations: u64,
+        root_visits: u64,
         control: Duration,
         control_invocations: u64,
         findings: usize,
@@ -821,6 +822,7 @@ mod measurement {
 
     fn measure_once_in_catalog(source: &str, entries: &'static [RuleEntry; 2]) -> Measured {
         CPU_TIMINGS.with(|timings| timings.set([(Duration::ZERO, 0); 2]));
+        crate::support::CHAIN_ROOT_VISITS.with(|visits| visits.set(0));
         let catalog = RuleCatalog::new(entries);
         let index = build_head_index(catalog);
         let tree = SyntaxTree::parse_with_dialect(source, Dialect::CommonLisp).expect("parse");
@@ -851,6 +853,7 @@ mod measurement {
         Measured {
             subject: cpu_timings[SUBJECT].0,
             subject_invocations: rows[SUBJECT].2,
+            root_visits: crate::support::CHAIN_ROOT_VISITS.with(Cell::get),
             control: cpu_timings[CONTROL_POSITION].0,
             control_invocations: rows[CONTROL_POSITION].2,
             findings: outcome.outcomes.len(),
@@ -991,8 +994,9 @@ mod measurement {
             "4x ratio: {ratio:.2} (control {control_ratio:.2}; \
              linear is ~4.0, quadratic is ~16.0)"
         );
-        // Both bounds have to hold. The quadratic negative control below must
-        // violate each independently; no cache or scheduling cause is assumed.
+        // Both CPU-time bounds still have to hold. The work-count control below
+        // separately proves quadratic sensitivity: CI CPU-time ratios varied
+        // despite the same quadratic scan count, so time alone cannot prove it.
         assert!(
             ratio < 9.0,
             "cost grew {ratio:.2}x when the file quadrupled ({small_us:.1}us -> {large_us:.1}us); \
@@ -1049,18 +1053,51 @@ mod measurement {
     }
 
     #[test]
-    fn the_chain_cost_gates_reject_quadratic_work() {
+    fn the_chain_scan_work_grows_linearly_with_the_file() {
+        let small = measure_once(&source_with(1024));
+        let large = measure_once(&source_with(4096));
+        for (measured, definitions) in [(&small, 1024_u64), (&large, 4096)] {
+            assert_eq!(measured.subject_invocations, 3);
+            assert_eq!(measured.control_invocations, definitions + 1);
+            assert_eq!(measured.findings, 1);
+            assert_eq!(measured.root_visits, definitions * 3 / 2 + 9);
+        }
+        let (ratio, control_ratio) = chain_work_growth(&small, &large);
+        assert!(ratio < 9.0, "chain work grew {ratio:.2}x");
+        assert!(
+            ratio < control_ratio * 2.2,
+            "chain work grew {ratio:.2}x, control {control_ratio:.2}x"
+        );
+    }
+
+    fn chain_work_growth(small: &Measured, large: &Measured) -> (f64, f64) {
+        assert!(small.root_visits > 0);
+        assert!(small.control_invocations > 0);
+        (
+            large.root_visits as f64 / small.root_visits as f64,
+            large.control_invocations as f64 / small.control_invocations as f64,
+        )
+    }
+
+    #[test]
+    fn the_chain_work_gates_reject_quadratic_work() {
         let small = measure_negative(&source_with(1024), &QUADRATIC_ENTRIES, 3, 1025, 1);
         let large = measure_negative(&source_with(4096), &QUADRATIC_ENTRIES, 3, 4097, 1);
+        for (measured, definitions) in [(&small, 1024_u64), (&large, 4096)] {
+            let roots = definitions + 5;
+            assert_eq!(measured.root_visits, 3 * roots * (roots + 1) / 2);
+        }
         let small_us = small.subject.as_secs_f64() * 1e6;
         let large_us = large.subject.as_secs_f64() * 1e6;
-        assert!(small_us >= 10.0, "the unchanged chain gate must be active");
-        let ratio = large_us / small_us;
-        let control_ratio = (large.control.as_secs_f64() * 1e6).max(f64::MIN_POSITIVE)
-            / (small.control.as_secs_f64() * 1e6).max(f64::MIN_POSITIVE);
+        assert!(
+            small_us >= 10.0,
+            "quadratic control must exceed the timing noise floor"
+        );
+        let (ratio, control_ratio) = chain_work_growth(&small, &large);
         println!(
-            "quadratic chain: {small_us:.2}us -> {large_us:.2}us; \
-             4x ratio {ratio:.2}, control {control_ratio:.2}"
+            "quadratic chain: {} -> {} root visits ({small_us:.2}us -> {large_us:.2}us); \
+             4x ratio {ratio:.2}, control {control_ratio:.2}",
+            small.root_visits, large.root_visits
         );
         assert!(
             ratio >= 9.0,
